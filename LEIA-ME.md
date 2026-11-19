@@ -44,6 +44,12 @@ e o admin) · fotos reprocessadas (remove dados de GPS/EXIF) · pastas internas 
 
 ---
 
+### Identidade visual (tema claro)
+Todo o visual fica em um único arquivo: `assets/css/app.css`. As cores estão no começo dele (bloco `:root`):
+`--bg` (fundo off-white), `--card` (cartões), `--ink` (preto da logo), `--mute` (texto de apoio) e as cores de
+status `--ok`, `--warn`, `--bad`. Para mudar o clima do app inteiro, troque esses valores. As logos têm
+versão escura (`logo-*.svg`, usadas hoje) e branca (`logo-*-branco.svg`, para fundos pretos).
+
 ## 2. Como o código está organizado (pronto para crescer)
 
 ```
@@ -193,7 +199,7 @@ Ideal: faça no celular e depois no computador.
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
 - [ ] O painel admin no celular abre o menu pelo botão ☰ (gaveta lateral).
-- [ ] A identidade segue a logo: fundo preto, texto branco, cortes diagonais. Cores só aparecem para status (verde/amarelo/vermelho).
+- [ ] Visual claro: fundo off-white, cartões brancos arredondados e **um bloco preto de destaque por tela** (na Início é o das sequências). Menu inferior em pílula preta. O corte diagonal da logo aparece no botão principal, no cantinho do bloco preto e nos dias da semana. Cores só aparecem para status (verde/amarelo/vermelho).
 - [ ] No Chrome do celular (HTTPS/localhost): menu ⋮ → **Adicionar à tela inicial** e abrir como app.
 - [ ] Desligar o Wi-Fi e abrir o app → aparece a tela "Sem conexão" (não quebra).
 

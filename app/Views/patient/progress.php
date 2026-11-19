@@ -70,7 +70,7 @@ $fmt = fn($v, $d = 1) => number_format((float) $v, $d, ',', '.');
 </section>
 
 <?php if ($rows): ?>
-<section class="section" style="padding-bottom:6px"><h2 class="section-title">Histórico</h2></section>
+<h2 class="section-title section-head">Histórico</h2>
 <div class="list">
     <?php foreach (array_reverse($rows) as $r): ?>
         <div class="li">

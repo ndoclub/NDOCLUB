@@ -43,7 +43,7 @@ $bio = trim((string) ($p['bio'] ?? ''));
     </form>
 <?php endif; ?>
 
-<section class="section" style="padding-bottom:6px"><h2 class="section-title"><?= $isMe ? 'Minhas publicações' : 'Publicações' ?></h2></section>
+<h2 class="section-title section-head"><?= $isMe ? 'Minhas publicações' : 'Publicações' ?></h2>
 <div class="list">
     <?php foreach ($posts as $post): ?>
         <a class="li" href="<?= e(url('/post/' . $post['id'])) ?>">

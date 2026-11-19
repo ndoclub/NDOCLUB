@@ -38,9 +38,7 @@
 <?php endif; ?>
 
 <?php if ($mine): ?>
-<section class="section" style="padding-bottom:6px">
-    <h2 class="section-title">Meus resgates</h2>
-</section>
+<h2 class="section-title section-head">Meus resgates</h2>
 <div class="list">
     <?php
     $labels = [

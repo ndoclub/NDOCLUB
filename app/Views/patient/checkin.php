@@ -2,7 +2,7 @@
     <section class="page">
         <p class="done-tag" style="display:flex"><?= icon('check', 22) ?> Check-in de hoje feito</p>
         <p class="title-xl mt"><?= (int) $streak ?> <?= $streak === 1 ? 'dia' : 'dias' ?> seguidos</p>
-        <div class="list mt-lg" style="border-top:1px solid var(--line)">
+        <div class="list mt-lg">
             <div class="li"><div class="li-main"><span class="li-sub">Sono</span><span class="li-title"><?= e($sleep[(int) $today['sleep_hours']] ?? '-') ?></span></div></div>
             <div class="li"><div class="li-main"><span class="li-sub">Água</span><span class="li-title"><?= e($water[(int) $today['water_ml']] ?? '-') ?></span></div></div>
             <div class="li"><div class="li-main"><span class="li-sub">Dieta</span><span class="li-title"><?= e($diet[(int) $today['diet_score']] ?? '-') ?></span></div></div>

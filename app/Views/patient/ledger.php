@@ -1,9 +1,9 @@
-<div class="strip" style="grid-template-columns:1fr 1fr;margin-top:0;border-top:0">
+<div class="strip" style="grid-template-columns:1fr 1fr">
     <div class="stat"><span class="big num"><?= pts($balance) ?></span><span class="lbl">saldo da loja</span></div>
     <div class="stat"><span class="big num"><?= pts($monthPts) ?></span><span class="lbl">ganhos no mês (ranking)</span></div>
 </div>
 
-<div class="list" style="border-top:0">
+<div class="list">
 <?php foreach ($rows as $r): ?>
     <div class="li">
         <div class="li-main">
