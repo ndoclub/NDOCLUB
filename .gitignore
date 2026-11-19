@@ -1,0 +1,12 @@
+# Segredos e dados locais: NUNCA enviar ao GitHub
+config/config.php
+.env
+storage/uploads/*
+storage/private/*
+storage/logs/*
+!storage/uploads/.gitkeep
+!storage/private/.gitkeep
+!storage/logs/.gitkeep
+*.sqlite
+.DS_Store
+Thumbs.db
