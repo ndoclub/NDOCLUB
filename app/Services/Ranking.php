@@ -34,7 +34,7 @@ final class Ranking
                FROM users u
                LEFT JOIN points_ledger l
                  ON l.user_id = u.id AND l.counts_ranking = 1 AND l.created_at >= ? AND l.created_at < ?
-              WHERE u.role = 'patient' AND u.status = 'active'
+              WHERE u.role = 'patient' AND u.status = 'active' AND u.app_access = 1
               GROUP BY u.id, u.name, u.avatar
               ORDER BY pts DESC, u.name ASC",
             [$start, $end]

@@ -4,7 +4,7 @@ $is = fn(string $prefix) => $path === $prefix || str_starts_with($path, $prefix 
 $finBadge = \App\Services\Payments::attentionStats()['count'];
 $nav = [
     ['/admin',            'Painel',        'grid',     $path === '/admin'],
-    ['/admin/pacientes',  'Pacientes',     'users',    $is('/admin/pacientes')],
+    ['/admin/pacientes',  'Pacientes',     'users',    $is('/admin/pacientes') || $is('/admin/importar')],
     ['/admin/planos',     'Planos',        'card',     $is('/admin/planos')],
     ['/admin/responsaveis','Responsáveis', 'users',    $is('/admin/responsaveis')],
     ['/admin/financeiro', 'Financeiro',    'cash',     $is('/admin/financeiro')],

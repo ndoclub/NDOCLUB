@@ -19,8 +19,9 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
             <div class="row wrap" style="gap:8px;margin-top:6px">
                 <span class="tag<?= $planStatus['tag'] ? ' ' . e($planStatus['tag']) : '' ?>"><?= e($planStatus['label']) ?></span>
                 <?php if ($p['status'] !== 'inactive') { partial('seal', ['renew' => $renew]); } ?>
-                <?php $awayNow = empty($p['last_seen_at']) || $p['last_seen_at'] < date('Y-m-d H:i:s', strtotime('-7 day')); ?>
-                <span class="tag<?= $awayNow ? ' warn' : '' ?>" title="Última vez que o paciente abriu o app"><?= !empty($p['last_seen_at']) ? 'Visto ' . e(time_ago($p['last_seen_at'])) : 'Nunca entrou no app' ?></span>
+                <?php $noApp = (int) ($p['app_access'] ?? 1) === 0; $awayNow = !$noApp && (empty($p['last_seen_at']) || $p['last_seen_at'] < date('Y-m-d H:i:s', strtotime('-7 day'))); ?>
+                <?php if ($noApp): ?><span class="tag" title="Veio de importação. Gere a senha provisória (mais abaixo) para liberar o acesso.">Sem acesso ao app</span>
+                <?php else: ?><span class="tag<?= $awayNow ? ' warn' : '' ?>" title="Última vez que o paciente abriu o app"><?= !empty($p['last_seen_at']) ? 'Visto ' . e(time_ago($p['last_seen_at'])) : 'Nunca entrou no app' ?></span><?php endif; ?>
                 <?php partial('level', ['level' => $level]); ?>
                 <?php foreach ($athleteNames as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?>
                 <?php if ($planRow): ?><span class="tag"><?= $consSummary['quota'] !== null ? (int) $consSummary['done'] . ' de ' . (int) $consSummary['quota'] . ' consultas' : (int) $consSummary['done'] . ' consultas' ?></span><?php endif; ?>
@@ -336,10 +337,15 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
 
     <div class="panel">
         <h3>Acesso e privacidade</h3>
-        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/senha')) ?>" data-confirm="Gerar uma nova senha provisória? A senha atual deixa de funcionar.">
+        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/senha')) ?>" data-confirm="<?= (int) ($p['app_access'] ?? 1) === 0 ? 'Liberar o acesso e gerar a senha provisória?' : 'Gerar uma nova senha provisória? A senha atual deixa de funcionar.' ?>">
             <?= csrf_field() ?>
-            <p class="muted small">Esqueceu a senha? Gere uma provisória; o paciente escolhe uma nova ao entrar.</p>
-            <button class="btn btn-ghost btn-sm" type="submit">Gerar nova senha provisória</button>
+            <?php if ((int) ($p['app_access'] ?? 1) === 0): ?>
+                <p class="muted small"><strong>Este paciente veio de importação e ainda não tem acesso ao app.</strong> Gere a senha provisória para liberar: ele escolhe a senha dele no primeiro acesso.</p>
+                <button class="btn btn-sm" type="submit">Liberar acesso e gerar senha provisória</button>
+            <?php else: ?>
+                <p class="muted small">Esqueceu a senha? Gere uma provisória; o paciente escolhe uma nova ao entrar.</p>
+                <button class="btn btn-ghost btn-sm" type="submit">Gerar nova senha provisória</button>
+            <?php endif; ?>
         </form>
         <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
         <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/excluir')) ?>" data-confirm="Excluir DEFINITIVAMENTE este paciente e todos os dados dele? Não dá para desfazer.">

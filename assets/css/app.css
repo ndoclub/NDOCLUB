@@ -517,3 +517,45 @@ details.pay-add > summary::-webkit-details-marker { display: none; }
   .search .filters-row select { flex: 1 1 100%; max-width: none; }
   .bulk select { flex: 1 1 100%; max-width: none; }
 }
+
+/* ---------- Importação de pacientes (admin) ---------- */
+.imp-steps { display: grid; gap: 14px; grid-template-columns: 1fr; margin-bottom: 4px; }
+@media (min-width: 900px) { .imp-steps { grid-template-columns: repeat(3, 1fr); } }
+.imp-steps .panel { margin-bottom: 14px; position: relative; padding-top: 22px; }
+.imp-steps .panel p { margin-bottom: 14px; }
+.imp-n { position: absolute; top: -12px; left: 16px; width: 28px; height: 28px; display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font-family: var(--display); font-size: 16px; border-radius: 8px; }
+.imp-rules { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 15px; }
+.imp-list { display: grid; gap: 2px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.imp-list:first-of-type { border-top: 0; }
+.imp-group { font-size: 14px; font-weight: 700; margin: 22px 0 8px; color: var(--mute); text-transform: uppercase; letter-spacing: .04em; }
+.imp-cols { min-width: 720px; }
+.imp-cols td { vertical-align: top; }
+.imp-cols td:first-child { white-space: nowrap; }
+.imp-cols .tag { margin-left: 6px; }
+.imp-pending { border-color: var(--ink); }
+.imp-safe { display: flex; flex-direction: column; gap: 2px; border-color: var(--ink); }
+.imp-note { padding: 12px 16px; }
+.imp-kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-bottom: 18px; }
+.imp-kpis .kpi.imp-ok .big { color: var(--ok); }
+.imp-kpis .kpi.imp-warn .big { color: var(--warn); }
+.imp-kpis .kpi.imp-err .big { color: var(--bad); }
+.imp-confirm form > p { margin-bottom: 12px; }
+.imp-tbl { min-width: 880px; }
+.imp-tbl td { vertical-align: top; }
+.imp-tbl .imp-err td:first-child, .imp-tbl .imp-dup td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
+.imp-tbl .imp-dup td:first-child { box-shadow: inset 3px 0 0 var(--line-strong); }
+.imp-tbl .imp-warn td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+.imp-msgs { margin: 0; padding-left: 16px; display: grid; gap: 4px; }
+.imp-msgs .m-err { color: var(--bad); }
+.imp-msgs .m-warn { color: var(--warn); }
+.imp-msgs .m-dup { color: var(--ink); font-weight: 700; }
+.imp-created { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 640px) { .imp-tbl { min-width: 760px; } }
+.imp-inline { display: none; }
+@media (max-width: 900px) {
+    .imp-tbl { min-width: 0; }
+    .imp-tbl .c-plan, .imp-tbl .c-pay, .imp-tbl .c-obs { display: none; }
+    .imp-inline { display: block; margin-top: 8px; }
+    .imp-inline .muted { display: none; }
+}
+.imp-sum { margin-bottom: 6px; }

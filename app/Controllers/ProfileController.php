@@ -28,7 +28,7 @@ final class ProfileController
         if ($id === (int) Auth::id()) {
             redirect(Auth::isAdmin() ? '/admin' : '/perfil');
         }
-        $u = DB::one("SELECT * FROM users WHERE id = ? AND status = 'active'", [$id]);
+        $u = DB::one("SELECT * FROM users WHERE id = ? AND status = 'active' AND app_access = 1", [$id]);
         if (!$u) {
             http_response_code(404);
             View::render('errors/404', ['title' => 'Perfil não encontrado'], Auth::isAdmin() ? 'admin' : 'app');

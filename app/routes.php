@@ -72,6 +72,17 @@ $router->post('/admin/pacientes/{id}/esporte', 'Admin\PatientController@sport', 
 $router->post('/admin/pacientes/{id}/pagamentos', 'Admin\PatientController@addPayment', $A);
 $router->post('/admin/pacientes/{id}/excluir', 'Admin\PatientController@delete', $A);
 $router->post('/admin/pacientes/responsavel', 'Admin\PatientController@assign', $A);
+
+// Importação de pacientes por planilha (modelo oficial NDO). Nada é salvo antes do "Confirmar".
+$router->get('/admin/importar', 'Admin\ImportController@index', $A);
+$router->get('/admin/importar/modelo', 'Admin\ImportController@template', $A);
+$router->post('/admin/importar/validar', 'Admin\ImportController@upload', $A);
+$router->get('/admin/importar/previa', 'Admin\ImportController@preview', $A);
+$router->get('/admin/importar/problemas.csv', 'Admin\ImportController@problems', $A);
+$router->post('/admin/importar/confirmar', 'Admin\ImportController@confirm', $A);
+$router->post('/admin/importar/descartar', 'Admin\ImportController@discard', $A);
+$router->get('/admin/importar/resultado', 'Admin\ImportController@result', $A);
+
 $router->post('/admin/pacientes/{id}/consultas', 'Admin\PatientController@addConsultation', $A);
 $router->post('/admin/consultas/{id}/apagar', 'Admin\PatientController@removeConsultation', $A);
 

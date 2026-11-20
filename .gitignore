@@ -10,3 +10,10 @@ storage/logs/*
 *.sqlite
 .DS_Store
 Thumbs.db
+
+# Planilhas podem ter dados de pacientes: nunca vão para o GitHub (só o modelo oficial vazio)
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+!app/Resources/modelo-importacao-pacientes.xlsx

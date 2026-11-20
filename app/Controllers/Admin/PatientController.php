@@ -96,7 +96,7 @@ final class PatientController
         $sortDir = $sortDir === 'desc' ? 'desc' : 'asc';
         $ord = $sortKey . '_' . $sortDir;
 
-        $sql = "SELECT u.id, u.name, u.email, u.phone, u.avatar, u.status, u.renewal_date, u.last_seen_at, u.responsible_id,
+        $sql = "SELECT u.id, u.name, u.email, u.phone, u.avatar, u.status, u.renewal_date, u.last_seen_at, u.responsible_id, u.app_access,
                        pl.name AS plan_name, COALESCE(bl.price, pl.price) AS plan_value,
                        CASE WHEN bl.price IS NOT NULL THEN bl.currency ELSE 'BRL' END AS plan_currency,
                        pl.consultations_included AS quota,
@@ -140,7 +140,8 @@ final class PatientController
         $list = [];
         foreach (DB::all($sql, $params) as $r) {
             $r['renew'] = Renewal::info($r['renewal_date']);
-            $r['away'] = empty($r['last_seen_at']) || $r['last_seen_at'] < $weekAgo;
+            $r['noapp'] = (int) $r['app_access'] === 0; // importado, acesso ainda não liberado
+            $r['away'] = !$r['noapp'] && (empty($r['last_seen_at']) || $r['last_seen_at'] < $weekAgo);
             $r['plan_status'] = Renewal::planStatus((string) $r['status'], $r['renewal_date']);
             $r['cons'] = Consultations::summary((int) $r['done_count'], $r['quota']);
             if ($filter === 'inactive' && $r['status'] !== 'inactive') {
@@ -150,6 +151,9 @@ final class PatientController
                 continue;
             }
             if ($filter === 'away' && ($r['status'] !== 'active' || !$r['away'])) {
+                continue;
+            }
+            if ($filter === 'noapp' && !$r['noapp']) {
                 continue;
             }
             $isAthlete = (int) ($r['is_athlete'] ?? 0) === 1;
@@ -692,11 +696,13 @@ final class PatientController
     {
         $p = $this->find($id);
         $pass = temp_password();
-        DB::run('UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?', [password_hash($pass, PASSWORD_DEFAULT), $id]);
+        $wasBlocked = (int) ($p['app_access'] ?? 1) === 0;
+        // Gerar a senha provisória também libera o acesso de quem veio de importação (app_access = 1)
+        DB::run('UPDATE users SET password_hash = ?, must_change_password = 1, app_access = 1 WHERE id = ?', [password_hash($pass, PASSWORD_DEFAULT), $id]);
         DB::run('DELETE FROM login_attempts WHERE email = ?', [$p['email']]);
-        Audit::log((int) Auth::id(), 'password_reset', 'user', $id, $p['name']);
+        Audit::log((int) Auth::id(), $wasBlocked ? 'access_release' : 'password_reset', 'user', $id, $p['name']);
         $_SESSION['_creds'] = ['name' => $p['name'], 'email' => $p['email'], 'password' => $pass];
-        flash('ok', 'Nova senha provisória gerada. Envie pelo WhatsApp (mensagem pronta abaixo).');
+        flash('ok', ($wasBlocked ? 'Acesso liberado! ' : '') . 'Senha provisória gerada. Envie pelo WhatsApp (mensagem pronta abaixo).');
         redirect('/admin/pacientes/' . $id);
     }
 

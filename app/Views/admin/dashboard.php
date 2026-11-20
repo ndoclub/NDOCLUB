@@ -40,7 +40,7 @@
                 <td><?php if ($r['plan_name']): ?><?= e($r['plan_name']) ?><br><span class="small muted"><?= $r['plan_value'] !== null ? e(money((float) $r['plan_value'], floor((float) $r['plan_value']) == (float) $r['plan_value'] ? 0 : 2, (string) $r['plan_currency'])) : 'sem valor' ?></span><?php else: ?><span class="muted">-</span><?php endif; ?></td>
                 <td><?php partial('seal', ['renew' => $r['renew']]); ?></td>
                 <td>
-                    <?= $r['last_seen_at'] ? e(time_ago($r['last_seen_at'])) : 'Nunca entrou' ?>
+                    <?= $r['noapp'] ? 'Sem acesso ao app' : ($r['last_seen_at'] ? e(time_ago($r['last_seen_at'])) : 'Nunca entrou') ?>
                     <?php if ($r['away']): ?> <span class="tag warn">sumido</span><?php endif; ?>
                 </td>
                 <td><?= $r['last_checkin'] ? e(fmt_date($r['last_checkin'])) : '-' ?></td>

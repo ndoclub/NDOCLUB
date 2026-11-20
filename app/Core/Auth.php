@@ -20,7 +20,8 @@ final class Auth
             return null;
         }
         $u = DB::one('SELECT * FROM users WHERE id = ?', [(int) $id]);
-        if (!$u || $u['status'] !== 'active') {
+        // Paciente importado por planilha ainda sem acesso liberado (app_access = 0) não entra
+        if (!$u || $u['status'] !== 'active' || (int) ($u['app_access'] ?? 1) === 0) {
             unset($_SESSION['uid']);
             return null;
         }
@@ -102,6 +103,10 @@ final class Auth
         }
         if ($user['status'] !== 'active') {
             $error = 'Seu acesso está desativado. Fale com o Gabriel.';
+            return null;
+        }
+        if ((int) ($user['app_access'] ?? 1) === 0) {
+            $error = 'Seu acesso ao app ainda não foi liberado. Fale com o Gabriel.';
             return null;
         }
 

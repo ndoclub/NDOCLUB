@@ -26,6 +26,7 @@ CREATE TABLE users (
   plan_id INT UNSIGNED NULL,
   responsible_id INT UNSIGNED NULL,
   must_change_password TINYINT(1) NOT NULL DEFAULT 1,
+  app_access TINYINT(1) NOT NULL DEFAULT 1,
   consent_at DATETIME NULL,
   consent_version VARCHAR(12) NULL,
   last_seen_at DATETIME NULL,

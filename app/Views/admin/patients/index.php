@@ -1,5 +1,5 @@
 <?php
-$filters = ['all' => 'Todos', 'green' => 'Em dia', 'yellow' => 'Vencem logo', 'red' => 'Críticos', 'away' => 'Sumidos', 'inactive' => 'Desativados', 'athletes' => 'Atletas', 'compete' => 'Competem', 'nocoach' => 'Sem assessoria'];
+$filters = ['all' => 'Todos', 'green' => 'Em dia', 'yellow' => 'Vencem logo', 'red' => 'Críticos', 'away' => 'Sumidos', 'noapp' => 'Sem acesso ao app', 'inactive' => 'Desativados', 'athletes' => 'Atletas', 'compete' => 'Competem', 'nocoach' => 'Sem assessoria'];
 // Nos filtros de atletas (ou ao escolher uma modalidade) a lista ganha as colunas Prova e Assessoria
 $athleteCols = in_array($filter, ['athletes', 'compete', 'nocoach'], true) || $sportId > 0;
 
@@ -22,7 +22,10 @@ $th = function (string $key, string $label, string $class = '') use ($sorts, $so
 ?>
 <div class="page-head">
     <h2>Pacientes</h2>
-    <a class="btn btn-sm" href="<?= e(url('/admin/pacientes/novo')) ?>"><?= icon('plus', 18) ?> Novo paciente</a>
+    <div class="row wrap" style="gap:8px">
+        <a class="btn btn-ghost btn-sm" href="<?= e(url('/admin/importar')) ?>">Importar planilha</a>
+        <a class="btn btn-sm" href="<?= e(url('/admin/pacientes/novo')) ?>"><?= icon('plus', 18) ?> Novo paciente</a>
+    </div>
 </div>
 
 <form class="search" method="get" action="<?= e(url('/admin/pacientes')) ?>">
@@ -143,7 +146,7 @@ $th = function (string $key, string $label, string $class = '') use ($sorts, $so
                 </td>
                 <td><?php if (!$isAth): ?><span class="muted">-</span><?php elseif ($r['has_coach']): ?><?= e($r['coach_name'] ?: 'Sim') ?><?php else: ?><span class="muted">Sem assessoria</span><?php endif; ?></td>
                 <?php endif; ?>
-                <td><span class="tag<?= $r['plan_status']['tag'] ? ' ' . e($r['plan_status']['tag']) : '' ?>"><?= e($r['plan_status']['label']) ?></span><?= $r['away'] && $r['status'] === 'active' ? '<br><span class="tag warn" title="Não abre o app há 7 dias ou mais">sumido</span>' : '' ?></td>
+                <td><span class="tag<?= $r['plan_status']['tag'] ? ' ' . e($r['plan_status']['tag']) : '' ?>"><?= e($r['plan_status']['label']) ?></span><?= $r['away'] && $r['status'] === 'active' ? '<br><span class="tag warn" title="Não abre o app há 7 dias ou mais">sumido</span>' : '' ?><?= $r['noapp'] ? '<br><span class="tag" title="Veio de importação. Gere a senha provisória na ficha para liberar o acesso.">sem acesso ao app</span>' : '' ?></td>
                 <td><?php if ($r['plan_name']): ?><?= e($r['plan_name']) ?><br><span class="small muted"><?= $r['plan_value'] !== null ? e(money((float) $r['plan_value'], floor((float) $r['plan_value']) == (float) $r['plan_value'] ? 0 : 2, (string) $r['plan_currency'])) : 'sem valor' ?></span><?php else: ?><span class="muted">-</span><?php endif; ?></td>
                 <td class="num">
                     <?php if ($r['renewal_date']): ?><strong><?= e(fmt_date($r['renewal_date'])) ?></strong><br><?php endif; ?>

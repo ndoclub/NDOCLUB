@@ -30,7 +30,7 @@ final class DashboardController
 
         // Painel de risco: quem vence logo (ou já venceu) e quanto tempo está sem abrir o app
         $rows = DB::all(
-            "SELECT u.id, u.name, u.avatar, u.phone, u.renewal_date, u.last_seen_at,
+            "SELECT u.id, u.name, u.avatar, u.phone, u.renewal_date, u.last_seen_at, u.app_access,
                     pl.name AS plan_name,
                     CASE WHEN bl.price IS NOT NULL AND bl.source <> 'reajuste' THEN bl.price ELSE pl.price END AS plan_value,
                     CASE WHEN bl.price IS NOT NULL AND bl.source <> 'reajuste' THEN bl.currency ELSE 'BRL' END AS plan_currency,
@@ -45,7 +45,8 @@ final class DashboardController
         $risk = [];
         foreach ($rows as $r) {
             $r['renew'] = Renewal::info($r['renewal_date']);
-            $r['away'] = empty($r['last_seen_at']) || $r['last_seen_at'] < $weekAgo;
+            $r['noapp'] = (int) $r['app_access'] === 0;
+            $r['away'] = !$r['noapp'] && (empty($r['last_seen_at']) || $r['last_seen_at'] < $weekAgo);
             $r['wa'] = wa_phone_url($r['phone'], 'Oi, ' . first_name($r['name']) . '! Aqui é do No Days Off Club. Vamos conversar sobre a renovação do seu plano' . ($r['plan_name'] ? ' ' . $r['plan_name'] : '') . '?');
             $risk[] = $r;
         }
