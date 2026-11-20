@@ -281,6 +281,7 @@ final class PatientController
         $phone = input('phone');
         $goal = input('goal');
         $renewal = input('renewal_date');
+        $joined = input('joined_on') ?: today();
         $password = input('password');
         $planId = (int) ($_POST['plan_id'] ?? 0);
         $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
@@ -312,6 +313,9 @@ final class PatientController
         }
         if ($renewal !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $renewal)) {
             $errors[] = 'Data de renovação inválida.';
+        }
+        if (!Payments::validDate($joined) || $joined > today()) {
+            $errors[] = '"Paciente desde" inválido (use uma data de hoje ou do passado).';
         }
         if (mb_strlen($password) < 8) {
             $errors[] = 'A senha provisória precisa ter pelo menos 8 caracteres.';
@@ -357,11 +361,11 @@ final class PatientController
         if ($storeCustom && $plan && $plan['price'] !== null && $customCur === 'BRL' && abs($custom - (float) $plan['price']) < 0.005) {
             $storeCustom = false;
         }
-        $id = DB::tx(function () use ($name, $email, $password, $phone, $goal, $renewal, $plan, $custom, $customCur, $storeCustom, $pay, $amount, $payCur, $respId) {
+        $id = DB::tx(function () use ($name, $email, $password, $phone, $goal, $renewal, $joined, $plan, $custom, $customCur, $storeCustom, $pay, $amount, $payCur, $respId) {
             $id = DB::insert(
-                "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, plan_id, responsible_id, must_change_password, created_at)
-                 VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, ?, 1, ?)",
-                [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, $plan ? (int) $plan['id'] : null, $respId > 0 ? $respId : null, now()]
+                "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, joined_on, plan_id, responsible_id, must_change_password, created_at)
+                 VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, 1, ?)",
+                [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, $joined, $plan ? (int) $plan['id'] : null, $respId > 0 ? $respId : null, now()]
             );
             if ($storeCustom) {
                 Plans::setCustomPrice($id, $custom, $customCur, 'manual');
@@ -479,6 +483,7 @@ final class PatientController
         $goal = input('goal');
         $status = input('status') === 'inactive' ? 'inactive' : 'active';
         $renewal = input('renewal_date');
+        $joined = input('joined_on');
         $planId = (int) ($_POST['plan_id'] ?? 0);
         $respId = (int) ($_POST['responsible_id'] ?? 0);
         $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
@@ -505,6 +510,9 @@ final class PatientController
         if ($renewal !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $renewal)) {
             $errors[] = 'Data de renovação inválida.';
         }
+        if ($joined !== '' && (!Payments::validDate($joined) || $joined > today())) {
+            $errors[] = '"Paciente desde" inválido (use uma data de hoje ou do passado).';
+        }
         if ($errors) {
             foreach ($errors as $e) {
                 flash('err', $e);
@@ -519,8 +527,8 @@ final class PatientController
             }
         }
         DB::run(
-            'UPDATE users SET name = ?, email = ?, phone = ?, goal = ?, status = ?, renewal_date = ?, plan_id = ?, responsible_id = ? WHERE id = ?',
-            [$name, $email, $phone ?: null, $goal ?: null, $status, $renewal ?: null, $planId ?: null, $respId > 0 ? $respId : null, $id]
+            'UPDATE users SET name = ?, email = ?, phone = ?, goal = ?, status = ?, renewal_date = ?, joined_on = ?, plan_id = ?, responsible_id = ? WHERE id = ?',
+            [$name, $email, $phone ?: null, $goal ?: null, $status, $renewal ?: null, $joined !== '' ? $joined : null, $planId ?: null, $respId > 0 ? $respId : null, $id]
         );
         Plans::setCustomPrice($id, $custom, $customCur);
         Audit::log((int) Auth::id(), 'patient_update', 'user', $id, $p['name']);

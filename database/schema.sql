@@ -23,6 +23,7 @@ CREATE TABLE users (
   goal VARCHAR(120) NULL,
   status ENUM('active','inactive') NOT NULL DEFAULT 'active',
   renewal_date DATE NULL,
+  joined_on DATE NULL,
   plan_id INT UNSIGNED NULL,
   responsible_id INT UNSIGNED NULL,
   must_change_password TINYINT(1) NOT NULL DEFAULT 1,

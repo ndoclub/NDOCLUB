@@ -15,6 +15,8 @@
             </select>
             <p class="hint">Ao escolher, a data de vencimento é preenchida sozinha (você pode mudar).</p></div>
         <div class="field"><label for="renewal_date">Vence em</label><input class="input" type="date" id="renewal_date" name="renewal_date" value="<?= e(old('renewal_date', $defaultRenewal)) ?>"></div>
+        <div class="field"><label for="joined_on">Paciente desde</label><input class="input" type="date" id="joined_on" name="joined_on" max="<?= e(today()) ?>" value="<?= e(old('joined_on', today())) ?>">
+            <p class="hint">Dia em que começou o acompanhamento. O painel usa para contar novos pacientes. Se ele já é antigo, coloque a data real.</p></div>
         <div class="field"><label for="responsible_id">Responsável</label>
             <select id="responsible_id" name="responsible_id">
                 <option value="">Sem responsável</option>

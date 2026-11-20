@@ -80,6 +80,8 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
                     : 'Em branco = valor do plano' . ($planRow && $planRow['price'] !== null ? ' (' . money((float) $planRow['price']) . ')' : '') . '. Só se for diferente (ou em dólar/euro). Só o admin vê.',
             ]); ?>
             <div class="field"><label for="renewal_date">Vence em</label><input class="input" type="date" id="renewal_date" name="renewal_date" value="<?= e(substr((string) $p['renewal_date'], 0, 10)) ?>"></div>
+            <div class="field"><label for="joined_on">Paciente desde</label><input class="input" type="date" id="joined_on" name="joined_on" max="<?= e(today()) ?>" value="<?= e(substr((string) ($p['joined_on'] ?? ''), 0, 10)) ?>">
+                <p class="hint">Dia em que começou o acompanhamento (o painel conta novos pacientes por esta data). Vazio = data do cadastro.</p></div>
             <div class="field"><label for="responsible_id">Responsável</label>
                 <select id="responsible_id" name="responsible_id">
                     <option value="">Sem responsável</option>

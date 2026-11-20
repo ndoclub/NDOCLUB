@@ -31,7 +31,7 @@ Gabriel. A ideia central é um ciclo simples:
 | **Perfil esportivo** | Para quem treina: modalidades (Corrida, Musculação, Hyrox, Natação...), se tem assessoria, se compete e a próxima prova. O paciente edita o dele e escolhe se mostra as **modalidades** no perfil da comunidade (assessoria e provas nunca aparecem para outros). |
 
 ### Para o Gabriel (painel `/admin`, funciona no celular e no computador)
-Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)** · **risco de renovação** (quem vence logo e quem sumiu há 7+ dias, com botão de
+**Painel gerencial** (tela inicial, aba **Visão executiva**: pacientes ativos, vendido, recebido, a receber, novos e taxa de renovação, evolução financeira, carteira por plano/modalidade, crescimento, equipe e alertas; a aba **Operação** mantém o painel do dia a dia) · Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)** · **risco de renovação** (quem vence logo e quem sumiu há 7+ dias, com botão de
 WhatsApp) · **planos e valores** (só o admin vê R$) · pacientes (cadastro com plano e "valor combinado",
 renovar com a duração do plano e bônus, pontos manuais, dieta, senha provisória, exclusão LGPD) · **lista de pacientes completa** (status Ativo/Inativo, vencimento, consultas "x de y" por plano, responsável da equipe, ordenar clicando na coluna, filtros por vencimento 15/30 dias, status, responsável e consultas, atribuição em lote) · **responsáveis** ("modo babá": quem cuida de quais pacientes) · **importação de pacientes por planilha** (modelo oficial em Excel, prévia antes de salvar, duplicados e erros) ·
 **atletas** (etiquetas de modalidade nos pacientes, filtros Atletas / Competem / Sem assessoria / por modalidade,
@@ -66,8 +66,8 @@ nodaysoffclub/
 │   └─ demo_data.sql       ← pacientes FICTÍCIOS para testar
 ├─ app/
 │   ├─ routes.php          ← mapa de URLs (uma linha por página)
-│   ├─ Core/               ← motor: DB, Router, Auth, View, Upload, Middleware, Xlsx (leitor de planilha)
-│   ├─ Services/           ← regras de negócio: Points, Ranking, Levels, Streak, Renewal, Settings, Audit, PatientImport (importação), ImportTemplate
+│   ├─ Core/               ← motor: DB, Router, Auth, View, Upload, Middleware, Xlsx (leitor de planilha), Charts (gráficos SVG do painel)
+│   ├─ Services/           ← regras de negócio: Points, Ranking, Levels, Streak, Renewal, Settings, Audit, PatientImport (importação), ImportTemplate, Insights (números do painel gerencial)
 │   ├─ Resources/          ← modelo-importacao-pacientes.xlsx (modelo oficial; só baixa pelo painel admin)
 │   ├─ Controllers/        ← uma classe por módulo (+ Admin/)
 │   └─ Views/              ← telas (HTML + PHP)
@@ -215,6 +215,26 @@ Mesmo processo, **depois** das atualizações 01 a 05:
 
 **Privacidade (LGPD):** a planilha tem dados pessoais. Não envie por WhatsApp ou e-mail e apague o arquivo do computador depois de importar (o sistema não guarda o arquivo, só o resultado). Valores (plano, combinado, pagamentos) continuam **só do admin**. Antes de usar com pacientes **reais**, faça um teste com 2 ou 3 pacientes fictícios.
 
+### Atualização 07 (Painel gerencial)
+Mesmo processo, **depois** das atualizações 01 a 06 (se ainda não aplicou a 05 e a 06, aplique-as **nesta ordem**: 05 → 06 → 07):
+1. Atualize os arquivos do projeto (`git pull`, ou copie a pasta nova por cima).
+2. phpMyAdmin → clique no banco **nodaysoffclub** (menu da esquerda) → aba **Importar** → `database/atualizacao_07_painel.sql` → **Executar**.
+   Acrescenta um único campo (`joined_on`, "Paciente desde") e preenche com a data de cadastro dos pacientes que já existem. Não apaga nada. **Importe antes de abrir o sistema.**
+3. **Ctrl + F5** e abra **Admin** (a tela inicial agora é a **Visão executiva**).
+
+**O que o painel mostra** (tudo calculado a partir do que já existe no sistema; nada inventado)
+- **Período:** Últimos 30 dias (padrão), Este mês, Mês passado, Este ano. Cada indicador compara com o período anterior (↑ ↓).
+- **Pacientes ativos:** status Ativo **e** plano não vencido (igual ao filtro "Ativo" da lista).
+- **Vendido:** soma das vendas pela **data da venda**. **Recebido:** o que realmente caiu, pela data em que caiu. **A receber:** parcelas pendentes que ainda não venceram (cartão já líquido da taxa). **Inadimplência:** parcelas pendentes **vencidas, a partir de 1 dia de atraso**.
+- **Novos pacientes:** pela data **"Paciente desde"** (campo novo no cadastro e na ficha; se ficar em branco, vale a data do cadastro). Serve para a carga dos pacientes antigos não aparecer como "170 novos de uma vez".
+- **Taxa de renovação:** dos planos que **venceram no período**, quantos **renovaram**. Sem plano vencido no período, aparece "—" (e não 0%).
+- **Carteira:** distribuição por plano (rosca) e por modalidade (barras). **Crescimento:** pacientes ativos e novos mês a mês.
+- **Desempenho dos responsáveis:** por responsável, pacientes ativos, consultas feitas ÷ cota (%) e taxa de renovação. A linha **"Sem responsável (sem acompanhamento)"** mostra pacientes ativos que ninguém está cuidando. Para o **Gabriel** aparecer na tabela, cadastre-o em **Admin → Responsáveis**.
+- **Alertas e acompanhamento:** renovações em 7 dias, planos vencidos, sumidos 7+ dias, em risco, inadimplentes, sem responsável, próxima prova, moderação e resgates. Cada alerta leva para a lista já filtrada.
+- **Comercial · Leads:** aparece como **"Em breve"**, sem números. A aba de Leads (Instagram, WhatsApp, indicação) é a próxima atualização.
+- **Privacidade:** os valores (R$) e a equipe ficam **só no painel do admin**; nenhuma tela do paciente mostra ou acessa isso.
+- Na **importação por planilha** há a coluna nova **Paciente desde** (opcional; vazia = data de hoje). Se você baixou o modelo antes, baixe de novo.
+
 ### Acessos para teste
 | Perfil | E-mail | Senha |
 |---|---|---|
@@ -358,6 +378,17 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Privacidade (importante):** entrar como paciente → importados sem acesso não aparecem no ranking nem em `/u/número`; nenhuma tela mostra valores. Como paciente, abrir `/admin/importar` → bloqueado.
 - [ ] **Excluir paciente importado de teste** (LGPD): consultas, pagamentos e perfil esportivo dele somem junto.
 
+### E7. Painel gerencial
+- [ ] **Abrir Admin:** a tela inicial mostra **Visão executiva** (6 cartões, evolução financeira, carteira, crescimento, responsáveis, alertas). A aba **Operação** mostra o painel antigo.
+- [ ] **Períodos:** troque entre Últimos 30 dias, Este mês, Mês passado e Este ano: os números mudam e as setas comparam com o período anterior. Gráfico: 6 meses, 12 meses ou ano.
+- [ ] **Conferir um número:** o **Vendido** do mês bate com **Financeiro** (vendido do mês). O **A receber** bate com a agenda de recebíveis.
+- [ ] **Paciente desde:** cadastre um paciente novo (vem preenchido com hoje) → **Novos pacientes** sobe 1. Edite na ficha para uma data antiga → ele sai de "Novos".
+- [ ] **Equipe:** cadastre o Gabriel em **Responsáveis**, atribua alguns pacientes → aparece na tabela com % de consultas e renovação. Pacientes sem responsável aparecem na linha de alerta.
+- [ ] **Alertas:** clique num alerta → abre a lista de pacientes já filtrada.
+- [ ] **Leads:** mostra "Em breve" (sem números inventados).
+- [ ] **Celular:** nada corta nem rola para o lado; gráficos legíveis; "Ver em tabela" abre os números.
+- [ ] **Privacidade (importante):** entrar como paciente → nenhuma tela mostra valores, responsável ou desempenho da equipe. Abrir `/admin` como paciente → bloqueado.
+
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
 - [ ] O painel admin no celular abre o menu pelo botão ☰ (gaveta lateral).
@@ -370,12 +401,12 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **741 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **847 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
-> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, arquivos quebrados, acesso dos importados, lote de 500), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
+> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
 > ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, os
-> arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql`, `atualizacao_04_financeiro_v2.sql`, `atualizacao_05_pacientes.sql` e `atualizacao_06_importacao.sql`) é o primeiro teste a fazer.
+> arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql`, `atualizacao_04_financeiro_v2.sql`, `atualizacao_05_pacientes.sql`, `atualizacao_06_importacao.sql` e `atualizacao_07_painel.sql`) é o primeiro teste a fazer.
 > Se o phpMyAdmin acusar algum erro, copie a mensagem e me envie que eu corrijo.
 
 ---
@@ -412,6 +443,8 @@ Ideal: faça no celular e depois no computador.
 | Financeiro v2: pagamento no cadastro do paciente, vendido × já caiu × falta cair, cartão automático em dia útil, taxa por bandeira com valor líquido, Pix para cobrar (WhatsApp + comprovante), cancelar parcela | ✅ **Neste MVP** (atualização 04) |
 | Pacientes v2: status Ativo/Inativo, vencimento, consultas presenciais com cota por plano, responsável (modo babá), ordenação por coluna, filtros e atribuição em lote | ✅ **Neste MVP** (atualização 05) |
 | Importação de pacientes por planilha: modelo oficial em Excel, prévia antes de salvar, duplicados, erros, paciente importado sem acesso até liberar | ✅ **Neste MVP** (atualização 06) |
+| **Painel gerencial**: visão executiva (financeiro, carteira, crescimento, equipe, alertas), períodos com comparação, "Paciente desde" | ✅ **Neste MVP** (atualização 07) |
+| **Leads** (Instagram, WhatsApp, indicação) com funil de conversão no painel gerencial; entrada manual primeiro | ⏭️ Próxima rodada (atualização 08) |
 | Estagiárias com **login próprio** (cada uma vê só os pacientes dela, sem valores), mensagem de ação por faixa de vencimento (15/30 dias), acompanhamento da renovação | ⏭️ Próxima rodada (pede revisão de segurança) |
 | Financeiro, próximos passos: **notificação push** da cobrança do dia, taxa de renovação, previsão por mês, acompanhamento da renovação (conversei / vai renovar / não vai), marcador "cobrado em", mensagem de cobrança editável, importação de **renovações/histórico** por planilha | ⏭️ Próxima rodada |
 | Contagem regressiva da prova no Início do paciente, temas do dia por modalidade, ranking por modalidade | ⏭️ Próxima rodada (dados já estão no banco) |

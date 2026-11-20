@@ -26,7 +26,7 @@ final class PatientImport
     public const MAX_ROWS = 500;           // pacientes por arquivo
     public const MAX_BYTES = 2097152;      // 2 MB
     public const SHEET = 'Pacientes';      // nome da aba que o modelo usa
-    public const TEMPLATE_VERSION = '1';
+    public const TEMPLATE_VERSION = '2';
 
     // ---------------------------------------------------------------
     // Colunas do modelo (a fonte única: o modelo .xlsx, a tela de instruções e o leitor usam esta lista)
@@ -69,6 +69,11 @@ final class PatientImport
                 'Dia em que o plano termina (próxima renovação).',
                 'Data no formato dd/mm/aaaa. Se tiver plano e esta coluna ficar vazia, o paciente fica "sem data" (aviso). Plano já vencido também gera aviso.',
                 '20/02/2027'],
+            'joined' => ['Paciente desde', 'Plano e acompanhamento', false,
+                ['paciente desde', 'data de entrada', 'entrada', 'inicio do acompanhamento', 'data de inicio', 'inicio', 'cliente desde'],
+                'Dia em que o paciente começou o acompanhamento. O painel usa esta data para contar novos pacientes e o crescimento da carteira.',
+                'Data no formato dd/mm/aaaa, de hoje ou do passado. Vazio = data da importação (então ele conta como paciente novo hoje: preencha nos antigos).',
+                '20/11/2026'],
             'responsible' => ['Responsável', 'Plano e acompanhamento', false,
                 ['responsavel', 'estagiaria', 'estagiario', 'responsavel pelo paciente'],
                 'Estagiária responsável pelo paciente (veja a aba Listas).',
@@ -688,6 +693,16 @@ final class PatientImport
             $warns[] = 'Plano já vencido em ' . fmt_date($renewal) . ': o paciente entra como Inativo (plano vencido).';
         }
 
+        // ---- Paciente desde (início do acompanhamento; usado pelo painel gerencial)
+        $joined = self::parseDate($g('joined'));
+        if ($joined === false) {
+            $errors[] = 'Paciente desde: "' . $g('joined') . '" não é uma data válida. Use dd/mm/aaaa (ex.: 15/08/2026).';
+            $joined = null;
+        } elseif ($joined !== null && $joined > $today) {
+            $errors[] = 'Paciente desde: ' . fmt_date($joined) . ' é uma data futura. Use o dia em que o paciente começou (hoje ou antes).';
+            $joined = null;
+        }
+
         // ---- Responsável
         $respId = null;
         $respName = '';
@@ -971,13 +986,13 @@ final class PatientImport
             'dups' => $dups,
             'view' => [
                 'name' => $name, 'email' => $g('email'), 'phone' => $phone,
-                'plan' => $plan ? (string) $plan['name'] : $planTxt, 'renewal' => $renewal, 'responsible' => $respName !== '' ? $respName : $respTxt,
+                'plan' => $plan ? (string) $plan['name'] : $planTxt, 'renewal' => $renewal, 'joined' => $joined, 'responsible' => $respName !== '' ? $respName : $respTxt,
                 'sports' => implode(', ', $sportNames), 'pay' => $payText,
                 'price' => $custom !== null ? money($custom, 2, $cur) : '', 'consultations' => $consults,
             ],
             'data' => $status === 'ok' || $status === 'warn' ? [
                 'name' => $name, 'email' => $email, 'phone' => $phone !== '' ? $phone : null, 'goal' => $goal !== '' ? $goal : null,
-                'plan_id' => $plan ? (int) $plan['id'] : null, 'renewal' => $renewal, 'responsible_id' => $respId,
+                'plan_id' => $plan ? (int) $plan['id'] : null, 'renewal' => $renewal, 'joined' => $joined, 'responsible_id' => $respId,
                 'sport_ids' => array_values($sportIds), 'has_coach' => $hasCoach, 'coach_name' => $coachName,
                 'competes' => $competes, 'event_name' => $eventName !== '' ? $eventName : null, 'event_date' => $eventDate,
                 'custom' => $custom, 'custom_cur' => $cur, 'store_custom' => $storeCustom,
@@ -1015,10 +1030,10 @@ final class PatientImport
                 $id = DB::tx(function () use ($d, $adminId) {
                     // Sem senha e sem acesso: a senha aqui é aleatória e ninguém conhece. O acesso é liberado depois, na ficha.
                     $id = DB::insert(
-                        "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, plan_id, responsible_id, must_change_password, app_access, created_at)
-                         VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, ?, 1, 0, ?)",
+                        "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, joined_on, plan_id, responsible_id, must_change_password, app_access, created_at)
+                         VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, 1, 0, ?)",
                         [$d['name'], $d['email'], password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), $d['phone'], $d['goal'],
-                            $d['renewal'], $d['plan_id'], $d['responsible_id'], now()]
+                            $d['renewal'], $d['joined'] ?? today(), $d['plan_id'], $d['responsible_id'], now()]
                     );
                     if ($d['store_custom'] && $d['custom'] !== null) {
                         Plans::setCustomPrice($id, $d['custom'], $d['custom_cur'], 'manual');

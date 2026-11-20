@@ -4,6 +4,7 @@ namespace App\Controllers\Admin;
 use App\Core\DB;
 use App\Core\View;
 use App\Services\Athletes;
+use App\Services\Insights;
 use App\Services\Payments;
 use App\Services\Plans;
 use App\Services\Renewal;
@@ -14,12 +15,24 @@ final class DashboardController
     public function index(): void
     {
         Payments::syncCards(); // cartão em R$ que já venceu cai sozinho
+
+        // Duas abas: "Visão executiva" (indicadores do negócio, padrão) e "Operação" (o dia a dia: risco, provas)
+        if (($_GET['aba'] ?? '') !== 'operacao') {
+            $period = Insights::periodKey($_GET['p'] ?? null);
+            $graph = Insights::graphKey($_GET['g'] ?? null);
+            View::render('admin/dashboard', [
+                'title' => 'Painel', 'aba' => 'executiva', 'period' => $period, 'graph' => $graph,
+                'x' => Insights::build($period, $graph),
+            ], 'admin');
+            return;
+        }
+
         $yellow = (int) Settings::get('warn_yellow_days', 15);
         $limitDate = date('Y-m-d', strtotime('+' . $yellow . ' day'));
         $weekAgo = date('Y-m-d H:i:s', strtotime('-7 day'));
 
         $stats = [
-            'patients' => (int) DB::val("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active'"),
+            'patients' => (int) DB::val("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND renewal_date >= ?", [today()]),
             'expiring' => (int) DB::val("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND renewal_date IS NOT NULL AND renewal_date >= ? AND renewal_date <= ?", [today(), $limitDate]),
             'expired' => (int) DB::val("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND renewal_date IS NOT NULL AND renewal_date < ?", [today()]),
             'checkins' => (int) DB::val('SELECT COUNT(*) FROM checkins WHERE checkin_date = ?', [today()]),
@@ -56,7 +69,7 @@ final class DashboardController
         $events = Athletes::upcoming(8);
         $stats['athletes'] = Athletes::countAthletes();
 
-        View::render('admin/dashboard', ['title' => 'Painel', 'stats' => $stats, 'risk' => $risk, 'yellow' => $yellow, 'due30' => Plans::dueWithin(30), 'pix' => Payments::attentionStats(),
+        View::render('admin/dashboard', ['title' => 'Painel', 'aba' => 'operacao', 'stats' => $stats, 'risk' => $risk, 'yellow' => $yellow, 'due30' => Plans::dueWithin(30), 'pix' => Payments::attentionStats(),
             'events' => $events, 'eventSports' => Athletes::namesFor(array_column($events, 'id')),
         ], 'admin');
     }
