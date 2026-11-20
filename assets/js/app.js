@@ -90,6 +90,14 @@
                 input.value = d.getFullYear() + '-' + mm + '-' + dd;
             }
         }
+        var fillSel = sel.getAttribute('data-price-fill');
+        if (fillSel) {
+            var amount = document.querySelector(fillSel);
+            if (amount && !amount.getAttribute('data-touched')) {
+                var pv = opt.getAttribute('data-price');
+                amount.value = pv ? pv : '';
+            }
+        }
         var priceSel = sel.getAttribute('data-price-target');
         if (priceSel) {
             var price = document.querySelector(priceSel);
@@ -108,25 +116,56 @@
         if (target) { target.hidden = !box.checked; }
     });
 
-    // Financeiro: formulário de pagamento (renovar / registrar)
-    //  - forma "cartão": 1ª parcela daqui a 30 dias e sem marcar "já recebida"; outras formas: hoje e marcada
+    // Financeiro: formulário de pagamento (cadastro / renovar / registrar)
+    //  - cartão em R$ (cai sozinho): mostra bandeira e taxa; esconde "já recebida"
+    //  - sem forma escolhida ("só cadastrar"): esconde parcelas, datas e taxas
+    //  - forma "cartão": 1ª parcela daqui a 30 dias; outras formas: hoje e "1ª já recebida" marcada
+    //  - taxa: preenchida pela tabela de taxas (bandeira x parcelas), a não ser que a pessoa já tenha digitado
     //  - moeda estrangeira com parcela recebida: pede quanto caiu em reais
     function isoDate(d) {
         var mm = ('0' + (d.getMonth() + 1)).slice(-2), dd = ('0' + d.getDate()).slice(-2);
         return d.getFullYear() + '-' + mm + '-' + dd;
     }
-    function syncPayBrl(form) {
+    function setHidden(list, hide) {
+        for (var i = 0; i < list.length; i++) { list[i].hidden = hide; }
+    }
+    function syncFee(form) {
+        var raw = form.getAttribute('data-fees');
+        var brand = form.querySelector('[data-pay-brand]');
+        var n = form.querySelector('[data-pay-n]');
+        var fee = form.querySelector('[data-pay-fee]');
+        if (!raw || !brand || !n || !fee || fee.getAttribute('data-touched')) { return; }
+        var map = {};
+        try { map = JSON.parse(raw) || {}; } catch (e) { map = {}; }
+        var count = parseInt(n.value, 10) || 1;
+        var band = count <= 1 ? 1 : (count <= 6 ? 2 : 3);
+        var v = map[brand.value] ? map[brand.value][band] : undefined;
+        fee.value = (v === undefined || v === null) ? '' : String(v).replace('.', ',');
+    }
+    function syncPay(form) {
+        var m = form.querySelector('[data-pay-method]');
         var cur = form.querySelector('[data-pay-currency]');
+        var method = m ? m.value : '';
+        var currency = cur ? cur.value : 'BRL';
+        var auto = method === 'cartao' && currency === 'BRL';
+        var none = method === '' || method === 'none';
+        setHidden(form.querySelectorAll('[data-pay-details]'), none);
+        setHidden(form.querySelectorAll('[data-auto-only]'), !auto);
+        setHidden(form.querySelectorAll('[data-auto-hide]'), auto);
         var box = form.querySelector('[data-pay-paid]');
         var cnt = form.querySelector('[data-pay-paidcount]');
         var field = form.querySelector('[data-brl-field]');
-        if (!cur || !field) { return; }
-        var paid = box ? box.checked : (cnt ? parseInt(cnt.value, 10) > 0 : false);
-        field.hidden = !(cur.value !== 'BRL' && paid);
+        if (field) {
+            var paid = box ? box.checked : (cnt ? parseInt(cnt.value, 10) > 0 : false);
+            field.hidden = !(currency !== 'BRL' && !auto && !none && paid);
+        }
+        syncFee(form);
     }
     document.addEventListener('input', function (ev) {
         var t = ev.target;
-        if (t && t.hasAttribute && t.hasAttribute('data-pay-due')) { t.setAttribute('data-touched', '1'); }
+        if (t && t.hasAttribute && (t.hasAttribute('data-pay-due') || t.hasAttribute('data-pay-fee') || t.hasAttribute('data-pay-amount'))) {
+            t.setAttribute('data-touched', '1');
+        }
     });
     document.addEventListener('change', function (ev) {
         var t = ev.target;
@@ -144,11 +183,19 @@
             var box = form.querySelector('[data-pay-paid]');
             if (box) { box.checked = !card; }
         }
-        syncPayBrl(form);
+        syncPay(form);
     });
     document.addEventListener('DOMContentLoaded', function () {
         var forms = document.querySelectorAll('[data-pay-form]');
-        for (var i = 0; i < forms.length; i++) { syncPayBrl(forms[i]); }
+        for (var i = 0; i < forms.length; i++) { syncPay(forms[i]); }
+    });
+
+    // Botão de clipe (comprovante): fica verde quando há arquivo escolhido
+    document.addEventListener('change', function (ev) {
+        var t = ev.target;
+        if (!t || !t.hasAttribute || !t.hasAttribute('data-file-btn')) { return; }
+        var label = t.closest('label');
+        if (label) { label.classList.toggle('has-file', !!(t.files && t.files.length)); }
     });
 
     // Copiar texto (mensagem de boas-vindas)

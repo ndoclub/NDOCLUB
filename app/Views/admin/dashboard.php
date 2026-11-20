@@ -10,9 +10,9 @@
             $foreignDue = array_diff_key($due30['by'], ['BRL' => 1]);
             if ($foreignDue): ?><br>+ <?= e(money_multi($foreignDue)) ?> (exterior)<?php endif; ?></span>
     </a>
-    <a class="kpi<?= $late['count'] > 0 ? ' alert' : '' ?>" href="<?= e(url('/admin/financeiro?f=late')) ?>">
-        <span class="big num"><?= (int) $late['count'] ?></span>
-        <span class="lbl">parcelas atrasadas<?= $late['count'] > 0 ? '<br>' . e(money_multi($late['by'])) : '' ?></span>
+    <a class="kpi<?= $pix['late'] > 0 ? ' alert' : '' ?>" href="<?= e(url('/admin/financeiro')) ?>">
+        <span class="big num"><?= (int) $pix['count'] ?></span>
+        <span class="lbl">parcelas para cobrar ou conferir<?= $pix['count'] > 0 ? '<br>' . ($pix['late'] > 0 ? (int) $pix['late'] . ($pix['late'] === 1 ? ' atrasado' : ' atrasados') . ' · ' : '') . e(money_multi($pix['by'])) : '' ?></span>
     </a>
     <a class="kpi" href="<?= e(url('/admin/pacientes')) ?>"><span class="big num"><?= (int) $stats['patients'] ?></span><span class="lbl">pacientes ativos</span></a>
     <div class="kpi"><span class="big num"><?= (int) $stats['active7'] ?></span><span class="lbl">abriram o app em 7 dias</span></div>

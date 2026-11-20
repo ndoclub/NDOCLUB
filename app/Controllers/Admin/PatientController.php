@@ -91,6 +91,7 @@ final class PatientController
             'password' => temp_password(),
             'defaultRenewal' => date('Y-m-d', strtotime('+30 day')),
             'plans' => Plans::active(),
+            'fees' => Payments::feeTable(),
         ], 'admin');
     }
 
@@ -107,12 +108,16 @@ final class PatientController
         $customCur = currency_or_brl($_POST['plan_currency'] ?? 'BRL');
         $plan = $planId ? DB::one('SELECT * FROM plans WHERE id = ? AND active = 1', [$planId]) : null;
 
+        // Pagamento (opcional): "method" ausente ou "none" = só cadastrar. Vazio = esqueceu de escolher.
+        $method = array_key_exists('method', $_POST) ? trim((string) $_POST['method']) : 'none';
+        $register = $method !== 'none';
+
         $errors = [];
         if ($planId && !$plan) {
             $errors[] = 'Plano inválido.';
         }
         if ($custom === false) {
-            $errors[] = 'Valor combinado inválido. Use números, por exemplo 450,00.';
+            $errors[] = 'Valor vendido inválido. Use números, por exemplo 450,00.';
         }
         if (mb_strlen($name) < 2) {
             $errors[] = 'Informe o nome.';
@@ -128,6 +133,31 @@ final class PatientController
         if (mb_strlen($password) < 8) {
             $errors[] = 'A senha provisória precisa ter pelo menos 8 caracteres.';
         }
+
+        // Valor da venda: o que foi digitado, ou o valor do plano
+        $amount = $custom === false ? null : $custom;
+        $payCur = $customCur;
+        if ($amount === null && $plan && $plan['price'] !== null) {
+            $amount = (float) $plan['price'];
+            $payCur = 'BRL';
+        }
+        $pay = null;
+        if ($register) {
+            if ($method === '' || !isset(Payments::methods()[$method])) {
+                $errors[] = 'Escolha a forma de pagamento (ou "Só cadastrar, sem pagamento agora").';
+            } elseif ($custom !== false) {
+                if ($amount === null || $amount <= 0) {
+                    $errors[] = 'Informe o valor vendido para registrar o pagamento.';
+                } else {
+                    $parsed = $this->parsePayment($amount, $payCur, 'first_paid');
+                    if (is_string($parsed)) {
+                        $errors[] = $parsed;
+                    } else {
+                        $pay = $parsed;
+                    }
+                }
+            }
+        }
         if ($errors) {
             keep_old();
             foreach ($errors as $e) {
@@ -139,17 +169,43 @@ final class PatientController
         if ($renewal === '' && $plan) {
             $renewal = date('Y-m-d', strtotime('+' . (int) $plan['duration_days'] . ' day'));
         }
-        $id = DB::insert(
-            "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, plan_id, must_change_password, created_at)
-             VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, 1, ?)",
-            [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, $plan ? (int) $plan['id'] : null, now()]
-        );
-        if ($custom !== null) {
-            Plans::setCustomPrice($id, $custom, $customCur, 'manual');
+        // Valor igual ao do plano não é "valor combinado": só guarda quando é diferente (ou em dólar/euro)
+        $storeCustom = $custom !== null;
+        if ($storeCustom && $plan && $plan['price'] !== null && $customCur === 'BRL' && abs($custom - (float) $plan['price']) < 0.005) {
+            $storeCustom = false;
         }
-        Audit::log((int) Auth::id(), 'patient_create', 'user', $id, $name);
+        $id = DB::tx(function () use ($name, $email, $password, $phone, $goal, $renewal, $plan, $custom, $customCur, $storeCustom, $pay, $amount, $payCur) {
+            $id = DB::insert(
+                "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, plan_id, must_change_password, created_at)
+                 VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, 1, ?)",
+                [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, $plan ? (int) $plan['id'] : null, now()]
+            );
+            if ($storeCustom) {
+                Plans::setCustomPrice($id, $custom, $customCur, 'manual');
+            }
+            if ($pay !== null && $amount !== null) {
+                Payments::create(
+                    $id,
+                    $plan ? (int) $plan['id'] : null,
+                    null,
+                    $amount,
+                    $payCur,
+                    $pay['method'],
+                    $pay['installments'],
+                    today(),
+                    $pay['first_due'],
+                    $pay['paid_count'],
+                    $pay['received_brl'],
+                    (int) Auth::id(),
+                    $pay['brand'],
+                    $pay['fee_pct']
+                );
+            }
+            return $id;
+        });
+        Audit::log((int) Auth::id(), 'patient_create', 'user', $id, $name . ($pay ? ' · ' . money((float) $amount, 2, $payCur) . ' em ' . $pay['installments'] . 'x (' . Payments::methodLabel($pay['method']) . ')' : ''));
         $_SESSION['_creds'] = ['name' => $name, 'email' => $email, 'password' => $password];
-        flash('ok', 'Paciente criado. Envie o acesso pelo WhatsApp (mensagem pronta abaixo).');
+        flash('ok', 'Paciente criado.' . ($pay ? ' Pagamento e parcelas registrados em Financeiro.' : '') . ' Envie o acesso pelo WhatsApp (mensagem pronta abaixo).');
         redirect('/admin/pacientes/' . $id);
     }
 
@@ -179,6 +235,7 @@ final class PatientController
             }
         }
         $planRow = !empty($p['plan_id']) ? DB::one('SELECT * FROM plans WHERE id = ?', [(int) $p['plan_id']]) : null;
+        Payments::syncCards();
         $payments = Payments::forUser($id);
         $priceInfo = Plans::priceInfoFor($id);
         $suggest = Plans::renewalSuggestion($id);
@@ -190,6 +247,7 @@ final class PatientController
             'priceInfo' => $priceInfo,
             'suggest' => $suggest,
             'payments' => $payments,
+            'fees' => Payments::feeTable(),
             'lastMethod' => $lastMethod,
             'renewChoices' => Plans::renewalChoices(),
             'athlete' => Athletes::profile($id),
@@ -339,6 +397,11 @@ final class PatientController
         if ($paid < 0 || $paid > $n) {
             return 'As parcelas já recebidas não podem ser mais que o total de parcelas.';
         }
+        // Cartão em reais cai sozinho no vencimento: não há "já recebida" para marcar
+        $auto = Payments::isAuto($method, $cur);
+        if ($auto) {
+            $paid = 0;
+        }
         $brl = null;
         if ($cur !== 'BRL' && $paid > 0) {
             $brl = parse_money((string) ($_POST['received_brl'] ?? ''));
@@ -346,7 +409,18 @@ final class PatientController
                 return 'Para ' . currencies()[$cur][1] . ' já recebido, informe quanto caiu em reais (R$).';
             }
         }
-        return ['method' => $method, 'installments' => $n, 'first_due' => $firstDue, 'paid_count' => $paid, 'received_brl' => $brl];
+        // Bandeira e taxa do cartão (taxa em branco = usa a tabela de Financeiro > Taxas do cartão)
+        $brand = null;
+        $fee = null;
+        if ($auto) {
+            $b = trim((string) ($_POST['card_brand'] ?? ''));
+            $brand = isset(Payments::brands()[$b]) ? $b : null;
+            $fee = Payments::parsePct((string) ($_POST['fee_pct'] ?? ''));
+            if ($fee === false) {
+                return 'Taxa do cartão inválida. Use um número de 0 a 30, por exemplo 2,5.';
+            }
+        }
+        return ['method' => $method, 'installments' => $n, 'first_due' => $firstDue, 'paid_count' => $paid, 'received_brl' => $brl, 'brand' => $brand, 'fee_pct' => $fee];
     }
 
     /** Registrar um pagamento avulso (contratos que já existiam antes do sistema, por exemplo). */
@@ -385,7 +459,9 @@ final class PatientController
                 $parsed['first_due'],
                 $parsed['paid_count'],
                 $parsed['received_brl'],
-                (int) Auth::id()
+                (int) Auth::id(),
+                $parsed['brand'],
+                $parsed['fee_pct']
             );
         });
         Audit::log((int) Auth::id(), 'payment_add', 'user', $id, money($total, 2, $cur) . ' em ' . $parsed['installments'] . 'x (' . Payments::methodLabel($parsed['method']) . ')');
@@ -511,6 +587,9 @@ final class PatientController
         $d = DB::one('SELECT pdf_file FROM diets WHERE user_id = ?', [$id]);
         if ($d) {
             Upload::delete($d['pdf_file'], 'pdf');
+        }
+        foreach (DB::all('SELECT i.proof_file FROM payment_installments i JOIN payments p ON p.id = i.payment_id WHERE p.user_id = ? AND i.proof_file IS NOT NULL', [$id]) as $row) {
+            Upload::deleteProof($row['proof_file']);
         }
         DB::run("DELETE FROM reports WHERE target_type = 'post' AND target_id IN (SELECT id FROM posts WHERE user_id = ?)", [$id]);
         DB::run("DELETE FROM reports WHERE target_type = 'comment' AND target_id IN (SELECT id FROM comments WHERE user_id = ?)", [$id]);

@@ -35,8 +35,8 @@ Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)*
 WhatsApp) · **planos e valores** (só o admin vê R$) · pacientes (cadastro com plano e "valor combinado",
 renovar com a duração do plano e bônus, pontos manuais, dieta, senha provisória, exclusão LGPD) ·
 **atletas** (etiquetas de modalidade nos pacientes, filtros Atletas / Competem / Sem assessoria / por modalidade,
-cartão **Próximas provas** no painel, tela Modalidades) · **financeiro** (faturamento do mês, parcelas no cartão/Pix até 12x,
-agenda de recebíveis dos próximos 12 meses, "Recebi" para conferir o que caiu, atrasadas, e valores em R$, US$ e €) · treinos · moderação do feed e denúncias · mural fixado · loja e
+cartão **Próximas provas** no painel, tela Modalidades) · **financeiro** (pagamento já no cadastro do paciente, vendido × já caiu × falta cair, cartão que cai sozinho em dia útil com taxa
+e valor líquido, Pix para cobrar com WhatsApp e comprovante, agenda de recebíveis dos próximos 12 meses, e valores em R$, US$ e €) · treinos · moderação do feed e denúncias · mural fixado · loja e
 resgates · regras de pontos · ranking · configurações (limites dos selos, WhatsApp, níveis, versão
 do termo) · auditoria.
 
@@ -139,16 +139,31 @@ Mesmo processo, **depois** das atualizações 01 e 02:
 3. *(Opcional, só para ver as telas cheias)* importe também `database/demo_financeiro.sql`: cria pagamentos **fictícios** só para os pacientes de teste. Rode uma vez.
 4. **Ctrl + F5** e abra **Admin → Financeiro**.
 
-**Como o Financeiro funciona**
-- **Faturamento do mês** = tudo que foi **vendido** no mês (o valor total da renovação, mesmo parcelado).
-- **Recebíveis** = as **parcelas**: cada uma tem data, valor e se já caiu. Cartão cai mês a mês (sem antecipar); no Pix você confere se caiu.
-- Ao **renovar** um paciente com valor preenchido, escolha a **moeda**, a **forma**, as **parcelas** e a data da 1ª. As parcelas aparecem em Financeiro e na ficha (painel **Pagamentos**).
-- Clicou **Recebi** quando caiu. Parcela que passou da data e não foi marcada vira **Atrasada** (aparece no Painel). Marcou sem querer? **Desfazer**.
-- **Dólar/euro:** o valor fica na moeda original e, ao marcar "Recebi", você informa **quanto caiu em reais** (o que creditou na conta). É esse R$ que entra em "recebido no mês". Dólar e euro nunca são somados ao real.
-- Contrato que já existia antes do sistema (ex.: anual no cartão com 3 parcelas já pagas): na ficha, **Registrar pagamento sem renovar**.
-- **Valores brutos** (sem taxas). Um campo de taxa pode entrar numa próxima etapa.
-- **Reajuste de plano:** se você mudar o valor de um plano, quem já está nele **mantém o valor antigo até a próxima renovação**; ao renovar, passa para o valor novo.
-- Tudo isso é **só do admin**. O paciente nunca vê valores nem parcelas.
+> As regras do Financeiro foram refeitas na **Atualização 04** (logo abaixo). Leia a 04 para saber como funciona hoje.
+
+### Atualização 04 (Financeiro v2: pagamento no cadastro, cartão automático, Pix para cobrar, taxas)
+Mesmo processo, **depois** das atualizações 01, 02 e 03:
+1. Atualize os arquivos do projeto (`git pull`, ou copie a pasta nova por cima).
+2. phpMyAdmin → clique no banco **nodaysoffclub** (menu da esquerda) → aba **Importar** → `database/atualizacao_04_financeiro_v2.sql` → **Executar**.
+   Acrescenta as colunas de bandeira/taxa/líquido/comprovante e cria a tabela de taxas. Não apaga nada.
+   **Importe antes de abrir o sistema**, senão as telas de pagamento dão erro.
+3. *(Opcional, só para ver as telas cheias)* importe `database/demo_financeiro.sql`. **Atenção:** esta versão **apaga e recria** os pagamentos dos pacientes de teste (`...teste@exemplo.com`) com datas relativas a hoje. Só os fictícios são mexidos.
+4. **Ctrl + F5** e abra **Admin → Financeiro**.
+5. Abra **Financeiro → Taxas do cartão** e preencha as porcentagens do contrato da maquininha (veja abaixo). Vem **vazia** de propósito: eu não chuto percentual.
+
+**Como o Financeiro funciona agora**
+- **Novo paciente já com pagamento:** em *Novo paciente* há a seção **Pagamento** (valor, forma, parcelas, data da 1ª e, no cartão, bandeira). Ao salvar, o contrato e as parcelas já aparecem em Financeiro. Se escolher "Só cadastrar", nada é lançado.
+- **Vendido** (faturamento do mês) = o valor **cheio** dos contratos vendidos no mês. **Já caiu** = o que realmente entrou no mês (**líquido**). **Falta cair** = o que ainda vai entrar no mês. Zero aparece como "—" para não confundir.
+- **Cartão de crédito (em reais):** cai **sozinho** na data do vencimento. Se a data cai em sábado, domingo ou feriado nacional, passa para o **próximo dia útil**. Não tem botão "Recebi" nem "Desfazer". O valor mostrado nos recebíveis é o **líquido** (já descontada a taxa).
+- **Taxas do cartão:** tela *Financeiro → Taxas do cartão*, por bandeira (Visa, Mastercard, Elo, Amex, Hipercard, Outra) e faixa (à vista, 2–6x, 7–12x). Ao lançar uma venda no cartão, o sistema sugere a taxa da tabela; você pode digitar outra na hora. A taxa fica **gravada na venda**: mudar a tabela depois não altera vendas antigas.
+- **Pix (à vista ou parcelado):** combine com o paciente o dia de cada parcela. No dia, a parcela aparece em **Pix para cobrar e conferir** (e como número no menu **Financeiro** e no Painel). Botão **Cobrar** abre o WhatsApp com a mensagem pronta; quando cair, **Recebi** (com **comprovante** em foto ou PDF, opcional). O contador mostra, por exemplo, "3 de 6 pago".
+- **Dólar/euro, Wise, dinheiro, outro:** continuam manuais ("Recebi"). Em dólar/euro você informa **quantos reais caíram**; nunca somamos US$ ou € com R$.
+- **Cancelar parcela:** para chargeback ou paciente que parou de pagar. A parcela sai de todos os totais e pode ser **Reativada**.
+- Feriados considerados: só os **nacionais** (mais Carnaval, Sexta-feira Santa e Corpus Christi). Feriado de cidade não entra.
+- **Notificação push** (aviso no celular no dia da cobrança) ainda **não existe**: por enquanto a tarefa do dia aparece no Painel e no número do menu Financeiro.
+- **Reajuste de plano:** se você mudar o valor de um plano, quem já está nele **mantém o valor antigo até a próxima renovação**.
+- Tudo isso é **só do admin**. O paciente nunca vê valores, parcelas, taxas nem comprovantes. Ao excluir um paciente (LGPD), os pagamentos e os arquivos de comprovante dele também são apagados.
+- Se algum contrato de cartão já estava vencido antes da atualização, as parcelas vencidas viram "recebidas" sozinhas no primeiro acesso ao Financeiro. É esperado.
 
 ### Acessos para teste
 | Perfil | E-mail | Senha |
@@ -255,15 +270,19 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Privacidade (importante):** entrar como **outro** paciente e abrir o perfil público da Carla (pelo Feed → nome dela): só aparecem as **modalidades**, e só se ela marcou mostrar. **Assessoria, prova e data nunca aparecem** para outros pacientes.
 
 ### E4. Financeiro (só o Gabriel vê)
-- [ ] **Admin → Financeiro:** abre com 4 números (faturamento do mês, recebido no mês, a receber no mês, parcelas atrasadas), filtros, lista de parcelas e a agenda dos próximos 12 meses. As setas ‹ › mudam o mês.
-- [ ] **Renovar com pagamento:** na ficha, preencher valor, forma **Cartão**, **12x** → Renovar. Em **Pagamentos** aparecem 12 parcelas (a 1ª daqui a 30 dias); em **Financeiro** elas entram na agenda mês a mês.
-- [ ] **Pix à vista já recebido:** forma **Pix**, 1x, marcar "1ª parcela já recebida" → a parcela entra como recebida hoje.
-- [ ] **Recebi / Desfazer:** clicar **Recebi** numa parcela → vira "Recebida" e o "recebido no mês" sobe; **Desfazer** volta para "A receber".
-- [ ] **Atrasadas:** parcela com data passada que não foi marcada aparece em vermelho, no filtro **Atrasadas** e no **Painel**.
-- [ ] **Dólar/euro:** renovar com moeda **US$** e forma **Wise**; ao marcar "Recebi", informar o **R$ que caiu**. O "recebido no mês" usa esse R$; o dólar aparece à parte (coluna Exterior).
-- [ ] **Registrar pagamento sem renovar:** contrato antigo com algumas parcelas já recebidas.
-- [ ] **Planos:** coluna **≈ por mês**; clicar no número de pacientes abre a lista filtrada por plano. Mudar o valor de um plano → aviso de quantos pacientes mantêm o valor antigo até renovar.
-- [ ] **Privacidade (importante):** entrar como paciente e passar pelas telas → **nenhum R$, US$ ou € em lugar nenhum**. Abrir `/admin/financeiro` como paciente → bloqueado.
+- [ ] **Taxas do cartão:** Admin → Financeiro → **Taxas do cartão** → preencher Visa (à vista, 2–6x, 7–12x) → Salvar. Voltar à tela e ver os números gravados.
+- [ ] **Novo paciente com cartão:** *Novo paciente* → seção **Pagamento** → valor, forma **Cartão**, **12x**, bandeira Visa → Cadastrar. Na ficha, painel **Pagamentos** mostra "Cartão · 12x", a bandeira, a taxa e 12 parcelas com valor líquido.
+- [ ] **Cartão cai sozinho:** a 1ª parcela fica na data certa (se cair em fim de semana ou feriado nacional, passa para o próximo dia útil). **Não existe** botão Recebi/Desfazer no cartão. Parcela vencida aparece como recebida.
+- [ ] **Novo paciente com Pix parcelado:** forma **Pix**, 6x, data da 1ª combinada → as parcelas aparecem com "Parcela 1/6 de R$ …".
+- [ ] **Pix para cobrar e conferir:** parcela com vencimento hoje aparece na seção com botão **Cobrar** (abre o WhatsApp com a mensagem pronta) e **Recebi**. O número no menu Financeiro e o cartão do Painel batem com a lista.
+- [ ] **Recebi com comprovante:** clicar no clipe, escolher foto ou PDF, **Recebi**. A parcela vira "Recebida" e o contador sobe ("3 de 6 pago"). **Comprovante** abre o arquivo; **Anexar** permite colocar depois.
+- [ ] **Vendido × Já caiu × Falta cair:** vender um anual hoje → **Vendido** sobe o valor cheio, **Já caiu** não muda (cartão só cai nas datas das parcelas). Pix à vista já recebido sobe nos dois.
+- [ ] **Cancelar / Reativar** uma parcela (chargeback): ela sai dos totais; **Reativar** devolve.
+- [ ] **Dólar/euro:** forma **Wise**, moeda **US$**; ao marcar "Recebi", informar o **R$ que caiu**. O "já caiu" usa esse R$.
+- [ ] **Registrar pagamento sem renovar:** na ficha, contrato antigo com algumas parcelas já recebidas.
+- [ ] **Planos:** coluna **≈ por mês**; clicar no número de pacientes abre a lista filtrada. Mudar o valor de um plano → aviso de quantos pacientes mantêm o valor antigo até renovar.
+- [ ] **Privacidade (importante):** entrar como paciente e passar pelas telas → **nenhum R$, US$ ou € em lugar nenhum**. Abrir `/admin/financeiro` e o endereço de um comprovante como paciente → bloqueado.
+- [ ] **Excluir paciente de teste** (LGPD): os pagamentos dele somem do Financeiro.
 
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
@@ -277,12 +296,12 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **415 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **490 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
-> perfil esportivo, financeiro (parcelas, moedas, recebíveis, atrasadas), privacidade dos valores e das provas, segurança e CSRF),
+> perfil esportivo, financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
 > ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, os
-> arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql` e `atualizacao_03_financeiro.sql`) é o primeiro teste a fazer.
+> arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql` e `atualizacao_04_financeiro_v2.sql`) é o primeiro teste a fazer.
 > Se o phpMyAdmin acusar algum erro, copie a mensagem e me envie que eu corrijo.
 
 ---
@@ -316,7 +335,8 @@ Ideal: faça no celular e depois no computador.
 | Planos (Trimestral/Semestral/Anual), valores só para o admin, previsão de renovações em R$, faixa de alerta de renovação para o paciente | ✅ **Neste MVP** (atualização 01) |
 | Perfil esportivo (atletas): modalidades, assessoria, próximas provas, filtros no painel, edição pelo paciente | ✅ **Neste MVP** (atualização 02) |
 | Financeiro: moedas (R$, US$, €), pagamentos parcelados, agenda de recebíveis, "Recebi", atrasadas, reajuste de plano só na renovação | ✅ **Neste MVP** (atualização 03) |
-| Financeiro, próximos passos: campo de **taxas** (cartão/Pix/Wise) para ver o líquido, taxa de renovação, previsão por mês, acompanhamento da renovação (conversei / vai renovar / não vai) | ⏭️ Próxima rodada |
+| Financeiro v2: pagamento no cadastro do paciente, vendido × já caiu × falta cair, cartão automático em dia útil, taxa por bandeira com valor líquido, Pix para cobrar (WhatsApp + comprovante), cancelar parcela | ✅ **Neste MVP** (atualização 04) |
+| Financeiro, próximos passos: **notificação push** da cobrança do dia, taxa de renovação, previsão por mês, acompanhamento da renovação (conversei / vai renovar / não vai), marcador "cobrado em", mensagem de cobrança editável, importação dos contratos por planilha | ⏭️ Próxima rodada |
 | Contagem regressiva da prova no Início do paciente, temas do dia por modalidade, ranking por modalidade | ⏭️ Próxima rodada (dados já estão no banco) |
 | Fase 2 — notificações push, medalhas/conquistas, desafios mensais, cupons de parceiros, fotos de evolução (privadas), indicação com link | ⏭️ Tabelas e serviços já preparados (`Points::award`, `point_rules`, `audit_log`); falta construir as telas |
 | Fase 3 — Laravel + Filament, relatórios, integrações (WhatsApp automático, pagamento) | ⏭️ Estrutura pronta para migrar (seção 2) |

@@ -13,6 +13,7 @@ final class DashboardController
 {
     public function index(): void
     {
+        Payments::syncCards(); // cartão em R$ que já venceu cai sozinho
         $yellow = (int) Settings::get('warn_yellow_days', 15);
         $limitDate = date('Y-m-d', strtotime('+' . $yellow . ' day'));
         $weekAgo = date('Y-m-d H:i:s', strtotime('-7 day'));
@@ -54,7 +55,7 @@ final class DashboardController
         $events = Athletes::upcoming(8);
         $stats['athletes'] = Athletes::countAthletes();
 
-        View::render('admin/dashboard', ['title' => 'Painel', 'stats' => $stats, 'risk' => $risk, 'yellow' => $yellow, 'due30' => Plans::dueWithin(30), 'late' => Payments::late(),
+        View::render('admin/dashboard', ['title' => 'Painel', 'stats' => $stats, 'risk' => $risk, 'yellow' => $yellow, 'due30' => Plans::dueWithin(30), 'pix' => Payments::attentionStats(),
             'events' => $events, 'eventSports' => Athletes::namesFor(array_column($events, 'id')),
         ], 'admin');
     }

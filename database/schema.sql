@@ -76,6 +76,8 @@ CREATE TABLE payments (
   total DECIMAL(10,2) NOT NULL,
   currency CHAR(3) NOT NULL DEFAULT 'BRL',
   method VARCHAR(12) NOT NULL DEFAULT 'outro',
+  card_brand VARCHAR(12) NULL,
+  fee_pct DECIMAL(5,2) NOT NULL DEFAULT 0,
   installments TINYINT UNSIGNED NOT NULL DEFAULT 1,
   sold_on DATE NOT NULL,
   created_by INT UNSIGNED NULL,
@@ -92,14 +94,25 @@ CREATE TABLE payment_installments (
   number TINYINT UNSIGNED NOT NULL,
   due_on DATE NOT NULL,
   amount DECIMAL(10,2) NOT NULL,
+  net_amount DECIMAL(10,2) NULL,
   currency CHAR(3) NOT NULL DEFAULT 'BRL',
   status VARCHAR(10) NOT NULL DEFAULT 'pending',
   received_on DATE NULL,
   received_brl DECIMAL(10,2) NULL,
+  proof_file VARCHAR(48) NULL,
   PRIMARY KEY (id),
   KEY idx_inst_payment (payment_id),
   KEY idx_inst_due (due_on, status),
   CONSTRAINT fk_inst_payment FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Taxas do cartão (percentual descontado de cada parcela): bandeira x faixa de parcelas
+-- (band 1 = à vista, 2 = 2 a 6x, 3 = 7 a 12x). Cadastradas pelo admin em Financeiro > Taxas do cartão.
+CREATE TABLE payment_fees (
+  brand VARCHAR(12) NOT NULL,
+  band TINYINT UNSIGNED NOT NULL,
+  pct DECIMAL(5,2) NOT NULL DEFAULT 0,
+  PRIMARY KEY (brand, band)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------

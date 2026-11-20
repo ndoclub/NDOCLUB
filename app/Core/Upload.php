@@ -16,7 +16,7 @@ final class Upload
     }
 
     /** Devolve o nome do arquivo salvo, ou null (e $error preenchido se houve problema). */
-    public static function image(?array $file, int $maxSide, ?string &$error = null): ?string
+    public static function image(?array $file, int $maxSide, ?string &$error = null, string $kind = 'img'): ?string
     {
         $error = null;
         if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
@@ -46,7 +46,7 @@ final class Upload
         }
 
         $name = bin2hex(random_bytes(16)) . '.jpg';
-        $dest = self::dir('img') . '/' . $name;
+        $dest = self::dir($kind) . '/' . $name;
 
         if (!function_exists('imagecreatefromjpeg')) {
             // Sem a extensão GD: guarda o arquivo como veio (menos seguro, mas funciona).
@@ -131,6 +131,37 @@ final class Upload
             return null;
         }
         return $name;
+    }
+
+    /**
+     * Comprovante de pagamento (foto ou PDF). Vai para a pasta PRIVADA (storage/private) e só o admin
+     * abre, pela rota /admin/parcelas/{id}/comprovante. Foto é recriada em JPEG (tira dados ocultos).
+     */
+    public static function proof(?array $file, ?string &$error = null): ?string
+    {
+        $error = null;
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            $error = 'Não foi possível enviar o comprovante. Tente um arquivo menor.';
+            return null;
+        }
+        $head = is_uploaded_file($file['tmp_name']) ? (string) file_get_contents($file['tmp_name'], false, null, 0, 5) : '';
+        if ($head === '%PDF-') {
+            return self::pdf($file, $error);
+        }
+        $name = self::image($file, 1600, $error, 'pdf');
+        if ($name === null && $error !== null && str_starts_with($error, 'Use uma imagem')) {
+            $error = 'O comprovante precisa ser uma foto (JPG, PNG ou WEBP) ou um PDF.';
+        }
+        return $name;
+    }
+
+    /** Apaga um comprovante da pasta privada (foto ou PDF). */
+    public static function deleteProof(?string $name): void
+    {
+        self::delete($name, 'pdf');
     }
 
     public static function delete(?string $name, string $kind = 'img'): void

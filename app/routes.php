@@ -81,6 +81,11 @@ $router->post('/admin/planos/{id}', 'Admin\PlanController@update', $A);
 $router->get('/admin/financeiro', 'Admin\FinanceController@index', $A);
 $router->post('/admin/parcelas/{id}/receber', 'Admin\FinanceController@receive', $A);
 $router->post('/admin/parcelas/{id}/desfazer', 'Admin\FinanceController@undo', $A);
+$router->post('/admin/parcelas/{id}/cancelar', 'Admin\FinanceController@cancel', $A);
+$router->post('/admin/parcelas/{id}/comprovante', 'Admin\FinanceController@attach', $A);
+$router->get('/admin/parcelas/{id}/comprovante', 'Admin\FinanceController@proof', $A);
+$router->get('/admin/financeiro/taxas', 'Admin\FinanceController@fees', $A);
+$router->post('/admin/financeiro/taxas', 'Admin\FinanceController@saveFees', $A);
 
 $router->get('/admin/modalidades', 'Admin\SportController@index', $A);
 $router->get('/admin/modalidades/novo', 'Admin\SportController@form', $A);

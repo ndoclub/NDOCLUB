@@ -445,6 +445,7 @@ a.kpi:hover { border-color: var(--ink); }
 /* ---------- Financeiro (admin) ---------- */
 .kpis.fin { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .kpis.fin .big { font-size: 28px; }
+@media (max-width: 520px) { .kpis.fin { grid-template-columns: 1fr; } }
 .month-nav { display: flex; align-items: center; gap: 10px; }
 .month-nav strong { min-width: 150px; text-align: center; }
 @media (min-width: 720px) { .form-grid .field.align-input { padding-top: 30px; } }
@@ -464,4 +465,30 @@ details.pay-add > summary { list-style: none; cursor: pointer; display: inline-b
 details.pay-add > summary::-webkit-details-marker { display: none; }
 
 .tbl .num { white-space: nowrap; }
+
+/* Financeiro v2: lista de parcelas, Pix para cobrar, comprovante */
+.pay-details { display: contents; }
+.fin-sub { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
+.fin-ok { display: flex; align-items: center; gap: 8px; padding: 14px 16px; background: var(--ok-bg); color: var(--ok); border: 1px solid #B9DEC6; border-radius: 12px; font-weight: 600; }
+.fin-list { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.fin-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 300px); gap: 10px 16px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.fin-row:last-child { border-bottom: 0; }
+.fin-row.is-late { background: var(--bad-bg); }
+.fin-who, .fin-part { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fin-name { font-weight: 700; text-decoration: none; }
+.fin-name:hover { text-decoration: underline; }
+.fin-part .tag { align-self: flex-start; }
+.fin-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
+.fin-actions .btn { white-space: nowrap; }
+@media (max-width: 719px) {
+    .fin-row { grid-template-columns: 1fr; }
+    .fin-actions { justify-content: flex-start; }
+}
+.file-btn { position: relative; cursor: pointer; padding: 0 12px; }
+.file-btn input[type=file] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; }
+.file-btn.has-file { background: var(--ok-bg); color: var(--ok); border-color: #B9DEC6; }
+.nav-badge { margin-left: auto; min-width: 22px; padding: 1px 7px; border-radius: 99px; background: var(--bad); color: #fff; font-size: 12px; font-weight: 700; text-align: center; line-height: 1.5; }
+.admin-nav nav a[aria-current="page"] .nav-badge { background: #fff; color: var(--bad); }
+.fee-input { width: 84px; display: inline-block; text-align: right; }
+.kpi .lbl .muted { font-size: 13px; }
 .field > label.checkbox { display: flex; font-weight: 400; margin-bottom: 0; }

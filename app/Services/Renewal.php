@@ -88,7 +88,7 @@ final class Renewal
      * $amount/$currency = valor total vendido nesta renovação (admin). Se vier $pay, também registra
      * o pagamento e as parcelas (financeiro), tudo na mesma operação. $pay:
      *   method, installments, first_due (AAAA-MM-DD), paid_count (parcelas já recebidas),
-     *   received_brl (R$ que creditou, para USD/EUR)
+     *   received_brl (R$ que creditou, para USD/EUR), brand e fee_pct (cartão em R$)
      * Quem estava só mantendo o valor antigo de um plano reajustado passa para o valor atual do plano.
      * Retorna a nova data de vencimento.
      */
@@ -126,7 +126,9 @@ final class Renewal
                     (string) ($pay['first_due'] ?? today()),
                     (int) ($pay['paid_count'] ?? 0),
                     isset($pay['received_brl']) ? (float) $pay['received_brl'] : null,
-                    $adminId
+                    $adminId,
+                    $pay['brand'] ?? null,
+                    isset($pay['fee_pct']) ? (float) $pay['fee_pct'] : null
                 );
             }
             Plans::clearReajuste($userId);

@@ -1,13 +1,29 @@
 <?php
-// Valor em R$ em destaque; dólar/euro numa linha à parte (nunca somados ao real)
-$brl = fn(array $by) => (float) ($by['BRL'] ?? 0);
-$foreign = fn(array $by) => array_diff_key($by, ['BRL' => 1]);
-$fmt0 = fn(float $v) => money($v, floor($v) == $v ? 0 : 2);
+$base = '/admin/financeiro';
 $sold = $summary['sold'];
 $pending = $summary['pending'];
-$base = '/admin/financeiro';
-$filters = ['month' => 'Vencem no mês', 'pending' => 'A receber no mês', 'received' => 'Recebidas no mês', 'late' => 'Atrasadas'];
+$filters = ['month' => 'Todas do mês', 'pending' => 'Falta cair', 'received' => 'Já caiu'];
+if ($filter === 'late') { $filters['late'] = 'Atrasadas'; }
 $back = $base . '?m=' . $ym . '&f=' . $filter;
+$brl = fn(array $by) => (float) ($by['BRL'] ?? 0);
+
+/** Número grande do cartão: primeiro valor > 0 (R$ primeiro); os demais vão numa linha embaixo. Zero vira um traço. */
+$big = function (array $by): array {
+    $items = [];
+    foreach (array_keys(currencies()) as $c) {
+        if (!empty($by[$c])) { $items[$c] = (float) $by[$c]; }
+    }
+    if (!$items) { return ['—', '']; }
+    $c = array_key_first($items);
+    $v = $items[$c];
+    unset($items[$c]);
+    return [money($v, floor($v) == $v ? 0 : 2, $c), $items ? '+ ' . money_multi($items) : ''];
+};
+[$soldBig, $soldExtra] = $big($sold);
+[$pendBig, $pendExtra] = $big($pending);
+$recvBig = $summary['received'] > 0 ? money($summary['received'], floor($summary['received']) == $summary['received'] ? 0 : 2) : '—';
+$plural = fn(int $n, string $one, string $many) => $n . ' ' . ($n === 1 ? $one : $many);
+
 $maxBrl = 0.0;
 $totals = [];
 $anyForeign = false;
@@ -19,6 +35,8 @@ foreach ($receivables as $rv) {
     }
 }
 $countAll = array_sum(array_column($receivables, 'count'));
+$lateCount = 0;
+foreach ($attention as $a) { if ($a['late']) { $lateCount++; } }
 ?>
 <div class="page-head">
     <h2>Financeiro</h2>
@@ -29,64 +47,50 @@ $countAll = array_sum(array_column($receivables, 'count'));
         <?php if (!$isCurrent): ?><a class="btn btn-ghost btn-sm" href="<?= e(url($base . '?f=' . $filter)) ?>">Hoje</a><?php endif; ?>
     </div>
 </div>
-<p class="muted small">Faturamento é o que foi vendido no mês. Os recebíveis são as parcelas: cartão e Pix caem mês a mês, e você confere o que caiu clicando em "Recebi". Valores brutos (sem taxas). Só o admin vê.</p>
+<p class="muted small"><strong>Vendido</strong> é o que foi vendido no mês (valor cheio). <strong>Já caiu</strong> e <strong>Falta cair</strong> são o dinheiro que entra na conta, em valor líquido (depois da taxa do cartão). Cartão cai sozinho no vencimento; Pix você confere. Só o admin vê. <a href="<?= e(url($base . '/taxas')) ?>">Taxas do cartão</a></p>
 
 <div class="kpis fin">
     <div class="kpi">
-        <span class="big num"><?= e($fmt0($brl($sold))) ?></span>
-        <span class="lbl">faturamento do mês<?php if ($foreign($sold)): ?><br>+ <?= e(money_multi($foreign($sold))) ?><?php endif; ?></span>
+        <span class="big num"><?= e($soldBig) ?></span>
+        <span class="lbl">vendido no mês<?= $soldExtra !== '' ? '<br>' . e($soldExtra) : '' ?><br><span class="muted"><?= $summary['soldCount'] > 0 ? e($plural($summary['soldCount'], 'venda', 'vendas')) : 'nenhuma venda ainda' ?></span></span>
     </div>
-    <div class="kpi">
-        <span class="big num"><?= e($fmt0($summary['received'])) ?></span>
-        <span class="lbl">recebido no mês (R$)<?= $summary['receivedMissing'] > 0 ? '<br>' . (int) $summary['receivedMissing'] . ' sem o valor em R$' : '' ?></span>
-    </div>
-    <a class="kpi" href="<?= e(url($base . '?m=' . $ym . '&f=pending')) ?>">
-        <span class="big num"><?= e($fmt0($brl($pending))) ?></span>
-        <span class="lbl">a receber no mês<?php if ($foreign($pending)): ?><br>+ <?= e(money_multi($foreign($pending))) ?><?php endif; ?></span>
+    <a class="kpi" href="<?= e(url($base . '?m=' . $ym . '&f=received')) ?>">
+        <span class="big num"><?= e($recvBig) ?></span>
+        <span class="lbl">já caiu no mês<br><span class="muted"><?= $summary['receivedCount'] > 0 ? e($plural($summary['receivedCount'], 'parcela', 'parcelas')) . ' · líquido' : 'nada caiu ainda' ?><?= $summary['receivedMissing'] > 0 ? ' · ' . (int) $summary['receivedMissing'] . ' sem o R$' : '' ?></span></span>
     </a>
-    <a class="kpi<?= $late['count'] > 0 ? ' alert' : '' ?>" href="<?= e(url($base . '?m=' . $ym . '&f=late')) ?>">
-        <span class="big num"><?= (int) $late['count'] ?></span>
-        <span class="lbl">parcelas atrasadas<?= $late['count'] > 0 ? '<br>' . e(money_multi($late['by'])) : '' ?></span>
+    <a class="kpi" href="<?= e(url($base . '?m=' . $ym . '&f=pending')) ?>">
+        <span class="big num"><?= e($pendBig) ?></span>
+        <span class="lbl">falta cair no mês<?= $pendExtra !== '' ? '<br>' . e($pendExtra) : '' ?><br><span class="muted"><?= $summary['pendingCount'] > 0 ? e($plural($summary['pendingCount'], 'parcela', 'parcelas')) : 'nada a receber' ?></span></span>
     </a>
 </div>
 
+<h3 class="sub fin-sub">Pix para cobrar e conferir
+    <?php if ($attention): ?><span class="tag<?= $lateCount > 0 ? ' bad' : ' warn' ?>"><?= count($attention) ?><?= $lateCount > 0 ? ' · ' . (int) $lateCount . ($lateCount === 1 ? ' atrasada' : ' atrasadas') : ' hoje' ?></span><?php endif; ?></h3>
+<?php if (!$attention): ?>
+    <div class="fin-ok"><?= icon('check', 18) ?> Tudo em dia: nenhum Pix para cobrar ou conferir hoje.</div>
+<?php else: ?>
+    <p class="muted small">Parcelas que vencem hoje ou já venceram (Pix, Wise, dinheiro...). Cobre pelo WhatsApp e, quando cair, clique em Recebi (pode anexar o comprovante). Cartão não aparece aqui: cai sozinho.</p>
+    <div class="fin-list">
+        <?php foreach ($attention as $r): partial('installment-row', ['r' => $r, 'back' => $back]); endforeach; ?>
+    </div>
+<?php endif; ?>
+
+<h3 class="sub fin-sub">Parcelas do mês</h3>
 <div class="chips">
     <?php foreach ($filters as $k => $label): ?>
         <a class="chip" href="<?= e(url($base . '?m=' . $ym . '&f=' . $k)) ?>"<?= $filter === $k ? ' aria-current="true"' : '' ?>><?= e($label) ?></a>
     <?php endforeach; ?>
 </div>
-
 <?php if (!$rows): ?>
-    <div class="empty"><strong><?= $filter === 'late' ? 'Nenhuma parcela atrasada' : 'Nenhuma parcela aqui' ?></strong><?= $filter === 'late' ? 'Tudo que venceu até hoje já caiu.' : 'Ao renovar um paciente com valor (ou em Registrar pagamento, na ficha), as parcelas aparecem aqui.' ?></div>
+    <div class="empty"><strong><?= $filter === 'late' ? 'Nenhuma parcela atrasada' : 'Nenhuma parcela aqui' ?></strong><?= $filter === 'late' ? 'Tudo que venceu até hoje já caiu.' : 'Ao cadastrar um paciente com valor, renovar, ou em Registrar pagamento (na ficha), as parcelas aparecem aqui.' ?></div>
 <?php else: ?>
-<div class="tbl-wrap">
-    <table class="tbl">
-        <thead><tr><th><?= $filter === 'received' ? 'Recebida em' : 'Vence' ?></th><th>Paciente</th><th>Forma</th><th>Parcela</th><th class="r">Valor</th><th>Situação</th><th class="r">Ação</th></tr></thead>
-        <tbody>
-        <?php foreach ($rows as $r): ?>
-            <tr>
-                <td class="num"><?= e(fmt_date($filter === 'received' ? $r['received_on'] : $r['due_on'])) ?></td>
-                <td><a class="who" href="<?= e(url('/admin/pacientes/' . (int) $r['user_id'])) ?>"><?= e($r['patient_name']) ?></a><?= !empty($r['plan_name']) ? '<br><span class="small muted">' . e($r['plan_name']) . '</span>' : '' ?></td>
-                <td><?= e(\App\Services\Payments::methodLabel($r['method'])) ?></td>
-                <td class="num"><?= (int) $r['number'] ?>/<?= (int) $r['total_n'] ?></td>
-                <td class="r num"><?= e(money((float) $r['amount'], 2, $r['currency'])) ?></td>
-                <td>
-                    <?php if ($r['status'] === 'received'): ?>
-                        <span class="tag ok">Recebida</span>
-                        <?php if ($r['currency'] !== 'BRL'): ?><br><span class="small muted"><?= $r['received_brl'] !== null ? 'Caiu ' . e(money((float) $r['received_brl'])) : 'falta informar o R$' ?></span><?php endif; ?>
-                    <?php elseif ($r['late']): ?><span class="tag bad">Atrasada</span>
-                    <?php else: ?><span class="tag">A receber</span><?php endif; ?>
-                </td>
-                <td class="r"><?php partial('installment-actions', ['i' => $r, 'back' => $back]); ?></td>
-            </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
-</div>
+    <div class="fin-list">
+        <?php foreach ($rows as $r): partial('installment-row', ['r' => $r, 'back' => $back]); endforeach; ?>
+    </div>
 <?php endif; ?>
 
 <h3 class="sub" style="margin-top:32px">Recebíveis: próximos 12 meses</h3>
-<p class="muted small">O que ainda vai cair, mês a mês (só parcelas pendentes). Em dólar/euro fica na moeda original, sem converter.</p>
+<p class="muted small">O que ainda vai cair, mês a mês (só parcelas pendentes, em valor líquido). Em dólar/euro fica na moeda original, sem converter.</p>
 <?php if ($countAll === 0): ?>
     <div class="empty"><strong>Nada a receber</strong>Quando houver parcelas pendentes, a agenda aparece aqui.</div>
 <?php else: ?>

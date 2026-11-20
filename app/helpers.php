@@ -406,6 +406,7 @@ function icon(string $name, int $size = 24): string
         'tag'      => '<path d="M4 4h8l8 8-8 8-8-8z"/><circle cx="8.5" cy="8.5" r="1"/>',
         'card'     => '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>',
         'cash'     => '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9.5h.01M17.5 14.5h.01"/>',
+        'clip'     => '<path d="M20 11l-8 8a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8"/>',
         'left'     => '<path d="M15 5l-7 7 7 7"/>',
         'right'    => '<path d="M9 5l7 7-7 7"/>',
     ];

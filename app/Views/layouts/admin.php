@@ -1,6 +1,7 @@
 <?php
 $path = strtok(current_path(), '?');
 $is = fn(string $prefix) => $path === $prefix || str_starts_with($path, $prefix . '/');
+$finBadge = \App\Services\Payments::attentionStats()['count'];
 $nav = [
     ['/admin',            'Painel',        'grid',     $path === '/admin'],
     ['/admin/pacientes',  'Pacientes',     'users',    $is('/admin/pacientes')],
@@ -34,7 +35,7 @@ $nav = [
     <a class="admin-logo" href="<?= e(url('/admin')) ?>"><img src="<?= e(asset('img/logo-horizontal.svg')) ?>" alt="<?= e(app_name()) ?>" width="170" height="51"></a>
     <nav>
         <?php foreach ($nav as [$href, $label, $ico, $active]): ?>
-            <a href="<?= e(url($href)) ?>"<?= $active ? ' aria-current="page"' : '' ?>><?= icon($ico, 20) ?><span><?= e($label) ?></span></a>
+            <a href="<?= e(url($href)) ?>"<?= $active ? ' aria-current="page"' : '' ?>><?= icon($ico, 20) ?><span><?= e($label) ?></span><?php if ($href === '/admin/financeiro' && $finBadge > 0): ?><b class="nav-badge" title="Pix para cobrar ou conferir"><?= (int) $finBadge ?></b><?php endif; ?></a>
         <?php endforeach; ?>
         <a href="<?= e(url('/feed')) ?>"<?= $is('/feed') || $is('/post') ? ' aria-current="page"' : '' ?>><?= icon('chat', 20) ?><span>Ver o feed</span></a>
     </nav>

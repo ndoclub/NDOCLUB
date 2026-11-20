@@ -107,7 +107,7 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
         $planDays = $planRow ? (int) $planRow['duration_days'] : 90;
         if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
         ?>
-        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/renovar')) ?>" data-confirm="Confirmar a renovação?" data-pay-form>
+        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/renovar')) ?>" data-confirm="Confirmar a renovação?" data-pay-form data-fees="<?= e(json_encode($fees ?: new stdClass())) ?>">
             <?= csrf_field() ?>
             <div class="form-grid">
                 <div class="field"><label for="days">Período</label>
@@ -116,34 +116,14 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
                             <option value="<?= (int) $d ?>"<?= $d === $planDays ? ' selected' : '' ?>>+<?= (int) $d ?> dias<?= ($planRow && $d === (int) $planRow['duration_days']) ? ' (' . e($planRow['name']) . ')' : '' ?></option>
                         <?php endforeach; ?>
                     </select></div>
-                <div class="field"><label for="amount">Valor total vendido</label>
-                    <div class="row" style="gap:8px">
-                        <select name="currency" aria-label="Moeda" data-pay-currency style="flex:0 0 96px">
-                            <?php foreach (currencies() as $code => $c): ?>
-                                <option value="<?= e($code) ?>"<?= $sugCur === $code ? ' selected' : '' ?>><?= e($c[0]) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <input class="input" id="amount" name="amount" inputmode="decimal" placeholder="Ex.: 1200,00" value="<?= $sugAmount !== null ? e(number_format($sugAmount, 2, ',', '')) : '' ?>">
-                    </div></div>
-                <div class="field"><label for="method">Forma de pagamento</label>
-                    <select id="method" name="method" data-pay-method>
-                        <?php foreach (\App\Services\Payments::methods() as $k => $label): ?>
-                            <option value="<?= e($k) ?>"<?= $defMethod === $k ? ' selected' : '' ?>><?= e($label) ?></option>
-                        <?php endforeach; ?>
-                    </select></div>
-                <div class="field"><label for="installments">Parcelas</label>
-                    <select id="installments" name="installments">
-                        <?php for ($n = 1; $n <= 12; $n++): ?>
-                            <option value="<?= $n ?>"><?= $n === 1 ? 'À vista (1x)' : $n . 'x' ?></option>
-                        <?php endfor; ?>
-                    </select></div>
-                <div class="field"><label for="first_due">1ª parcela em</label>
-                    <input class="input" type="date" id="first_due" name="first_due" value="<?= e($defDue) ?>" data-pay-due>
-                    <p class="hint">As próximas caem todo mês, no mesmo dia. No cartão, a 1ª costuma cair 30 dias depois.</p></div>
-                <div class="field align-input"><label class="checkbox"><input type="checkbox" name="first_paid" value="1" data-pay-paid<?= $defMethod === 'cartao' ? '' : ' checked' ?>><span>1ª parcela já recebida</span></label></div>
-                <div class="field" data-brl-field<?= $sugCur === 'BRL' ? ' hidden' : '' ?>><label for="received_brl">Quanto caiu em reais (R$)</label>
-                    <input class="input" id="received_brl" name="received_brl" inputmode="decimal" placeholder="Ex.: 4950,00">
-                    <p class="hint">Em dólar/euro, o total em R$ usa o valor que creditou na conta.</p></div>
+                <?php partial('payment-fields', [
+                    'idp' => 'r_', 'amountName' => 'amount', 'amountId' => 'amount', 'amountLabel' => 'Valor total vendido',
+                    'amountValue' => $sugAmount !== null ? number_format($sugAmount, 2, ',', '') : '', 'amountPlaceholder' => 'Ex.: 1200,00',
+                    'currencyName' => 'currency', 'currency' => $sugCur,
+                    'method' => $defMethod, 'allowNone' => false,
+                    'installments' => 1, 'due' => $defDue,
+                    'paidMode' => 'first', 'paidChecked' => $defMethod !== 'cartao',
+                ]); ?>
             </div>
             <div class="form-actions"><button class="btn btn-sm" type="submit">Renovar</button></div>
         </form>
@@ -163,7 +143,7 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
 
     <div class="panel">
         <h3>Pagamentos</h3>
-        <p class="muted small">Cada pagamento tem as parcelas (recebíveis). Quando cair, clique em "Recebi"; se marcou sem querer, "Desfazer". Só o admin vê.</p>
+        <p class="muted small">Cada pagamento tem as parcelas (recebíveis). Cartão em reais cai sozinho no vencimento; Pix e as outras formas você confere e clica em "Recebi" (dá para anexar o comprovante). Só o admin vê.</p>
         <?php $backHere = '/admin/pacientes/' . $id; ?>
         <?php if (!$payments): ?>
             <p class="muted small" style="margin:0 0 12px">Nenhum pagamento registrado ainda.</p>
@@ -172,9 +152,10 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
             <details class="pay"<?= $pay['late_count'] > 0 ? ' open' : '' ?>>
                 <summary>
                     <strong class="num"><?= e(money((float) $pay['total'], 2, $pay['currency'])) ?></strong>
-                    <span class="muted small"><?= e(\App\Services\Payments::methodLabel($pay['method'])) ?> · <?= (int) $pay['installments'] === 1 ? 'à vista' : (int) $pay['installments'] . 'x' ?> · vendido em <?= e(fmt_date($pay['sold_on'])) ?><?= !empty($pay['plan_name']) ? ' · ' . e($pay['plan_name']) : '' ?></span>
-                    <span class="tag<?= $pay['received_count'] === (int) $pay['installments'] ? ' ok' : '' ?>"><?= (int) $pay['received_count'] ?>/<?= (int) $pay['installments'] ?> recebidas</span>
+                    <span class="muted small"><?= e(\App\Services\Payments::methodText($pay['method'], (int) $pay['installments'])) ?><?= !empty($pay['card_brand']) ? ' · ' . e(\App\Services\Payments::brandLabel($pay['card_brand'])) : '' ?><?= (float) $pay['fee_pct'] > 0 ? ' · taxa ' . e(rtrim(rtrim(number_format((float) $pay['fee_pct'], 2, ',', ''), '0'), ',')) . '%' : '' ?> · vendido em <?= e(fmt_date($pay['sold_on'])) ?><?= !empty($pay['plan_name']) ? ' · ' . e($pay['plan_name']) : '' ?></span>
+                    <span class="tag<?= $pay['received_count'] === (int) $pay['installments'] ? ' ok' : '' ?>"><?= (int) $pay['received_count'] ?>/<?= (int) $pay['installments'] ?> <?= $pay['received_count'] === 1 ? 'recebida' : 'recebidas' ?></span>
                     <?php if ($pay['late_count'] > 0): ?><span class="tag bad"><?= (int) $pay['late_count'] ?> <?= $pay['late_count'] === 1 ? 'atrasada' : 'atrasadas' ?></span><?php endif; ?>
+                    <?php if ($pay['canceled_count'] > 0): ?><span class="tag"><?= (int) $pay['canceled_count'] ?> <?= $pay['canceled_count'] === 1 ? 'cancelada' : 'canceladas' ?></span><?php endif; ?>
                 </summary>
                 <div class="tbl-wrap"><table class="tbl" style="min-width:0">
                     <thead><tr><th>Parcela</th><th>Vence</th><th class="r">Valor</th><th>Situação</th><th class="r">Ação</th></tr></thead>
@@ -183,15 +164,12 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
                         <tr>
                             <td class="num"><?= (int) $it['number'] ?>/<?= (int) $pay['installments'] ?></td>
                             <td><?= e(fmt_date($it['due_on'])) ?></td>
-                            <td class="r num"><?= e(money((float) $it['amount'], 2, $it['currency'])) ?></td>
+                            <td class="r num"><?= e(money((float) $it['amount'], 2, $it['currency'])) ?><?= $it['fee'] > 0 ? '<br><span class="small muted">líquido ' . e(money((float) $it['net'])) . '</span>' : '' ?></td>
                             <td>
-                                <?php if ($it['status'] === 'received'): ?>
-                                    <span class="tag ok">Recebida <?= e(fmt_date($it['received_on'])) ?></span>
-                                    <?php if ($it['currency'] !== 'BRL'): ?><br><span class="small muted"><?= $it['received_brl'] !== null ? 'Caiu ' . e(money((float) $it['received_brl'])) : 'falta informar o R$' ?></span><?php endif; ?>
-                                <?php elseif ($it['late']): ?><span class="tag bad">Atrasada</span>
-                                <?php else: ?><span class="tag">A receber</span><?php endif; ?>
+                                <span class="tag<?= $it['st']['tag'] !== '' ? ' ' . e($it['st']['tag']) : '' ?>"><?= e($it['st']['text']) ?></span>
+                                <?php if ($it['status'] === 'received' && $it['currency'] !== 'BRL'): ?><br><span class="small muted"><?= $it['received_brl'] !== null ? 'Caiu ' . e(money((float) $it['received_brl'])) : 'falta informar o R$' ?></span><?php endif; ?>
                             </td>
-                            <td class="r"><?php partial('installment-actions', ['i' => $it, 'back' => $backHere]); ?></td>
+                            <td class="r"><?php partial('installment-actions', ['i' => $it, 'back' => $backHere, 'showCancel' => true]); ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -202,33 +180,18 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
         <details class="pay-add">
             <summary class="btn btn-ghost btn-sm">+ Registrar pagamento sem renovar</summary>
             <p class="muted small" style="margin-top:12px">Para contratos que já existiam antes do sistema (ex.: anual no cartão em 12x que já tem parcelas recebidas).</p>
-            <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/pagamentos')) ?>" data-pay-form>
+            <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/pagamentos')) ?>" data-pay-form data-fees="<?= e(json_encode($fees ?: new stdClass())) ?>">
                 <?= csrf_field() ?>
                 <div class="form-grid">
-                    <div class="field"><label for="total">Valor total</label>
-                        <div class="row" style="gap:8px">
-                            <select name="currency" aria-label="Moeda" data-pay-currency style="flex:0 0 96px">
-                                <?php foreach (currencies() as $code => $c): ?><option value="<?= e($code) ?>"><?= e($c[0]) ?></option><?php endforeach; ?>
-                            </select>
-                            <input class="input" id="total" name="total" inputmode="decimal" placeholder="Ex.: 4500,00" required>
-                        </div></div>
-                    <div class="field"><label for="p_method">Forma de pagamento</label>
-                        <select id="p_method" name="method" data-pay-method>
-                            <?php foreach (\App\Services\Payments::methods() as $k => $label): ?><option value="<?= e($k) ?>"<?= $defMethod === $k ? ' selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
-                        </select></div>
-                    <div class="field"><label for="p_installments">Parcelas</label>
-                        <select id="p_installments" name="installments">
-                            <?php for ($n = 1; $n <= 12; $n++): ?><option value="<?= $n ?>"><?= $n === 1 ? 'À vista (1x)' : $n . 'x' ?></option><?php endfor; ?>
-                        </select></div>
+                    <?php partial('payment-fields', [
+                        'idp' => 'p_', 'amountName' => 'total', 'amountId' => 'total', 'amountLabel' => 'Valor total',
+                        'amountValue' => '', 'amountPlaceholder' => 'Ex.: 4500,00', 'amountRequired' => true,
+                        'currencyName' => 'currency', 'currency' => 'BRL',
+                        'method' => $defMethod, 'allowNone' => false,
+                        'installments' => 1, 'due' => $defDue,
+                        'paidMode' => 'count', 'paidCount' => 0,
+                    ]); ?>
                     <div class="field"><label for="sold_on">Data da venda</label><input class="input" type="date" id="sold_on" name="sold_on" value="<?= e(today()) ?>" max="<?= e(today()) ?>"></div>
-                    <div class="field"><label for="p_first_due">Vencimento da 1ª parcela</label><input class="input" type="date" id="p_first_due" name="first_due" value="<?= e($defDue) ?>" data-pay-due></div>
-                    <div class="field"><label for="paid_count">Parcelas já recebidas</label>
-                        <select id="paid_count" name="paid_count" data-pay-paidcount>
-                            <?php for ($n = 0; $n <= 12; $n++): ?><option value="<?= $n ?>"><?= $n === 0 ? 'Nenhuma' : $n ?></option><?php endfor; ?>
-                        </select>
-                        <p class="hint">As primeiras parcelas, na ordem.</p></div>
-                    <div class="field" data-brl-field hidden><label for="p_received_brl">Total que caiu em reais (R$)</label>
-                        <input class="input" id="p_received_brl" name="received_brl" inputmode="decimal" placeholder="Soma do R$ das parcelas recebidas"></div>
                 </div>
                 <div class="form-actions"><button class="btn btn-sm" type="submit">Registrar pagamento</button></div>
             </form>
