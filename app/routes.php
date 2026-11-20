@@ -71,6 +71,9 @@ $router->post('/admin/pacientes/{id}/dieta/pdf-remover', 'Admin\PatientControlle
 $router->post('/admin/pacientes/{id}/esporte', 'Admin\PatientController@sport', $A);
 $router->post('/admin/pacientes/{id}/pagamentos', 'Admin\PatientController@addPayment', $A);
 $router->post('/admin/pacientes/{id}/excluir', 'Admin\PatientController@delete', $A);
+$router->post('/admin/pacientes/responsavel', 'Admin\PatientController@assign', $A);
+$router->post('/admin/pacientes/{id}/consultas', 'Admin\PatientController@addConsultation', $A);
+$router->post('/admin/consultas/{id}/apagar', 'Admin\PatientController@removeConsultation', $A);
 
 $router->get('/admin/planos', 'Admin\PlanController@index', $A);
 $router->get('/admin/planos/novo', 'Admin\PlanController@form', $A);
@@ -92,6 +95,12 @@ $router->get('/admin/modalidades/novo', 'Admin\SportController@form', $A);
 $router->post('/admin/modalidades', 'Admin\SportController@store', $A);
 $router->get('/admin/modalidades/{id}', 'Admin\SportController@form', $A);
 $router->post('/admin/modalidades/{id}', 'Admin\SportController@update', $A);
+
+$router->get('/admin/responsaveis', 'Admin\ResponsibleController@index', $A);
+$router->get('/admin/responsaveis/novo', 'Admin\ResponsibleController@form', $A);
+$router->post('/admin/responsaveis', 'Admin\ResponsibleController@store', $A);
+$router->get('/admin/responsaveis/{id}', 'Admin\ResponsibleController@form', $A);
+$router->post('/admin/responsaveis/{id}', 'Admin\ResponsibleController@update', $A);
 
 $router->get('/admin/treinos', 'Admin\WorkoutController@index', $A);
 $router->get('/admin/treinos/novo', 'Admin\WorkoutController@form', $A);

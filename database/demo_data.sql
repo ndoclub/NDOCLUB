@@ -379,3 +379,50 @@ INSERT INTO payment_fees (brand, band, pct) VALUES ('visa', 3, 4.50);
 INSERT INTO payment_fees (brand, band, pct) VALUES ('mastercard', 1, 2.40);
 INSERT INTO payment_fees (brand, band, pct) VALUES ('mastercard', 2, 3.20);
 INSERT INTO payment_fees (brand, band, pct) VALUES ('mastercard', 3, 4.30);
+
+-- ---------------------------------------------------------------------
+-- Pacientes v2 (responsáveis, cotas e consultas)
+-- ---------------------------------------------------------------------
+-- Responsáveis fictícios (modo babá)
+INSERT INTO responsibles (name, active, created_at) VALUES ('Estagiária 1 (teste)', 1, NOW());
+INSERT INTO responsibles (name, active, created_at) VALUES ('Estagiária 2 (teste)', 1, NOW());
+INSERT INTO responsibles (name, active, created_at) VALUES ('Estagiária 3 (teste)', 1, NOW());
+
+-- Cota de consultas por plano: valores de EXEMPLO (só onde ainda está em branco). Troque em Admin > Planos.
+UPDATE plans SET consultations_included = 2 WHERE name = 'Trimestral' AND consultations_included IS NULL;
+UPDATE plans SET consultations_included = 4 WHERE name = 'Semestral' AND consultations_included IS NULL;
+UPDATE plans SET consultations_included = 8 WHERE name = 'Anual' AND consultations_included IS NULL;
+
+-- Quem é responsável por quem (Karen, Lucas e o paciente novo ficam sem responsável de propósito)
+UPDATE users SET responsible_id = (SELECT id FROM responsibles WHERE name = 'Estagiária 1 (teste)') WHERE email = 'ana.teste@exemplo.com';
+UPDATE users SET responsible_id = (SELECT id FROM responsibles WHERE name = 'Estagiária 1 (teste)') WHERE email = 'bruno.teste@exemplo.com';
+UPDATE users SET responsible_id = (SELECT id FROM responsibles WHERE name = 'Estagiária 1 (teste)') WHERE email = 'carla.teste@exemplo.com';
+UPDATE users SET responsible_id = (SELECT id FROM responsibles WHERE name = 'Estagiária 1 (teste)') WHERE email = 'diego.teste@exemplo.com';
+UPDATE users SET responsible_id = (SELECT id FROM responsibles WHERE name = 'Estagiária 2 (teste)') WHERE email = 'elisa.teste@exemplo.com';
+UPDATE users SET responsible_id = (SELECT id FROM responsibles WHERE name = 'Estagiária 2 (teste)') WHERE email = 'felipe.teste@exemplo.com';
+UPDATE users SET responsible_id = (SELECT id FROM responsibles WHERE name = 'Estagiária 2 (teste)') WHERE email = 'gabi.teste@exemplo.com';
+UPDATE users SET responsible_id = (SELECT id FROM responsibles WHERE name = 'Estagiária 2 (teste)') WHERE email = 'heitor.teste@exemplo.com';
+UPDATE users SET responsible_id = (SELECT id FROM responsibles WHERE name = 'Estagiária 3 (teste)') WHERE email = 'isabela.teste@exemplo.com';
+UPDATE users SET responsible_id = (SELECT id FROM responsibles WHERE name = 'Estagiária 3 (teste)') WHERE email = 'joao.teste@exemplo.com';
+
+-- Consultas já realizadas (no plano atual de cada um)
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 95 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Avaliação inicial', NOW() FROM users u WHERE u.email = 'ana.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 50 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Retorno', NOW() FROM users u WHERE u.email = 'ana.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 12 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Retorno', NOW() FROM users u WHERE u.email = 'ana.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 80 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Avaliação inicial', NOW() FROM users u WHERE u.email = 'bruno.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 40 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Retorno', NOW() FROM users u WHERE u.email = 'bruno.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 20 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Retorno', NOW() FROM users u WHERE u.email = 'bruno.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 6 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Bioimpedância', NOW() FROM users u WHERE u.email = 'bruno.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 30 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Avaliação inicial', NOW() FROM users u WHERE u.email = 'carla.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 60 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Avaliação inicial', NOW() FROM users u WHERE u.email = 'diego.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 25 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Retorno', NOW() FROM users u WHERE u.email = 'diego.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 10 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Avaliação inicial', NOW() FROM users u WHERE u.email = 'felipe.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 55 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Avaliação inicial', NOW() FROM users u WHERE u.email = 'heitor.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 20 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Retorno', NOW() FROM users u WHERE u.email = 'heitor.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 70 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Avaliação inicial', NOW() FROM users u WHERE u.email = 'isabela.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 35 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Retorno', NOW() FROM users u WHERE u.email = 'isabela.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 85 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Avaliação inicial', NOW() FROM users u WHERE u.email = 'joao.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 120 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Avaliação inicial', NOW() FROM users u WHERE u.email = 'karen.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 60 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Retorno', NOW() FROM users u WHERE u.email = 'karen.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 10 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Retorno', NOW() FROM users u WHERE u.email = 'karen.teste@exemplo.com';
+INSERT INTO consultations (user_id, held_on, cycle, note, created_at) SELECT u.id, CURDATE() - INTERVAL 3 DAY, (SELECT COUNT(*) FROM renewals r WHERE r.user_id = u.id), 'Bioimpedância', NOW() FROM users u WHERE u.email = 'karen.teste@exemplo.com';

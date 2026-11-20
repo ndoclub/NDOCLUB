@@ -17,9 +17,12 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
         <div>
             <h2 style="font-size:22px"><?= e($p['name']) ?></h2>
             <div class="row wrap" style="gap:8px;margin-top:6px">
-                <?php if ($p['status'] === 'inactive'): ?><span class="tag">Desativado</span><?php else: partial('seal', ['renew' => $renew]); endif; ?>
+                <span class="tag<?= $planStatus['tag'] ? ' ' . e($planStatus['tag']) : '' ?>"><?= e($planStatus['label']) ?></span>
+                <?php if ($p['status'] !== 'inactive') { partial('seal', ['renew' => $renew]); } ?>
                 <?php partial('level', ['level' => $level]); ?>
                 <?php foreach ($athleteNames as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?>
+                <?php if ($planRow): ?><span class="tag"><?= $consSummary['quota'] !== null ? (int) $consSummary['done'] . ' de ' . (int) $consSummary['quota'] . ' consultas' : (int) $consSummary['done'] . ' consultas' ?></span><?php endif; ?>
+                <?php if ($respName): ?><span class="tag">Responsável: <?= e($respName) ?></span><?php endif; ?>
                 <?php if ($planRow): ?><span class="tag"><?= e($planRow['name']) ?><?= $priceInfo['amount'] !== null ? ' · ' . e(money($priceInfo['amount'], 2, $priceInfo['currency'])) . ($priceInfo['source'] === 'manual' ? ' (combinado)' : ($priceInfo['source'] === 'reajuste' ? ' (mantido até renovar)' : '')) : ' · sem valor' ?></span><?php endif; ?>
             </div>
         </div>
@@ -74,6 +77,14 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
                     : 'Em branco = valor do plano' . ($planRow && $planRow['price'] !== null ? ' (' . money((float) $planRow['price']) . ')' : '') . '. Só se for diferente (ou em dólar/euro). Só o admin vê.',
             ]); ?>
             <div class="field"><label for="renewal_date">Vence em</label><input class="input" type="date" id="renewal_date" name="renewal_date" value="<?= e(substr((string) $p['renewal_date'], 0, 10)) ?>"></div>
+            <div class="field"><label for="responsible_id">Responsável</label>
+                <select id="responsible_id" name="responsible_id">
+                    <option value="">Sem responsável</option>
+                    <?php foreach ($respChoices as $rc): ?>
+                        <option value="<?= (int) $rc['id'] ?>"<?= (int) ($p['responsible_id'] ?? 0) === (int) $rc['id'] ? ' selected' : '' ?>><?= e($rc['name']) ?><?= $rc['active'] ? '' : ' (desativada)' ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="hint">Quem da equipe cuida deste paciente (modo babá). O paciente não vê.</p></div>
             <div class="field"><label for="status">Acesso</label>
                 <select id="status" name="status">
                     <option value="active"<?= $p['status'] === 'active' ? ' selected' : '' ?>>Ativo</option>
@@ -138,6 +149,46 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
                 <?php endforeach; ?>
                 </tbody>
             </table></div>
+        <?php endif; ?>
+    </div>
+
+    <div class="panel" id="consultas">
+        <h3>Consultas presenciais</h3>
+        <?php if (!$planRow): ?>
+            <p class="muted small">Escolha o plano do paciente para acompanhar a cota de consultas.</p>
+        <?php elseif ($consSummary['quota'] === null): ?>
+            <p class="muted small"><strong class="num"><?= (int) $consSummary['done'] ?></strong> no plano atual. O plano <?= e($planRow['name']) ?> ainda não tem a quantidade de consultas definida: <a href="<?= e(url('/admin/planos/' . (int) $planRow['id'])) ?>">defina em Planos</a> para ver "x de y".</p>
+        <?php else: ?>
+            <p style="margin:0 0 12px"><strong class="num" style="font-size:26px"><?= (int) $consSummary['done'] ?> de <?= (int) $consSummary['quota'] ?></strong>
+                <span class="muted small">consultas do plano atual (<?= e($planRow['name']) ?>)</span>
+                <?= $consSummary['full'] ? '<span class="tag ok">cota completa</span>' : '<span class="tag">restam ' . (int) $consSummary['left'] . '</span>' ?></p>
+        <?php endif; ?>
+        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/consultas')) ?>">
+            <?= csrf_field() ?>
+            <div class="form-grid">
+                <div class="field"><label for="held_on">Data da consulta</label><input class="input" type="date" id="held_on" name="held_on" value="<?= e(today()) ?>" max="<?= e(today()) ?>" required></div>
+                <div class="field"><label for="qty">Quantas</label><input class="input" type="number" id="qty" name="qty" min="1" max="20" value="1" inputmode="numeric">
+                    <p class="hint">Para lançar consultas antigas de uma vez, aumente o número (todas ficam com a mesma data).</p></div>
+                <div class="field full"><label for="cnote">Observação (opcional)</label><input class="input" id="cnote" name="note" maxlength="160" placeholder="Ex.: avaliação inicial, retorno, bioimpedância"></div>
+            </div>
+            <div class="form-actions"><button class="btn btn-sm" type="submit">Registrar consulta</button></div>
+        </form>
+        <p class="hint">Ao <strong>renovar</strong> o plano, o contador "x de y" recomeça do zero. As consultas antigas continuam no histórico. Só o admin vê.</p>
+        <?php if ($consultations): ?>
+            <div class="tbl-wrap"><table class="tbl" style="min-width:0">
+                <thead><tr><th>Data</th><th>Observação</th><th>Plano</th><th class="r"></th></tr></thead>
+                <tbody>
+                <?php foreach ($consultations as $c): ?>
+                    <tr>
+                        <td class="num"><?= e(fmt_date($c['held_on'])) ?></td>
+                        <td><?= $c['note'] !== null && $c['note'] !== '' ? e($c['note']) : '<span class="muted">-</span>' ?></td>
+                        <td><?= $c['current'] ? '<span class="tag ok">atual</span>' : '<span class="tag">anterior</span>' ?></td>
+                        <td class="r"><form method="post" action="<?= e(url('/admin/consultas/' . (int) $c['id'] . '/apagar')) ?>" data-confirm="Apagar esta consulta?"><?= csrf_field() ?><button class="btn btn-ghost btn-sm" type="submit">Apagar</button></form></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table></div>
+            <p class="muted small mt"><?= (int) $consTotal ?> <?= $consTotal === 1 ? 'consulta registrada' : 'consultas registradas' ?> no total.</p>
         <?php endif; ?>
     </div>
 

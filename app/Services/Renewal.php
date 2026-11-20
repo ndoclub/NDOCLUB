@@ -35,6 +35,25 @@ final class Renewal
         return ['days' => $days, 'seal' => $seal, 'label' => $label, 'short' => $short, 'word' => $word];
     }
 
+    /**
+     * Status do paciente para o admin (lista e ficha):
+     *  Ativo = plano vigente (vence hoje ou depois) · Inativo = plano venceu e não renovou ·
+     *  Desativado = conta bloqueada pelo admin · Sem data = ainda sem vencimento.
+     * Retorna key (active, expired, disabled, nodate), label e tag (classe visual).
+     */
+    public static function planStatus(string $accountStatus, ?string $date): array
+    {
+        if ($accountStatus === 'inactive') {
+            return ['key' => 'disabled', 'label' => 'Desativado', 'tag' => ''];
+        }
+        if (!$date) {
+            return ['key' => 'nodate', 'label' => 'Sem data', 'tag' => ''];
+        }
+        return (int) days_until($date) < 0
+            ? ['key' => 'expired', 'label' => 'Inativo', 'tag' => 'bad']
+            : ['key' => 'active', 'label' => 'Ativo', 'tag' => 'ok'];
+    }
+
     /** Frase curta sobre o vencimento ("Seu plano Trimestral vence em 5 dias."). Sem valores em R$. */
     public static function headline(array $renew, ?string $planName): string
     {

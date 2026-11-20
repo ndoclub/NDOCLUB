@@ -33,7 +33,7 @@ Gabriel. A ideia central é um ciclo simples:
 ### Para o Gabriel (painel `/admin`, funciona no celular e no computador)
 Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)** · **risco de renovação** (quem vence logo e quem sumiu há 7+ dias, com botão de
 WhatsApp) · **planos e valores** (só o admin vê R$) · pacientes (cadastro com plano e "valor combinado",
-renovar com a duração do plano e bônus, pontos manuais, dieta, senha provisória, exclusão LGPD) ·
+renovar com a duração do plano e bônus, pontos manuais, dieta, senha provisória, exclusão LGPD) · **lista de pacientes completa** (status Ativo/Inativo, vencimento, consultas "x de y" por plano, responsável da equipe, ordenar clicando na coluna, filtros por vencimento 15/30 dias, status, responsável e consultas, atribuição em lote) · **responsáveis** ("modo babá": quem cuida de quais pacientes) ·
 **atletas** (etiquetas de modalidade nos pacientes, filtros Atletas / Competem / Sem assessoria / por modalidade,
 cartão **Próximas provas** no painel, tela Modalidades) · **financeiro** (pagamento já no cadastro do paciente, vendido × já caiu × falta cair, cartão que cai sozinho em dia útil com taxa
 e valor líquido, Pix para cobrar com WhatsApp e comprovante, agenda de recebíveis dos próximos 12 meses, e valores em R$, US$ e €) · treinos · moderação do feed e denúncias · mural fixado · loja e
@@ -165,6 +165,27 @@ Mesmo processo, **depois** das atualizações 01, 02 e 03:
 - Tudo isso é **só do admin**. O paciente nunca vê valores, parcelas, taxas nem comprovantes. Ao excluir um paciente (LGPD), os pagamentos e os arquivos de comprovante dele também são apagados.
 - Se algum contrato de cartão já estava vencido antes da atualização, as parcelas vencidas viram "recebidas" sozinhas no primeiro acesso ao Financeiro. É esperado.
 
+### Atualização 05 (Pacientes v2: status, vencimento, consultas e responsáveis)
+Mesmo processo, **depois** das atualizações 01 a 04:
+1. Atualize os arquivos do projeto (`git pull`, ou copie a pasta nova por cima).
+2. phpMyAdmin → clique no banco **nodaysoffclub** (menu da esquerda) → aba **Importar** → `database/atualizacao_05_pacientes.sql` → **Executar**.
+   Acrescenta a cota de consultas nos planos, o campo "responsável" no paciente e as tabelas de consultas e responsáveis. Não apaga nada.
+   **Importe antes de abrir o sistema.**
+3. *(Opcional, só para ver as telas cheias)* importe `database/demo_pacientes.sql`: cria 3 responsáveis **fictícios**, atribui os pacientes de teste e lança consultas de exemplo.
+   Ele também preenche a cota de consultas dos planos **só onde estiver em branco** (Trimestral 2, Semestral 4, Anual 8: é exemplo, troque pelos números reais).
+4. **Ctrl + F5**, abra **Admin → Planos** → **Editar** e preencha **"Consultas presenciais incluídas"** de cada plano (o Gabriel sabe os números).
+5. Abra **Admin → Responsáveis** e cadastre as 3 estagiárias.
+
+**Como a lista de pacientes funciona agora**
+- **Colunas:** Paciente · Status · Plano (com valor) · Vencimento (data + quantos dias faltam) · Consultas ("2 de 4", restam, ou "completa") · Responsável · Pontos · Visto por último.
+- **Status:** *Ativo* = plano em dia (vence hoje ou depois). *Inativo* = o plano venceu e não renovou. *Desativado* = conta bloqueada pelo Gabriel (não consegue entrar). *Sem data* = ainda sem vencimento. É calculado sozinho pela data de vencimento.
+- **Ordenar:** clique no título da coluna (clicar de novo inverte; a setinha mostra o sentido). Também dá para escolher em **Ordenar** (fica útil no celular). Padrão: nome de A a Z.
+- **Filtros** (combinam entre si e com os botões Em dia, Vencem logo, Atletas...): **Status**, **Vencimento** (vencidos, 0 a 7, 8 a 15, 16 a 30, 31 a 60, mais de 60 dias, sem data: serve para o plano de ação "vence em 15 dias, 30 dias..."), **Responsável** (cada estagiária ou "sem responsável"), **Consultas** (ainda têm a fazer, cota completa, nenhuma feita, plano sem cota), além de Plano e Modalidade. "Limpar filtros" volta ao começo.
+- **Consultas presenciais:** cada plano tem uma **cota** (Admin → Planos). Na ficha do paciente, painel **Consultas presenciais**, você registra cada consulta com a data e uma observação opcional (dá para lançar várias de uma vez, útil para quem já fez consultas antes do sistema). Ao **renovar** o plano o contador recomeça do zero; as consultas antigas ficam no histórico como "anterior". Registrou errado? **Apagar**.
+- **Responsáveis (modo babá):** por enquanto as estagiárias **não entram no sistema**: é só uma etiqueta. Para atribuir em massa: na lista, marque os pacientes (a caixinha do topo marca todos os que aparecem), escolha a estagiária em **"Atribuir os marcados a…"** e clique **Aplicar**. Dica: filtre por "Sem responsável" e marque todos para distribuir de uma vez. Também dá para escolher o responsável no cadastro e na ficha de cada paciente. Responsável não é apagado, só desativado.
+- **Privacidade:** responsável e consultas são só do painel do admin. O paciente nunca vê. Ao excluir um paciente (LGPD), as consultas dele também são apagadas.
+- **Ainda não existe:** login próprio para as estagiárias (cada uma ver só os pacientes dela, sem valores). Fica para uma próxima etapa, junto com a revisão de segurança.
+
 ### Acessos para teste
 | Perfil | E-mail | Senha |
 |---|---|---|
@@ -284,6 +305,18 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Privacidade (importante):** entrar como paciente e passar pelas telas → **nenhum R$, US$ ou € em lugar nenhum**. Abrir `/admin/financeiro` e o endereço de um comprovante como paciente → bloqueado.
 - [ ] **Excluir paciente de teste** (LGPD): os pagamentos dele somem do Financeiro.
 
+### E5. Lista de pacientes, consultas e responsáveis
+- [ ] **Planos:** Admin → Planos → Editar → preencher **Consultas presenciais incluídas** (ex.: 4). A tabela de Planos mostra a coluna **Consultas**. Número inválido (letras, 61 ou mais) é recusado; em branco = "definir".
+- [ ] **Responsáveis:** Admin → Responsáveis → Novo responsável. Nome repetido é recusado. Desativar não apaga.
+- [ ] **Atribuir em lote:** Pacientes → marcar 3 pacientes → escolher a estagiária → **Aplicar**. O aviso diz quantos mudaram e a coluna **Responsável** mostra o nome. O filtro **Responsável** mostra só os dela e **Sem responsável** mostra quem ficou sem.
+- [ ] **Status:** paciente com vencimento no futuro aparece **Ativo**; com data passada aparece **Inativo**; conta bloqueada (ficha → Acesso → Desativado) aparece **Desativado**.
+- [ ] **Vencimento:** filtro **16 a 30 dias** mostra só quem vence nessa faixa. Conferir a data na coluna Vencimento.
+- [ ] **Ordenar:** clicar em **Vencimento** (mais próximo primeiro), clicar de novo (mais distante primeiro). Clicar em **Pontos**, **Consultas**, **Responsável**. O filtro escolhido não se perde ao ordenar.
+- [ ] **Registrar consulta:** ficha → **Consultas presenciais** → data de hoje → **Registrar consulta**. Mostra "1 de 4", "restam 3". Data futura é recusada. Quantidade 2 lança duas de uma vez. **Apagar** remove.
+- [ ] **Cota completa:** ao chegar em "4 de 4" aparece **cota completa** na ficha e **completa** na lista; o filtro **Cota de consultas completa** lista o paciente.
+- [ ] **Renovar zera o contador:** renovar o paciente → volta para "0 de 4"; o histórico mostra as consultas antigas como **anterior**.
+- [ ] **Privacidade (importante):** entrar como paciente → nenhuma tela mostra responsável nem consultas. Abrir `/admin/responsaveis` como paciente → bloqueado.
+
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
 - [ ] O painel admin no celular abre o menu pelo botão ☰ (gaveta lateral).
@@ -296,12 +329,12 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **490 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **622 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
-> perfil esportivo, financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
+> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
 > ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, os
-> arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql` e `atualizacao_04_financeiro_v2.sql`) é o primeiro teste a fazer.
+> arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql`, `atualizacao_04_financeiro_v2.sql` e `atualizacao_05_pacientes.sql`) é o primeiro teste a fazer.
 > Se o phpMyAdmin acusar algum erro, copie a mensagem e me envie que eu corrijo.
 
 ---
@@ -336,6 +369,8 @@ Ideal: faça no celular e depois no computador.
 | Perfil esportivo (atletas): modalidades, assessoria, próximas provas, filtros no painel, edição pelo paciente | ✅ **Neste MVP** (atualização 02) |
 | Financeiro: moedas (R$, US$, €), pagamentos parcelados, agenda de recebíveis, "Recebi", atrasadas, reajuste de plano só na renovação | ✅ **Neste MVP** (atualização 03) |
 | Financeiro v2: pagamento no cadastro do paciente, vendido × já caiu × falta cair, cartão automático em dia útil, taxa por bandeira com valor líquido, Pix para cobrar (WhatsApp + comprovante), cancelar parcela | ✅ **Neste MVP** (atualização 04) |
+| Pacientes v2: status Ativo/Inativo, vencimento, consultas presenciais com cota por plano, responsável (modo babá), ordenação por coluna, filtros e atribuição em lote | ✅ **Neste MVP** (atualização 05) |
+| Estagiárias com **login próprio** (cada uma vê só os pacientes dela, sem valores), mensagem de ação por faixa de vencimento (15/30 dias), acompanhamento da renovação | ⏭️ Próxima rodada (pede revisão de segurança) |
 | Financeiro, próximos passos: **notificação push** da cobrança do dia, taxa de renovação, previsão por mês, acompanhamento da renovação (conversei / vai renovar / não vai), marcador "cobrado em", mensagem de cobrança editável, importação dos contratos por planilha | ⏭️ Próxima rodada |
 | Contagem regressiva da prova no Início do paciente, temas do dia por modalidade, ranking por modalidade | ⏭️ Próxima rodada (dados já estão no banco) |
 | Fase 2 — notificações push, medalhas/conquistas, desafios mensais, cupons de parceiros, fotos de evolução (privadas), indicação com link | ⏭️ Tabelas e serviços já preparados (`Points::award`, `point_rules`, `audit_log`); falta construir as telas |

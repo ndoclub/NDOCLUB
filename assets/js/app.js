@@ -68,6 +68,24 @@
         if (t && t.hasAttribute && t.hasAttribute('data-autosubmit') && t.form) { t.form.submit(); }
     });
 
+    // Lista de pacientes: marcar todos / contar os marcados (para atribuir responsável em lote)
+    function countChecked() {
+        var n = document.querySelectorAll('input[data-check-item]:checked').length;
+        var out = document.querySelector('[data-check-count]');
+        if (out) { out.textContent = n; }
+    }
+    document.addEventListener('change', function (ev) {
+        var t = ev.target;
+        if (!t || !t.hasAttribute) { return; }
+        if (t.hasAttribute('data-check-all')) {
+            var items = document.querySelectorAll('input[data-check-item]');
+            for (var i = 0; i < items.length; i++) { items[i].checked = t.checked; }
+            countChecked();
+        } else if (t.hasAttribute('data-check-item')) {
+            countChecked();
+        }
+    });
+
     // Confirmação em botões que escolhem a ação (ex.: Recusar resgate)
     document.addEventListener('click', function (ev) {
         var b = ev.target.closest ? ev.target.closest('[data-confirm-click]') : null;

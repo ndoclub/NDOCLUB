@@ -24,6 +24,7 @@ CREATE TABLE users (
   status ENUM('active','inactive') NOT NULL DEFAULT 'active',
   renewal_date DATE NULL,
   plan_id INT UNSIGNED NULL,
+  responsible_id INT UNSIGNED NULL,
   must_change_password TINYINT(1) NOT NULL DEFAULT 1,
   consent_at DATETIME NULL,
   consent_version VARCHAR(12) NULL,
@@ -45,6 +46,7 @@ CREATE TABLE plans (
   name VARCHAR(60) NOT NULL,
   duration_days INT UNSIGNED NOT NULL,
   price DECIMAL(10,2) NULL,
+  consultations_included TINYINT UNSIGNED NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (id)
@@ -359,6 +361,34 @@ CREATE TABLE measurements (
   PRIMARY KEY (id),
   UNIQUE KEY uq_measure_day (user_id, measured_on),
   CONSTRAINT fk_measure_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
+-- Responsáveis ("modo babá": cada estagiária cuida de alguns pacientes) e consultas presenciais.
+-- Responsáveis não são apagados, só desativados. Só o admin vê isso (nunca o paciente).
+-- Consultas: cada plano tem uma cota (plans.consultations_included). A coluna "cycle" é o número de
+-- renovações que o paciente tinha quando a consulta foi registrada; ao renovar, o contador "x de y" recomeça.
+-- ---------------------------------------------------------------------
+CREATE TABLE responsibles (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(80) NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_responsibles_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE consultations (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id INT UNSIGNED NOT NULL,
+  held_on DATE NOT NULL,
+  cycle SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  note VARCHAR(160) NULL,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_consultations_user (user_id, cycle),
+  CONSTRAINT fk_consultations_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------

@@ -13,6 +13,8 @@ $price = old('price', ($plan['price'] ?? null) !== null ? number_format((float) 
             <p class="hint">Trimestral 90, semestral 180, anual 365. É o que a renovação soma.</p></div>
         <div class="field"><label for="price">Valor (R$)</label><input class="input" id="price" name="price" inputmode="decimal" value="<?= e($price) ?>" placeholder="Ex.: 450,00">
             <p class="hint">Só o admin vê. Deixe em branco se ainda não definiu.<?= $isEdit ? ' Se você mudar o valor, quem já está no plano mantém o valor antigo até a próxima renovação.' : '' ?></p></div>
+        <div class="field"><label for="consultations_included">Consultas presenciais incluídas</label><input class="input" type="number" id="consultations_included" name="consultations_included" min="0" max="60" inputmode="numeric" value="<?= e(old('consultations_included', ($plan['consultations_included'] ?? null) !== null ? (string) (int) $plan['consultations_included'] : '')) ?>" placeholder="Ex.: 4">
+            <p class="hint">Quantas consultas presenciais o plano dá. A lista de pacientes mostra "2 de 4". Em branco = ainda não definido.</p></div>
         <div class="field full"><label class="checkbox"><input type="checkbox" name="active" value="1"<?= (!$isEdit || $plan['active']) ? ' checked' : '' ?>><span>Ativo (aparece ao escolher o plano de um paciente)</span></label>
             <p class="hint">Planos não são apagados: desative para esconder, e os pacientes que já estão nele continuam normais.</p></div>
     </div>

@@ -7,32 +7,110 @@ use App\Core\Upload;
 use App\Core\View;
 use App\Services\Athletes;
 use App\Services\Audit;
+use App\Services\Consultations;
 use App\Services\Levels;
 use App\Services\Payments;
 use App\Services\Plans;
 use App\Services\Points;
 use App\Services\Ranking;
+use App\Services\Responsibles;
 use App\Services\Renewal;
 use App\Services\Streak;
 
 final class PatientController
 {
+    /**
+     * Ordenações possíveis da lista: chave => [rótulo, texto crescente, texto decrescente, sentido inicial,
+     * expressão SQL, "vazio por último"]. A chave vem da URL, então só estas valem (lista fechada).
+     */
+    public static function sortOptions(): array
+    {
+        return [
+            'name'     => ['Nome', 'A a Z', 'Z a A', 'asc', 'u.name', false],
+            'status'   => ['Status', 'Ativos primeiro', 'Desativados primeiro', 'asc', "CASE WHEN u.status = 'inactive' THEN 3 WHEN u.renewal_date IS NULL THEN 2 WHEN u.renewal_date < ? THEN 1 ELSE 0 END", false],
+            'plan'     => ['Plano', 'do mais curto ao mais longo', 'do mais longo ao mais curto', 'asc', 'pl.duration_days', true],
+            'renewal'  => ['Vencimento', 'mais próximo primeiro', 'mais distante primeiro', 'asc', 'u.renewal_date', true],
+            'consults' => ['Consultas feitas', 'menos primeiro', 'mais primeiro', 'asc', 'done_count', false],
+            'resp'     => ['Responsável', 'A a Z', 'Z a A', 'asc', 'rs.name', true],
+            'points'   => ['Pontos', 'menos primeiro', 'mais primeiro', 'desc', 'balance', false],
+            'seen'     => ['Visto por último', 'há mais tempo primeiro', 'mais recente primeiro', 'asc', 'u.last_seen_at', false],
+        ];
+    }
+
+    /** Faixas de vencimento do filtro (dias até vencer). */
+    public static function dueBuckets(): array
+    {
+        return [
+            'expired' => 'Vencidos',
+            'd7'      => 'Vencem em 0 a 7 dias',
+            'd15'     => 'Vencem em 8 a 15 dias',
+            'd30'     => 'Vencem em 16 a 30 dias',
+            'd60'     => 'Vencem em 31 a 60 dias',
+            'd60p'    => 'Vencem em mais de 60 dias',
+            'nodate'  => 'Sem data de vencimento',
+        ];
+    }
+
+    private static function inDueBucket(?int $days, string $bucket): bool
+    {
+        return match ($bucket) {
+            'expired' => $days !== null && $days < 0,
+            'd7'      => $days !== null && $days >= 0 && $days <= 7,
+            'd15'     => $days !== null && $days >= 8 && $days <= 15,
+            'd30'     => $days !== null && $days >= 16 && $days <= 30,
+            'd60'     => $days !== null && $days >= 31 && $days <= 60,
+            'd60p'    => $days !== null && $days > 60,
+            'nodate'  => $days === null,
+            default   => true,
+        };
+    }
+
     public function index(): void
     {
         $q = trim((string) ($_GET['q'] ?? ''));
         $filter = (string) ($_GET['f'] ?? 'all');
         $sportId = (int) ($_GET['s'] ?? 0);
         $planFilter = (int) ($_GET['plan'] ?? 0);
+        $stFilter = (string) ($_GET['st'] ?? '');
+        $dueFilter = (string) ($_GET['v'] ?? '');
+        $respFilter = (string) ($_GET['r'] ?? '');
+        $consFilter = (string) ($_GET['c'] ?? '');
+        if (!in_array($stFilter, ['active', 'expired', 'disabled', 'nodate'], true)) {
+            $stFilter = '';
+        }
+        if (!isset(self::dueBuckets()[$dueFilter])) {
+            $dueFilter = '';
+        }
+        if ($respFilter !== 'none') {
+            $respFilter = ctype_digit($respFilter) && (int) $respFilter > 0 ? (string) (int) $respFilter : '';
+        }
+        if (!in_array($consFilter, ['left', 'full', 'zero', 'noquota'], true)) {
+            $consFilter = '';
+        }
 
-        $sql = "SELECT u.id, u.name, u.email, u.phone, u.avatar, u.status, u.renewal_date, u.last_seen_at,
+        // Ordenação: "chave_sentido" (ex.: renewal_asc). Chave desconhecida volta para nome A a Z.
+        $sorts = self::sortOptions();
+        $ord = (string) ($_GET['ord'] ?? 'name_asc');
+        [$sortKey, $sortDir] = array_pad(explode('_', $ord, 2), 2, 'asc');
+        if (!isset($sorts[$sortKey])) {
+            $sortKey = 'name';
+        }
+        $sortDir = $sortDir === 'desc' ? 'desc' : 'asc';
+        $ord = $sortKey . '_' . $sortDir;
+
+        $sql = "SELECT u.id, u.name, u.email, u.phone, u.avatar, u.status, u.renewal_date, u.last_seen_at, u.responsible_id,
                        pl.name AS plan_name, COALESCE(bl.price, pl.price) AS plan_value,
                        CASE WHEN bl.price IS NOT NULL THEN bl.currency ELSE 'BRL' END AS plan_currency,
+                       pl.consultations_included AS quota,
+                       rs.name AS responsible_name, rs.active AS responsible_active,
                        ap.is_athlete, ap.competes, ap.has_coach, ap.coach_name, ap.event_name, ap.event_date,
+                       " . Consultations::DONE_SQL . " AS done_count,
                        (SELECT COALESCE(SUM(l.points), 0) FROM points_ledger l WHERE l.user_id = u.id) AS balance
                   FROM users u
                   LEFT JOIN plans pl ON pl.id = u.plan_id
                   LEFT JOIN patient_billing bl ON bl.user_id = u.id
                   LEFT JOIN athlete_profiles ap ON ap.user_id = u.id
+                  LEFT JOIN responsibles rs ON rs.id = u.responsible_id
                  WHERE u.role = 'patient'";
         $params = [];
         if ($sportId > 0) {
@@ -43,18 +121,31 @@ final class PatientController
             $sql .= ' AND u.plan_id = ?';
             $params[] = $planFilter;
         }
+        if ($respFilter === 'none') {
+            $sql .= ' AND u.responsible_id IS NULL';
+        } elseif ($respFilter !== '') {
+            $sql .= ' AND u.responsible_id = ?';
+            $params[] = (int) $respFilter;
+        }
         if ($q !== '') {
             $sql .= ' AND (u.name LIKE ? OR u.email LIKE ?)';
             $params[] = '%' . $q . '%';
             $params[] = '%' . $q . '%';
         }
-        $sql .= ' ORDER BY u.name ASC';
+        // ORDER BY só usa expressões da lista fechada acima (nada vem direto da URL)
+        [, , , , $expr, $nullsLast] = $sorts[$sortKey];
+        $sql .= ' ORDER BY ' . ($nullsLast ? '(' . $expr . ' IS NULL) ASC, ' : '') . $expr . ' ' . strtoupper($sortDir) . ', u.name ASC';
+        if ($sortKey === 'status') {
+            $params[] = today();
+        }
 
         $weekAgo = date('Y-m-d H:i:s', strtotime('-7 day'));
         $list = [];
         foreach (DB::all($sql, $params) as $r) {
             $r['renew'] = Renewal::info($r['renewal_date']);
             $r['away'] = empty($r['last_seen_at']) || $r['last_seen_at'] < $weekAgo;
+            $r['plan_status'] = Renewal::planStatus((string) $r['status'], $r['renewal_date']);
+            $r['cons'] = Consultations::summary((int) $r['done_count'], $r['quota']);
             if ($filter === 'inactive' && $r['status'] !== 'inactive') {
                 continue;
             }
@@ -74,14 +165,100 @@ final class PatientController
             if ($filter === 'nocoach' && !($isAthlete && (int) $r['has_coach'] === 0)) {
                 continue;
             }
+            if ($stFilter !== '' && $r['plan_status']['key'] !== $stFilter) {
+                continue;
+            }
+            // Faixas de vencimento só olham contas ativas (conta desativada não precisa de plano de ação)
+            if ($dueFilter !== '' && ($r['status'] !== 'active' || !self::inDueBucket($r['renew']['days'], $dueFilter))) {
+                continue;
+            }
+            if ($consFilter === 'left' && !($r['cons']['quota'] !== null && !$r['cons']['full'])) {
+                continue;
+            }
+            if ($consFilter === 'full' && !$r['cons']['full']) {
+                continue;
+            }
+            if ($consFilter === 'zero' && $r['cons']['done'] !== 0) {
+                continue;
+            }
+            if ($consFilter === 'noquota' && $r['cons']['quota'] !== null) {
+                continue;
+            }
             $list[] = $r;
         }
         View::render('admin/patients/index', [
             'title' => 'Pacientes', 'list' => $list, 'q' => $q, 'filter' => $filter,
             'sportId' => $sportId, 'sports' => Athletes::sports(false),
             'planFilter' => $planFilter, 'planOptions' => Plans::withCounts(),
+            'stFilter' => $stFilter, 'dueFilter' => $dueFilter, 'respFilter' => $respFilter, 'consFilter' => $consFilter,
+            'dueBuckets' => self::dueBuckets(),
+            'sorts' => $sorts, 'ord' => $ord, 'sortKey' => $sortKey, 'sortDir' => $sortDir,
+            'responsibles' => Responsibles::all(), 'respChoices' => Responsibles::choices(),
             'sportNames' => Athletes::namesFor(array_column($list, 'id')),
         ], 'admin');
+    }
+
+    /** Define o responsável de vários pacientes de uma vez (marcados na lista). */
+    public function assign(): void
+    {
+        $back = safe_back((string) ($_POST['back'] ?? ''), '/admin/pacientes');
+        $ids = $_POST['ids'] ?? [];
+        $ids = is_array($ids) ? array_values(array_unique(array_filter(array_map('intval', $ids), fn($i) => $i > 0))) : [];
+        $raw = (string) ($_POST['responsible_id'] ?? '');
+        if (!$ids) {
+            flash('err', 'Marque pelo menos um paciente na lista.');
+            redirect($back);
+        }
+        if ($raw === '' || !ctype_digit($raw)) {
+            flash('err', 'Escolha o responsável (ou "Sem responsável").');
+            redirect($back);
+        }
+        $rid = (int) $raw;
+        if ($rid > 0 && !Responsibles::isActive($rid)) {
+            flash('err', 'Esse responsável não existe ou está desativado.');
+            redirect($back);
+        }
+        $n = Responsibles::assign($ids, $rid);
+        $label = $rid > 0 ? (string) DB::val('SELECT name FROM responsibles WHERE id = ?', [$rid]) : 'sem responsável';
+        Audit::log((int) Auth::id(), 'patient_assign', 'responsible', $rid ?: null, count($ids) . ' paciente(s) -> ' . $label);
+        flash('ok', $rid > 0
+            ? count($ids) . (count($ids) === 1 ? ' paciente agora é de ' : ' pacientes agora são de ') . $label . '.'
+            : 'Responsável removido de ' . count($ids) . (count($ids) === 1 ? ' paciente.' : ' pacientes.'));
+        redirect($back);
+    }
+
+    /** Registra consulta(s) presencial(is) já realizada(s). */
+    public function addConsultation(int $id): void
+    {
+        $this->find($id);
+        $err = Consultations::add(
+            $id,
+            input('held_on') ?: today(),
+            input('note'),
+            (int) ($_POST['qty'] ?? 1) ?: 1,
+            (int) Auth::id()
+        );
+        if ($err !== null) {
+            flash('err', $err);
+            redirect('/admin/pacientes/' . $id . '#consultas');
+        }
+        $qty = max(1, (int) ($_POST['qty'] ?? 1));
+        Audit::log((int) Auth::id(), 'consultation_add', 'user', $id, $qty . ' consulta(s) em ' . (input('held_on') ?: today()));
+        flash('ok', $qty === 1 ? 'Consulta registrada.' : $qty . ' consultas registradas.');
+        redirect('/admin/pacientes/' . $id . '#consultas');
+    }
+
+    /** Apaga uma consulta registrada por engano. */
+    public function removeConsultation(int $id): void
+    {
+        $row = Consultations::remove($id);
+        if (!$row) {
+            flash('err', 'Consulta não encontrada.');
+            redirect('/admin/pacientes');
+        }
+        Audit::log((int) Auth::id(), 'consultation_delete', 'user', (int) $row['user_id'], 'consulta de ' . $row['held_on']);
+        flash('ok', 'Consulta apagada.');
+        redirect('/admin/pacientes/' . (int) $row['user_id'] . '#consultas');
     }
 
     public function create(): void
@@ -92,6 +269,7 @@ final class PatientController
             'defaultRenewal' => date('Y-m-d', strtotime('+30 day')),
             'plans' => Plans::active(),
             'fees' => Payments::feeTable(),
+            'respChoices' => Responsibles::choices(),
         ], 'admin');
     }
 
@@ -107,6 +285,7 @@ final class PatientController
         $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
         $customCur = currency_or_brl($_POST['plan_currency'] ?? 'BRL');
         $plan = $planId ? DB::one('SELECT * FROM plans WHERE id = ? AND active = 1', [$planId]) : null;
+        $respId = (int) ($_POST['responsible_id'] ?? 0);
 
         // Pagamento (opcional): "method" ausente ou "none" = só cadastrar. Vazio = esqueceu de escolher.
         $method = array_key_exists('method', $_POST) ? trim((string) $_POST['method']) : 'none';
@@ -115,6 +294,9 @@ final class PatientController
         $errors = [];
         if ($planId && !$plan) {
             $errors[] = 'Plano inválido.';
+        }
+        if ($respId > 0 && !Responsibles::isActive($respId)) {
+            $errors[] = 'Responsável inválido ou desativado.';
         }
         if ($custom === false) {
             $errors[] = 'Valor vendido inválido. Use números, por exemplo 450,00.';
@@ -174,11 +356,11 @@ final class PatientController
         if ($storeCustom && $plan && $plan['price'] !== null && $customCur === 'BRL' && abs($custom - (float) $plan['price']) < 0.005) {
             $storeCustom = false;
         }
-        $id = DB::tx(function () use ($name, $email, $password, $phone, $goal, $renewal, $plan, $custom, $customCur, $storeCustom, $pay, $amount, $payCur) {
+        $id = DB::tx(function () use ($name, $email, $password, $phone, $goal, $renewal, $plan, $custom, $customCur, $storeCustom, $pay, $amount, $payCur, $respId) {
             $id = DB::insert(
-                "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, plan_id, must_change_password, created_at)
-                 VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, 1, ?)",
-                [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, $plan ? (int) $plan['id'] : null, now()]
+                "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, plan_id, responsible_id, must_change_password, created_at)
+                 VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, ?, 1, ?)",
+                [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, $plan ? (int) $plan['id'] : null, $respId > 0 ? $respId : null, now()]
             );
             if ($storeCustom) {
                 Plans::setCustomPrice($id, $custom, $customCur, 'manual');
@@ -240,7 +422,14 @@ final class PatientController
         $priceInfo = Plans::priceInfoFor($id);
         $suggest = Plans::renewalSuggestion($id);
         $lastMethod = $payments ? (string) $payments[0]['method'] : 'pix';
+        $consSummary = Consultations::summary(Consultations::done($id), $planRow['consultations_included'] ?? null);
         View::render('admin/patients/show', [
+            'consSummary' => $consSummary,
+            'consultations' => Consultations::forUser($id),
+            'consTotal' => Consultations::total($id),
+            'respChoices' => Responsibles::choices(!empty($p['responsible_id']) ? (int) $p['responsible_id'] : null),
+            'respName' => !empty($p['responsible_id']) ? DB::val('SELECT name FROM responsibles WHERE id = ?', [(int) $p['responsible_id']]) : null,
+            'planStatus' => Renewal::planStatus((string) $p['status'], $p['renewal_date']),
             'plans' => $plansList,
             'planRow' => $planRow,
             'customPrice' => Plans::customPrice($id),
@@ -290,10 +479,14 @@ final class PatientController
         $status = input('status') === 'inactive' ? 'inactive' : 'active';
         $renewal = input('renewal_date');
         $planId = (int) ($_POST['plan_id'] ?? 0);
+        $respId = (int) ($_POST['responsible_id'] ?? 0);
         $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
         $customCur = currency_or_brl($_POST['plan_currency'] ?? 'BRL');
 
         $errors = [];
+        if ($respId > 0 && $respId !== (int) ($p['responsible_id'] ?? 0) && !Responsibles::isActive($respId)) {
+            $errors[] = 'Responsável inválido ou desativado.';
+        }
         if ($planId && !DB::one('SELECT id FROM plans WHERE id = ? AND (active = 1 OR id = ?)', [$planId, (int) ($p['plan_id'] ?? 0)])) {
             $errors[] = 'Plano inválido.';
         }
@@ -325,8 +518,8 @@ final class PatientController
             }
         }
         DB::run(
-            'UPDATE users SET name = ?, email = ?, phone = ?, goal = ?, status = ?, renewal_date = ?, plan_id = ? WHERE id = ?',
-            [$name, $email, $phone ?: null, $goal ?: null, $status, $renewal ?: null, $planId ?: null, $id]
+            'UPDATE users SET name = ?, email = ?, phone = ?, goal = ?, status = ?, renewal_date = ?, plan_id = ?, responsible_id = ? WHERE id = ?',
+            [$name, $email, $phone ?: null, $goal ?: null, $status, $renewal ?: null, $planId ?: null, $respId > 0 ? $respId : null, $id]
         );
         Plans::setCustomPrice($id, $custom, $customCur);
         Audit::log((int) Auth::id(), 'patient_update', 'user', $id, $p['name']);

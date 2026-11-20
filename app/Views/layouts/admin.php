@@ -6,6 +6,7 @@ $nav = [
     ['/admin',            'Painel',        'grid',     $path === '/admin'],
     ['/admin/pacientes',  'Pacientes',     'users',    $is('/admin/pacientes')],
     ['/admin/planos',     'Planos',        'card',     $is('/admin/planos')],
+    ['/admin/responsaveis','Responsáveis', 'users',    $is('/admin/responsaveis')],
     ['/admin/financeiro', 'Financeiro',    'cash',     $is('/admin/financeiro')],
     ['/admin/modalidades','Modalidades',   'tag',      $is('/admin/modalidades')],
     ['/admin/treinos',    'Treinos',       'dumbbell', $is('/admin/treinos')],

@@ -15,6 +15,14 @@
             </select>
             <p class="hint">Ao escolher, a data de vencimento é preenchida sozinha (você pode mudar).</p></div>
         <div class="field"><label for="renewal_date">Vence em</label><input class="input" type="date" id="renewal_date" name="renewal_date" value="<?= e(old('renewal_date', $defaultRenewal)) ?>"></div>
+        <div class="field"><label for="responsible_id">Responsável</label>
+            <select id="responsible_id" name="responsible_id">
+                <option value="">Sem responsável</option>
+                <?php foreach ($respChoices as $rc): if (!$rc['active']) { continue; } ?>
+                    <option value="<?= (int) $rc['id'] ?>"<?= (string) old('responsible_id') === (string) $rc['id'] ? ' selected' : '' ?>><?= e($rc['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <p class="hint">Quem da equipe cuida deste paciente (modo babá). Dá para mudar depois.</p></div>
         <h3 class="sub full" style="margin:12px 0 4px">Pagamento</h3>
         <p class="muted small full" style="margin:0 0 12px">Já registra a venda em Financeiro. Para o valor, o sistema usa o do plano; mude se este paciente combinou outro valor. Só o admin vê.</p>
         <?php

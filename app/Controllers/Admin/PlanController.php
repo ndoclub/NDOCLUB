@@ -32,8 +32,8 @@ final class PlanController
     {
         $d = $this->validated('/admin/planos/novo');
         $id = DB::insert(
-            'INSERT INTO plans (name, duration_days, price, active, created_at) VALUES (?, ?, ?, ?, ?)',
-            [$d['name'], $d['days'], $d['price'], $d['active'], now()]
+            'INSERT INTO plans (name, duration_days, price, consultations_included, active, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [$d['name'], $d['days'], $d['price'], $d['consults'], $d['active'], now()]
         );
         Audit::log((int) Auth::id(), 'plan_create', 'plan', $id, $d['name'] . ' (' . $d['days'] . ' dias)');
         flash('ok', 'Plano criado.');
@@ -51,8 +51,8 @@ final class PlanController
         $oldPrice = $plan['price'] === null ? null : (float) $plan['price'];
         $kept = Plans::protectOnPriceChange($id, $oldPrice, $d['price']);
         DB::run(
-            'UPDATE plans SET name = ?, duration_days = ?, price = ?, active = ? WHERE id = ?',
-            [$d['name'], $d['days'], $d['price'], $d['active'], $id]
+            'UPDATE plans SET name = ?, duration_days = ?, price = ?, consultations_included = ?, active = ? WHERE id = ?',
+            [$d['name'], $d['days'], $d['price'], $d['consults'], $d['active'], $id]
         );
         $old = $plan['price'] === null ? 'sem valor' : money((float) $plan['price']);
         $new = $d['price'] === null ? 'sem valor' : money($d['price']);
@@ -70,6 +70,8 @@ final class PlanController
         $name = input('name');
         $days = (int) ($_POST['duration_days'] ?? 0);
         $price = parse_money((string) ($_POST['price'] ?? ''));
+        $consRaw = trim((string) ($_POST['consultations_included'] ?? ''));
+        $consults = $consRaw === '' ? null : (ctype_digit($consRaw) ? (int) $consRaw : false);
 
         $errors = [];
         if (mb_strlen($name) < 2 || mb_strlen($name) > 60) {
@@ -81,6 +83,9 @@ final class PlanController
         if ($price === false) {
             $errors[] = 'Valor inválido. Use números, por exemplo 450 ou 450,00.';
         }
+        if ($consults === false || ($consults !== null && $consults > 60)) {
+            $errors[] = 'Consultas incluídas: use um número de 0 a 60 (ou deixe em branco se ainda não definiu).';
+        }
         if ($errors) {
             keep_old();
             foreach ($errors as $e) {
@@ -88,6 +93,6 @@ final class PlanController
             }
             redirect($back);
         }
-        return ['name' => $name, 'days' => $days, 'price' => $price, 'active' => empty($_POST['active']) ? 0 : 1];
+        return ['name' => $name, 'days' => $days, 'price' => $price, 'consults' => $consults, 'active' => empty($_POST['active']) ? 0 : 1];
     }
 }
