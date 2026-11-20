@@ -41,12 +41,20 @@ final class HomeController
             [$id]
         );
 
+        // Plano do paciente: só nome e duração (nunca o valor em R$, que é exclusivo do admin)
+        $plan = !empty($u['plan_id']) ? DB::one('SELECT name, duration_days FROM plans WHERE id = ?', [(int) $u['plan_id']]) : null;
+        $renew = Renewal::info($u['renewal_date']);
+        $meterTotal = $plan ? max(1, (int) $plan['duration_days']) : 30;
+        $meterPct = $renew['days'] === null ? 0 : (int) max(4, min(100, round(max(0, $renew['days']) / $meterTotal * 100)));
+
         View::render('patient/home', [
             'title' => 'Início',
             'streak' => Streak::current($id),
             'week' => Streak::week($id),
             'doneToday' => Streak::doneToday($id),
-            'renew' => Renewal::info($u['renewal_date']),
+            'renew' => $renew,
+            'planName' => $plan['name'] ?? null,
+            'meterPct' => $meterPct,
             'whatsapp' => Renewal::whatsappUrl($u),
             'balance' => Points::balance($id),
             'level' => Levels::forPoints($life),

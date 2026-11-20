@@ -74,6 +74,32 @@
         if (b && !window.confirm(b.getAttribute('data-confirm-click'))) { ev.preventDefault(); }
     });
 
+    // Escolher o plano: preenche a data de vencimento (cadastro) e mostra o valor do plano no campo "valor combinado"
+    document.addEventListener('change', function (ev) {
+        var sel = ev.target;
+        if (!sel || !sel.hasAttribute || !sel.hasAttribute('data-plan-select')) { return; }
+        var opt = sel.options[sel.selectedIndex];
+        var days = parseInt(opt.getAttribute('data-days'), 10);
+        var dateSel = sel.getAttribute('data-date-target');
+        if (dateSel && days) {
+            var input = document.querySelector(dateSel);
+            if (input) {
+                var d = new Date();
+                d.setDate(d.getDate() + days);
+                var mm = ('0' + (d.getMonth() + 1)).slice(-2), dd = ('0' + d.getDate()).slice(-2);
+                input.value = d.getFullYear() + '-' + mm + '-' + dd;
+            }
+        }
+        var priceSel = sel.getAttribute('data-price-target');
+        if (priceSel) {
+            var price = document.querySelector(priceSel);
+            if (price) {
+                var p = opt.getAttribute('data-price');
+                price.placeholder = p ? 'Padrão do plano: R$ ' + p : 'Igual ao do plano';
+            }
+        }
+    });
+
     // Copiar texto (mensagem de boas-vindas)
     document.addEventListener('click', function (ev) {
         var b = ev.target.closest ? ev.target.closest('[data-copy]') : null;

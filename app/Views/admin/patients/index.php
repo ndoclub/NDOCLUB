@@ -23,7 +23,7 @@ $filters = ['all' => 'Todos', 'green' => 'Em dia', 'yellow' => 'Vencem logo', 'r
 <?php else: ?>
 <div class="tbl-wrap">
     <table class="tbl">
-        <thead><tr><th>Paciente</th><th>Renovação</th><th class="r">Pontos</th><th>Visto por último</th></tr></thead>
+        <thead><tr><th>Paciente</th><th>Plano</th><th>Renovação</th><th class="r">Pontos</th><th>Visto por último</th></tr></thead>
         <tbody>
         <?php foreach ($list as $r): ?>
             <tr>
@@ -31,6 +31,7 @@ $filters = ['all' => 'Todos', 'green' => 'Em dia', 'yellow' => 'Vencem logo', 'r
                     <a class="who" href="<?= e(url('/admin/pacientes/' . $r['id'])) ?>"><?= avatar($r, 34) ?>
                         <span><?= e($r['name']) ?><br><span class="small muted" style="font-weight:400"><?= e($r['email']) ?></span></span></a>
                 </td>
+                <td><?php if ($r['plan_name']): ?><?= e($r['plan_name']) ?><br><span class="small muted"><?= $r['plan_value'] !== null ? e(money((float) $r['plan_value'], floor((float) $r['plan_value']) == (float) $r['plan_value'] ? 0 : 2)) : 'sem valor' ?></span><?php else: ?><span class="muted">-</span><?php endif; ?></td>
                 <td>
                     <?php if ($r['status'] === 'inactive'): ?><span class="tag">Desativado</span>
                     <?php else: partial('seal', ['renew' => $r['renew']]); endif; ?>

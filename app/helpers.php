@@ -281,6 +281,32 @@ function parse_decimal(string $s): ?float
     return is_numeric($s) ? (float) $s : null;
 }
 
+/** Valor em reais no padrão brasileiro: R$ 1.234,50. Só usar no painel admin. */
+function money(?float $v, int $dec = 2): string
+{
+    return $v === null ? '-' : 'R$ ' . number_format($v, $dec, ',', '.');
+}
+
+/**
+ * Lê um valor digitado ("300", "300,50", "1.234,50", "R$ 300").
+ * Retorna null se estiver vazio e false se for inválido (negativo, texto ou acima de 99.999,99).
+ */
+function parse_money(string $s): float|false|null
+{
+    $s = trim(str_ireplace(['R$', ' '], '', $s));
+    if ($s === '') {
+        return null;
+    }
+    if (str_contains($s, ',')) {
+        $s = str_replace('.', '', $s);
+        $s = str_replace(',', '.', $s);
+    }
+    if (!is_numeric($s) || (float) $s < 0 || (float) $s > 99999.99) {
+        return false;
+    }
+    return round((float) $s, 2);
+}
+
 /** Senha provisória fácil de ditar (sem letras parecidas como l/1, O/0). */
 function temp_password(): string
 {
@@ -342,6 +368,7 @@ function icon(string $name, int $size = 24): string
         'pin'      => '<path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v8"/>',
         'external' => '<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>',
         'doc'      => '<path d="M6 3h9l4 4v14H6z"/><path d="M9 13h6M9 17h6"/>',
+        'card'     => '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>',
         'left'     => '<path d="M15 5l-7 7 7 7"/>',
         'right'    => '<path d="M9 5l7 7-7 7"/>',
     ];

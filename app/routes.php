@@ -68,6 +68,12 @@ $router->post('/admin/pacientes/{id}/dieta', 'Admin\PatientController@diet', $A)
 $router->post('/admin/pacientes/{id}/dieta/pdf-remover', 'Admin\PatientController@removeDietPdf', $A);
 $router->post('/admin/pacientes/{id}/excluir', 'Admin\PatientController@delete', $A);
 
+$router->get('/admin/planos', 'Admin\PlanController@index', $A);
+$router->get('/admin/planos/novo', 'Admin\PlanController@form', $A);
+$router->post('/admin/planos', 'Admin\PlanController@store', $A);
+$router->get('/admin/planos/{id}', 'Admin\PlanController@form', $A);
+$router->post('/admin/planos/{id}', 'Admin\PlanController@update', $A);
+
 $router->get('/admin/treinos', 'Admin\WorkoutController@index', $A);
 $router->get('/admin/treinos/novo', 'Admin\WorkoutController@form', $A);
 $router->post('/admin/treinos', 'Admin\WorkoutController@store', $A);

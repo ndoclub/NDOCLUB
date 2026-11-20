@@ -23,6 +23,7 @@ CREATE TABLE users (
   goal VARCHAR(120) NULL,
   status ENUM('active','inactive') NOT NULL DEFAULT 'active',
   renewal_date DATE NULL,
+  plan_id INT UNSIGNED NULL,
   must_change_password TINYINT(1) NOT NULL DEFAULT 1,
   consent_at DATETIME NULL,
   consent_version VARCHAR(12) NULL,
@@ -32,6 +33,29 @@ CREATE TABLE users (
   UNIQUE KEY uq_users_email (email),
   KEY idx_users_role_status (role, status),
   KEY idx_users_renewal (renewal_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
+-- Planos (Trimestral, Semestral, Anual...) e dados financeiros.
+-- ATENÇÃO: valores em R$ são só do painel admin. O paciente nunca vê.
+-- Planos não são apagados, só desativados (users.plan_id aponta para eles).
+-- ---------------------------------------------------------------------
+CREATE TABLE plans (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(60) NOT NULL,
+  duration_days INT UNSIGNED NOT NULL,
+  price DECIMAL(10,2) NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Valor combinado com um paciente (quando diferente do valor do plano)
+CREATE TABLE patient_billing (
+  user_id INT UNSIGNED NOT NULL,
+  price DECIMAL(10,2) NULL,
+  PRIMARY KEY (user_id),
+  CONSTRAINT fk_billing_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tentativas de login (limite contra força bruta)
@@ -253,6 +277,8 @@ CREATE TABLE renewals (
   previous_date DATE NULL,
   new_date DATE NOT NULL,
   days_added INT NOT NULL,
+  plan_id INT UNSIGNED NULL,
+  amount DECIMAL(10,2) NULL,
   created_by INT UNSIGNED NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (id),
@@ -288,6 +314,12 @@ INSERT INTO point_rules (rkey, label, points, daily_limit, active, sort_order) V
 ('streak_100', 'Bônus: 100 dias seguidos',         500,   0, 1, 8),
 ('renewal',    'Renovação do acompanhamento',      100,   0, 1, 9),
 ('referral',   'Indicação que virou paciente',     200,   0, 1, 10);
+
+-- Planos iniciais (o Gabriel define os valores em Admin > Planos)
+INSERT INTO plans (name, duration_days, price, active, created_at) VALUES
+('Trimestral', 90, NULL, 1, NOW()),
+('Semestral', 180, NULL, 1, NOW()),
+('Anual', 365, NULL, 1, NOW());
 
 -- Configurações
 INSERT INTO settings (skey, svalue) VALUES

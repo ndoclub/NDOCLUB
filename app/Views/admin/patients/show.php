@@ -11,6 +11,7 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
             <div class="row wrap" style="gap:8px;margin-top:6px">
                 <?php if ($p['status'] === 'inactive'): ?><span class="tag">Desativado</span><?php else: partial('seal', ['renew' => $renew]); endif; ?>
                 <?php partial('level', ['level' => $level]); ?>
+                <?php if ($planRow): ?><span class="tag"><?= e($planRow['name']) ?><?= $planPrice !== null ? ' · ' . e(money($planPrice)) . ($customPrice !== null ? ' (combinado)' : '') : ' · sem valor' ?></span><?php endif; ?>
             </div>
         </div>
     </div>
@@ -48,6 +49,15 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
             <div class="field"><label for="email">E-mail</label><input class="input" type="email" id="email" name="email" value="<?= e($p['email']) ?>" required></div>
             <div class="field"><label for="phone">WhatsApp</label><input class="input" id="phone" name="phone" inputmode="tel" value="<?= e($p['phone'] ?? '') ?>"></div>
             <div class="field"><label for="goal">Objetivo</label><input class="input" id="goal" name="goal" maxlength="120" value="<?= e($p['goal'] ?? '') ?>"></div>
+            <div class="field"><label for="plan_id">Plano</label>
+                <select id="plan_id" name="plan_id" data-plan-select data-price-target="#plan_price">
+                    <option value="">Sem plano definido</option>
+                    <?php foreach ($plans as $pl): ?>
+                        <option value="<?= (int) $pl['id'] ?>" data-days="<?= (int) $pl['duration_days'] ?>" data-price="<?= $pl['price'] !== null ? e(number_format((float) $pl['price'], 2, ',', '')) : '' ?>"<?= (int) ($p['plan_id'] ?? 0) === (int) $pl['id'] ? ' selected' : '' ?>><?= e($pl['name']) ?> · <?= (int) $pl['duration_days'] ?> dias<?= !$pl['active'] ? ' (desativado)' : '' ?></option>
+                    <?php endforeach; ?>
+                </select></div>
+            <div class="field"><label for="plan_price">Valor combinado (R$)</label><input class="input" id="plan_price" name="plan_price" inputmode="decimal" value="<?= $customPrice !== null ? e(number_format($customPrice, 2, ',', '')) : '' ?>" placeholder="<?= $planRow && $planRow['price'] !== null ? e('Padrão do plano: ' . money((float) $planRow['price'])) : 'Igual ao do plano' ?>">
+                <p class="hint">Só se for diferente do plano. Só o admin vê.</p></div>
             <div class="field"><label for="renewal_date">Vence em</label><input class="input" type="date" id="renewal_date" name="renewal_date" value="<?= e(substr((string) $p['renewal_date'], 0, 10)) ?>"></div>
             <div class="field"><label for="status">Acesso</label>
                 <select id="status" name="status">
@@ -64,18 +74,24 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
         <form class="search" method="post" action="<?= e(url('/admin/pacientes/' . $id . '/renovar')) ?>" data-confirm="Confirmar a renovação?">
             <?= csrf_field() ?>
             <select name="days" aria-label="Período">
-                <?php foreach ([30 => '+30 dias', 60 => '+60 dias', 90 => '+90 dias', 180 => '+180 dias', 365 => '+365 dias'] as $d => $label): ?>
-                    <option value="<?= $d ?>"<?= $d === 90 ? ' selected' : '' ?>><?= e($label) ?></option>
+                <?php
+                $planDays = $planRow ? (int) $planRow['duration_days'] : 90;
+                if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
+                foreach ($renewChoices as $d): ?>
+                    <option value="<?= (int) $d ?>"<?= $d === $planDays ? ' selected' : '' ?>>+<?= (int) $d ?> dias<?= ($planRow && $d === (int) $planRow['duration_days']) ? ' (' . e($planRow['name']) . ')' : '' ?></option>
                 <?php endforeach; ?>
             </select>
+            <input class="input" name="amount" inputmode="decimal" aria-label="Valor recebido (R$)" placeholder="R$" value="<?= $planPrice !== null ? e(number_format($planPrice, 2, ',', '')) : '' ?>" style="flex:0 0 120px;width:120px">
             <button class="btn btn-sm" type="submit">Renovar</button>
         </form>
+        <p class="hint">O valor é só para o seu controle (opcional) e fica no histórico abaixo. O paciente nunca vê.</p>
         <?php if ($renewals): ?>
             <div class="tbl-wrap"><table class="tbl" style="min-width:0">
-                <thead><tr><th>Quando</th><th>De</th><th>Até</th></tr></thead>
+                <thead><tr><th>Quando</th><th>De</th><th>Até</th><th class="r">Valor</th></tr></thead>
                 <tbody>
                 <?php foreach ($renewals as $r): ?>
-                    <tr><td><?= e(fmt_date($r['created_at'])) ?></td><td><?= e(fmt_date($r['previous_date'])) ?></td><td><?= e(fmt_date($r['new_date'])) ?> <span class="tag">+<?= (int) $r['days_added'] ?> d</span></td></tr>
+                    <tr><td><?= e(fmt_date($r['created_at'])) ?></td><td><?= e(fmt_date($r['previous_date'])) ?></td><td><?= e(fmt_date($r['new_date'])) ?> <span class="tag">+<?= (int) $r['days_added'] ?> d</span><?= !empty($r['plan_name']) ? '<br><span class="small muted">' . e($r['plan_name']) . '</span>' : '' ?></td>
+                        <td class="r num"><?= $r['amount'] !== null ? e(money((float) $r['amount'])) : '-' ?></td></tr>
                 <?php endforeach; ?>
                 </tbody>
             </table></div>

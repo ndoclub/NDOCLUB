@@ -4,6 +4,10 @@
 </div>
 
 <div class="kpis">
+    <a class="kpi wide" href="<?= e(url('/admin/pacientes?f=yellow')) ?>">
+        <span class="big num"><?= e(money($due30['total'], floor($due30['total']) == $due30['total'] ? 0 : 2)) ?></span>
+        <span class="lbl">a renovar em 30 dias · <?= (int) $due30['count'] ?> <?= $due30['count'] === 1 ? 'paciente' : 'pacientes' ?><?= $due30['missing'] > 0 ? ' · ' . (int) $due30['missing'] . ' sem valor definido' : '' ?></span>
+    </a>
     <a class="kpi" href="<?= e(url('/admin/pacientes')) ?>"><span class="big num"><?= (int) $stats['patients'] ?></span><span class="lbl">pacientes ativos</span></a>
     <div class="kpi"><span class="big num"><?= (int) $stats['active7'] ?></span><span class="lbl">abriram o app em 7 dias</span></div>
     <div class="kpi"><span class="big num"><?= (int) $stats['checkins'] ?></span><span class="lbl">check-ins hoje</span></div>
@@ -21,11 +25,12 @@
 <?php else: ?>
 <div class="tbl-wrap">
     <table class="tbl">
-        <thead><tr><th>Paciente</th><th>Renovação</th><th>Visto por último</th><th>Último check-in</th><th class="r">Ação</th></tr></thead>
+        <thead><tr><th>Paciente</th><th>Plano</th><th>Renovação</th><th>Visto por último</th><th>Último check-in</th><th class="r">Ação</th></tr></thead>
         <tbody>
         <?php foreach ($risk as $r): ?>
             <tr>
                 <td><a class="who" href="<?= e(url('/admin/pacientes/' . $r['id'])) ?>"><?= avatar($r, 34) ?><?= e($r['name']) ?></a></td>
+                <td><?php if ($r['plan_name']): ?><?= e($r['plan_name']) ?><br><span class="small muted"><?= $r['plan_value'] !== null ? e(money((float) $r['plan_value'], floor((float) $r['plan_value']) == (float) $r['plan_value'] ? 0 : 2)) : 'sem valor' ?></span><?php else: ?><span class="muted">-</span><?php endif; ?></td>
                 <td><?php partial('seal', ['renew' => $r['renew']]); ?></td>
                 <td>
                     <?= $r['last_seen_at'] ? e(time_ago($r['last_seen_at'])) : 'Nunca entrou' ?>

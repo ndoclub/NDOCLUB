@@ -28,6 +28,7 @@ $tabs = [
         <?php endif; ?>
     </header>
 
+    <?php partial('renew-banner', ['user' => $user]); ?>
     <?php partial('flash'); ?>
     <main id="main">
         <?= $content ?>

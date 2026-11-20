@@ -42,7 +42,10 @@ $streakWord = $streak === 1 ? 'dia seguido' : 'dias seguidos';
 
 <section class="section">
     <div class="row-between">
-        <h2 class="section-title" style="margin:0">Renovação</h2>
+        <div>
+            <span class="eyebrow"><?= $planName ? 'Seu plano' : 'Renovação' ?></span>
+            <?php if ($planName): ?><h2 class="plan-name"><?= e($planName) ?></h2><?php endif; ?>
+        </div>
         <?php partial('seal', ['renew' => $renew, 'word' => true]); ?>
     </div>
     <?php if ($renew['days'] === null): ?>
@@ -51,20 +54,18 @@ $streakWord = $streak === 1 ? 'dia seguido' : 'dias seguidos';
         <div class="renew-row mt">
             <?php if ($renew['days'] >= 0): ?>
                 <span class="renew-days num"><?= (int) $renew['days'] ?></span>
-                <span><?= $renew['days'] === 1 ? 'dia' : 'dias' ?> para renovar</span>
+                <span><?= $renew['days'] === 1 ? 'dia restante' : 'dias restantes' ?></span>
             <?php else: ?>
                 <span class="renew-days num"><?= abs((int) $renew['days']) ?></span>
                 <span><?= abs((int) $renew['days']) === 1 ? 'dia' : 'dias' ?> de atraso</span>
             <?php endif; ?>
         </div>
-        <div class="meter" aria-hidden="true"><i style="width:<?= (int) max(4, min(100, round(max(0, $renew['days']) / 30 * 100))) ?>%"></i></div>
-        <p class="hint">Vence em <?= e(fmt_date($user['renewal_date'])) ?></p>
+        <div class="meter" aria-hidden="true"><i style="width:<?= (int) $meterPct ?>%"></i></div>
+        <p class="hint">Válido até <?= e(fmt_date($user['renewal_date'])) ?></p>
 
         <?php if (in_array($renew['seal'], ['yellow', 'red'], true)): ?>
             <div class="renew-alert <?= e($renew['seal']) ?>">
-                <p><?= $renew['seal'] === 'red'
-                    ? 'Seu acompanhamento vence em poucos dias. Renove para não ficar sem plano e manter seus pontos rendendo.'
-                    : 'Seu acompanhamento está chegando ao fim. Fale com o Gabriel para renovar.' ?></p>
+                <p><?= e(\App\Services\Renewal::message($renew, $planName)) ?></p>
                 <a class="btn btn-sm btn-block" href="<?= e($whatsapp) ?>" target="_blank" rel="noopener">Renovar pelo WhatsApp</a>
             </div>
         <?php endif; ?>

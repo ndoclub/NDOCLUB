@@ -21,8 +21,8 @@ $bio = trim((string) ($p['bio'] ?? ''));
 
 <?php if ($isMe && $isPatient): ?>
     <section class="section">
-        <div class="row-between"><h2 class="section-title" style="margin:0">Renovação</h2><?php partial('seal', ['renew' => $renew, 'word' => true]); ?></div>
-        <?php if ($renew['days'] !== null): ?><p class="muted mt" style="margin-bottom:0">Vence em <?= e(fmt_date($p['renewal_date'])) ?></p><?php endif; ?>
+        <div class="row-between"><h2 class="section-title" style="margin:0"><?= $planName ? 'Plano ' . e($planName) : 'Renovação' ?></h2><?php partial('seal', ['renew' => $renew, 'word' => true]); ?></div>
+        <?php if ($renew['days'] !== null): ?><p class="muted mt" style="margin-bottom:0">Válido até <?= e(fmt_date($p['renewal_date'])) ?></p><?php endif; ?>
         <?php if (in_array($renew['seal'], ['yellow', 'red'], true)): ?>
             <a class="btn btn-sm btn-block mt" href="<?= e($whatsapp) ?>" target="_blank" rel="noopener">Renovar pelo WhatsApp</a>
         <?php endif; ?>

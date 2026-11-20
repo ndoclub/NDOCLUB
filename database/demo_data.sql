@@ -296,3 +296,11 @@ INSERT INTO post_likes (post_id, user_id, created_at) VALUES ((SELECT id FROM po
 INSERT INTO post_likes (post_id, user_id, created_at) VALUES ((SELECT id FROM posts WHERE body LIKE 'Bem-vindos%'), (SELECT id FROM users WHERE email = 'ana.teste@exemplo.com'), NOW());
 INSERT INTO post_likes (post_id, user_id, created_at) VALUES ((SELECT id FROM posts WHERE body LIKE 'Minha marmita%'), (SELECT id FROM users WHERE email = 'karen.teste@exemplo.com'), NOW());
 INSERT INTO reports (reporter_id, target_type, target_id, reason, status, created_at) VALUES ((SELECT id FROM users WHERE email = 'elisa.teste@exemplo.com'), 'post', (SELECT id FROM posts WHERE body LIKE 'Quem tem dica de café%'), 'Spam ou venda', 'open', NOW() - INTERVAL 30 MINUTE);
+
+-- ---------------------------------------------------------------------
+-- Planos dos pacientes de teste (os valores em R$ ficam em branco:
+-- preencha em Admin > Planos para ver o indicador "a renovar" no Painel)
+-- ---------------------------------------------------------------------
+UPDATE users SET plan_id = (SELECT id FROM plans WHERE name = 'Anual')      WHERE email IN ('ana.teste@exemplo.com', 'karen.teste@exemplo.com');
+UPDATE users SET plan_id = (SELECT id FROM plans WHERE name = 'Semestral')  WHERE email IN ('bruno.teste@exemplo.com', 'elisa.teste@exemplo.com', 'isabela.teste@exemplo.com');
+UPDATE users SET plan_id = (SELECT id FROM plans WHERE name = 'Trimestral') WHERE email IN ('carla.teste@exemplo.com', 'diego.teste@exemplo.com', 'felipe.teste@exemplo.com', 'gabi.teste@exemplo.com', 'heitor.teste@exemplo.com', 'joao.teste@exemplo.com', 'lucas.teste@exemplo.com', 'novo.teste@exemplo.com');

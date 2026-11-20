@@ -6,6 +6,7 @@ use App\Core\DB;
 use App\Core\Upload;
 use App\Core\View;
 use App\Services\Levels;
+use App\Services\Plans;
 use App\Services\Points;
 use App\Services\Ranking;
 use App\Services\Renewal;
@@ -61,6 +62,7 @@ final class ProfileController
         ];
         if ($isMe && $isPatient) {
             $data['renew'] = Renewal::info($u['renewal_date']);
+            $data['planName'] = !empty($u['plan_id']) ? Plans::name((int) $u['plan_id']) : null;
             $data['whatsapp'] = Renewal::whatsappUrl($u);
             $data['balance'] = Points::balance($id);
         }

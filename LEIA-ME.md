@@ -19,7 +19,7 @@ Gabriel. A ideia central é um ciclo simples:
 | **Login e primeiro acesso** | Entra com e-mail e senha. No primeiro acesso troca a senha provisória e aceita o termo de consentimento. |
 | **Início** | Sequência de dias seguidos, semana, pontos, posição no ranking, nível, contador de renovação, aviso fixo do Gabriel, atalhos. |
 | **Check-in de 10 segundos** | Sono, água e dieta em toques. Vale pontos 1× por dia e alimenta a sequência (streak). |
-| **Renovação** | Selo verde (mais de 15 dias), amarelo (8 a 15) e vermelho (7 ou menos / vencido) + botão **Renovar pelo WhatsApp**. |
+| **Seu plano e renovação** | Cartão com o **plano** (Trimestral, Semestral, Anual), **dias restantes**, barra de progresso e "válido até". Selo verde (mais de 15 dias), amarelo (8 a 15) e vermelho (7 ou menos / vencido) + botão **Renovar pelo WhatsApp** (a mensagem já leva o nome do plano). No vermelho, uma **faixa de aviso** aparece em todas as telas. O paciente **nunca vê valores em R$**. |
 | **Treino** | Treinos gerais (A/B/C) e treinos individuais criados pelo Gabriel; botão **Treino feito** + calendário do mês. |
 | **Dieta** | Link (WebDiet ou outro) e/ou PDF privado + recados do Gabriel. |
 | **Feed da comunidade** | Posts com foto, curtidas, comentários, tema do dia, denúncia, regras de convivência, mural fixo do Gabriel. |
@@ -30,9 +30,9 @@ Gabriel. A ideia central é um ciclo simples:
 | **Perfil** | Foto, dados, trocar senha. |
 
 ### Para o Gabriel (painel `/admin`, funciona no celular e no computador)
-Painel com indicadores · **risco de renovação** (quem vence logo e quem sumiu há 7+ dias, com botão de
-WhatsApp) · pacientes (cadastro, renovar +30/60/90/180/365 dias com bônus, pontos manuais, dieta,
-senha provisória, exclusão LGPD) · treinos · moderação do feed e denúncias · mural fixado · loja e
+Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)** · **risco de renovação** (quem vence logo e quem sumiu há 7+ dias, com botão de
+WhatsApp) · **planos e valores** (só o admin vê R$) · pacientes (cadastro com plano e "valor combinado",
+renovar com a duração do plano e bônus, pontos manuais, dieta, senha provisória, exclusão LGPD) · treinos · moderação do feed e denúncias · mural fixado · loja e
 resgates · regras de pontos · ranking · configurações (limites dos selos, WhatsApp, níveis, versão
 do termo) · auditoria.
 
@@ -106,9 +106,18 @@ admin pode virar Filament. Nada do MVP precisa ser jogado fora.
    Isso cria o banco `nodaysoffclub`, todas as tabelas e o usuário admin.
 5. Ainda no phpMyAdmin: selecione o banco `nodaysoffclub` (menu da esquerda) → **Importar** →
    `database/demo_data.sql` → **Importar**. (São os pacientes de mentira para testar.)
+   *(Os planos Trimestral, Semestral e Anual já vêm criados, sem valores. Você preenche em* **Admin → Planos**.*)*
 6. Confira `config/config.php`: no XAMPP padrão (usuário `root`, senha vazia) **não precisa mudar nada**.
    Se o seu MySQL tiver senha, coloque em `'pass'`.
 7. Abra **http://localhost/nodaysoffclub/** no navegador. Deve aparecer a tela de login preta com a logo.
+
+### Já instalou antes? Atualização 01 (planos e valores)
+Quem já importou o `schema.sql` **não precisa refazer o banco** (e não perde nenhum dado):
+1. Atualize os arquivos do projeto (`git pull`, ou copie a pasta nova por cima).
+2. phpMyAdmin → clique no banco **nodaysoffclub** (menu da esquerda) → aba **Importar** →
+   escolha `database/atualizacao_01_planos.sql` → **Executar**. Pode rodar de novo sem problema.
+   *(Funciona no MariaDB que vem no XAMPP. Se usar MySQL 8 puro, avise o desenvolvedor.)*
+3. Abra o app com **Ctrl + F5** (limpa o cache) e vá em **Admin → Planos** preencher os valores.
 
 ### Acessos para teste
 | Perfil | E-mail | Senha |
@@ -180,7 +189,8 @@ Ideal: faça no celular e depois no computador.
 ### D. Renovação
 - [ ] **Heitor** (vence em 3 dias): selo **Urgente** vermelho + caixa de alerta + botão **Renovar pelo WhatsApp** (abre `wa.me` com mensagem pronta).
 - [ ] **João**: mostra "dias de atraso".
-- [ ] **Ana** (45 dias): selo **Em dia** verde, sem botão de alerta.
+- [ ] **Ana** (45 dias): selo **Em dia** verde, sem botão de alerta; cartão mostra **Seu plano Anual**, dias restantes e "Válido até".
+- [ ] **Heitor** (vermelho): ao abrir o **Feed**, **Treino**, **Ranking** ou **Loja**, aparece a **faixa vermelha** "Seu plano Trimestral vence em 3 dias" com botão **Renovar** (no Início e no Perfil a faixa não repete, pois o cartão já avisa).
 - [ ] No admin, renovar o Heitor (+90 dias) → selo volta a verde e entra o **bônus de renovação (+100)** no extrato dele.
 
 ### E. Admin (Gabriel) — use a janela anônima
@@ -196,6 +206,15 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Configurações:** mudar o limite do selo amarelo (ex.: 20 dias) → selos recalculam. Trocar o WhatsApp. Subir a **versão do termo** → todos os pacientes precisam aceitar de novo no próximo acesso.
 - [ ] **Auditoria:** as ações acima aparecem registradas (quem fez, o quê, quando).
 
+### E2. Planos e valores (só o Gabriel vê R$)
+- [ ] **Admin → Planos:** abre com Trimestral (90 dias), Semestral (180) e Anual (365). Preencher os valores (ex.: 450, 800, 1400) → aparecem como `R$ 450,00`.
+- [ ] Digitar `abc` no valor → recusa com mensagem. Criar um plano novo (ex.: Mensal, 30 dias) → aparece na lista. **Desativar** um plano → some das escolhas, mas quem já está nele continua normal. (Planos não são apagados.)
+- [ ] **Novo paciente:** escolher o plano → a data de vencimento é preenchida sozinha (hoje + duração). Preencher **Valor combinado** (ex.: 399,90) só se esse paciente tiver preço diferente.
+- [ ] **Ficha do paciente:** mostra plano e valor (com "combinado" quando for o caso). Trocar o plano e apagar o valor combinado → passa a valer o valor do plano.
+- [ ] **Renovar:** a duração do plano já vem selecionada e o valor sugerido; renovar guarda o valor no **histórico de renovações**. Valor é opcional.
+- [ ] **Painel:** cartão **"a renovar em 30 dias"** com o total em R$ (usa o valor combinado, ou o do plano) e aviso de quantos pacientes estão **sem valor definido**. A tabela de risco mostra o plano e o valor de cada um.
+- [ ] **Privacidade (importante):** entrar como paciente e passar por Início, Perfil, Extrato, Dieta, Feed, Treino, Ranking, Loja e Evolução → **nenhum R$ aparece em lugar nenhum**. Tentar abrir `/admin/planos` como paciente → bloqueado.
+
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
 - [ ] O painel admin no celular abre o menu pelo botão ☰ (gaveta lateral).
@@ -208,10 +227,12 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **204 verificações** (login,
-> primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, segurança e CSRF),
+> **Como foi testado aqui:** o código passou por uma bateria automática de **262 verificações** (login,
+> primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
+> privacidade dos valores, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
-> ser executado nesse ambiente** — por isso o passo 4/5 da instalação é o primeiro teste a fazer.
+> ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, o
+> arquivo `atualizacao_01_planos.sql`) é o primeiro teste a fazer.
 > Se o phpMyAdmin acusar algum erro, copie a mensagem e me envie que eu corrijo.
 
 ---
@@ -242,6 +263,7 @@ Ideal: faça no celular e depois no computador.
 |---|---|
 | Fase 1 — login, perfil, renovação, dieta, treino, feed + moderação, pontos/extrato, ranking mensal, loja manual, admin básico, PWA | ✅ **Neste MVP** |
 | Extras da Fase 1 — painel de risco de renovação, streak, check-in de 10 s, níveis, bônus de renovação, mural fixado, evolução de peso | ✅ **Neste MVP** |
+| Planos (Trimestral/Semestral/Anual), valores só para o admin, previsão de renovações em R$, faixa de alerta de renovação para o paciente | ✅ **Neste MVP** (atualização 01) |
 | Fase 2 — notificações push, medalhas/conquistas, desafios mensais, cupons de parceiros, fotos de evolução (privadas), indicação com link | ⏭️ Tabelas e serviços já preparados (`Points::award`, `point_rules`, `audit_log`); falta construir as telas |
 | Fase 3 — Laravel + Filament, relatórios, integrações (WhatsApp automático, pagamento) | ⏭️ Estrutura pronta para migrar (seção 2) |
 

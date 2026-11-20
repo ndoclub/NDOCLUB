@@ -7,6 +7,7 @@ use App\Core\Upload;
 use App\Core\View;
 use App\Services\Audit;
 use App\Services\Levels;
+use App\Services\Plans;
 use App\Services\Points;
 use App\Services\Ranking;
 use App\Services\Renewal;
@@ -20,8 +21,12 @@ final class PatientController
         $filter = (string) ($_GET['f'] ?? 'all');
 
         $sql = "SELECT u.id, u.name, u.email, u.phone, u.avatar, u.status, u.renewal_date, u.last_seen_at,
+                       pl.name AS plan_name, COALESCE(bl.price, pl.price) AS plan_value,
                        (SELECT COALESCE(SUM(l.points), 0) FROM points_ledger l WHERE l.user_id = u.id) AS balance
-                  FROM users u WHERE u.role = 'patient'";
+                  FROM users u
+                  LEFT JOIN plans pl ON pl.id = u.plan_id
+                  LEFT JOIN patient_billing bl ON bl.user_id = u.id
+                 WHERE u.role = 'patient'";
         $params = [];
         if ($q !== '') {
             $sql .= ' AND (u.name LIKE ? OR u.email LIKE ?)';
@@ -55,6 +60,7 @@ final class PatientController
             'title' => 'Novo paciente',
             'password' => temp_password(),
             'defaultRenewal' => date('Y-m-d', strtotime('+30 day')),
+            'plans' => Plans::active(),
         ], 'admin');
     }
 
@@ -66,8 +72,17 @@ final class PatientController
         $goal = input('goal');
         $renewal = input('renewal_date');
         $password = input('password');
+        $planId = (int) ($_POST['plan_id'] ?? 0);
+        $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
+        $plan = $planId ? DB::one('SELECT * FROM plans WHERE id = ? AND active = 1', [$planId]) : null;
 
         $errors = [];
+        if ($planId && !$plan) {
+            $errors[] = 'Plano inválido.';
+        }
+        if ($custom === false) {
+            $errors[] = 'Valor combinado inválido. Use números, por exemplo 450,00.';
+        }
         if (mb_strlen($name) < 2) {
             $errors[] = 'Informe o nome.';
         }
@@ -90,11 +105,17 @@ final class PatientController
             redirect('/admin/pacientes/novo');
         }
 
+        if ($renewal === '' && $plan) {
+            $renewal = date('Y-m-d', strtotime('+' . (int) $plan['duration_days'] . ' day'));
+        }
         $id = DB::insert(
-            "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, must_change_password, created_at)
-             VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, 1, ?)",
-            [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, now()]
+            "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, plan_id, must_change_password, created_at)
+             VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, 1, ?)",
+            [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, $plan ? (int) $plan['id'] : null, now()]
         );
+        if ($custom !== null) {
+            Plans::setCustomPrice($id, $custom);
+        }
         Audit::log((int) Auth::id(), 'patient_create', 'user', $id, $name);
         $_SESSION['_creds'] = ['name' => $name, 'email' => $email, 'password' => $password];
         flash('ok', 'Paciente criado. Envie o acesso pelo WhatsApp (mensagem pronta abaixo).');
@@ -119,12 +140,29 @@ final class PatientController
         }
 
         $life = Points::lifetime($id);
+        $plansList = Plans::active();
+        if (!empty($p['plan_id']) && !in_array((int) $p['plan_id'], array_map(fn($x) => (int) $x['id'], $plansList), true)) {
+            $cur = DB::one('SELECT * FROM plans WHERE id = ?', [(int) $p['plan_id']]);
+            if ($cur) {
+                $plansList[] = $cur;
+            }
+        }
+        $planRow = !empty($p['plan_id']) ? DB::one('SELECT * FROM plans WHERE id = ?', [(int) $p['plan_id']]) : null;
         View::render('admin/patients/show', [
+            'plans' => $plansList,
+            'planRow' => $planRow,
+            'customPrice' => Plans::customPrice($id),
+            'planPrice' => Plans::priceFor($id),
+            'renewChoices' => Plans::renewalChoices(),
             'title' => $p['name'],
             'p' => $p,
             'welcome' => $welcome,
             'renew' => Renewal::info($p['renewal_date']),
-            'renewals' => DB::all('SELECT * FROM renewals WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 8', [$id]),
+            'renewals' => DB::all(
+                'SELECT r.*, pl.name AS plan_name FROM renewals r LEFT JOIN plans pl ON pl.id = r.plan_id
+                  WHERE r.user_id = ? ORDER BY r.created_at DESC, r.id DESC LIMIT 8',
+                [$id]
+            ),
             'balance' => Points::balance($id),
             'monthPts' => Points::monthTotal($id),
             'level' => Levels::forPoints($life),
@@ -152,8 +190,16 @@ final class PatientController
         $goal = input('goal');
         $status = input('status') === 'inactive' ? 'inactive' : 'active';
         $renewal = input('renewal_date');
+        $planId = (int) ($_POST['plan_id'] ?? 0);
+        $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
 
         $errors = [];
+        if ($planId && !DB::one('SELECT id FROM plans WHERE id = ? AND (active = 1 OR id = ?)', [$planId, (int) ($p['plan_id'] ?? 0)])) {
+            $errors[] = 'Plano inválido.';
+        }
+        if ($custom === false) {
+            $errors[] = 'Valor combinado inválido. Use números, por exemplo 450,00.';
+        }
         if (mb_strlen($name) < 2) {
             $errors[] = 'Informe o nome.';
         }
@@ -172,9 +218,10 @@ final class PatientController
             redirect('/admin/pacientes/' . $id);
         }
         DB::run(
-            'UPDATE users SET name = ?, email = ?, phone = ?, goal = ?, status = ?, renewal_date = ? WHERE id = ?',
-            [$name, $email, $phone ?: null, $goal ?: null, $status, $renewal ?: null, $id]
+            'UPDATE users SET name = ?, email = ?, phone = ?, goal = ?, status = ?, renewal_date = ?, plan_id = ? WHERE id = ?',
+            [$name, $email, $phone ?: null, $goal ?: null, $status, $renewal ?: null, $planId ?: null, $id]
         );
+        Plans::setCustomPrice($id, $custom);
         Audit::log((int) Auth::id(), 'patient_update', 'user', $id, $p['name']);
         flash('ok', 'Dados salvos.');
         redirect('/admin/pacientes/' . $id);
@@ -184,12 +231,17 @@ final class PatientController
     {
         $p = $this->find($id);
         $days = (int) ($_POST['days'] ?? 0);
-        if (!in_array($days, [30, 60, 90, 180, 365], true)) {
+        if (!in_array($days, Plans::renewalChoices(), true)) {
             flash('err', 'Escolha um período de renovação.');
             redirect('/admin/pacientes/' . $id);
         }
-        $new = Renewal::renew($id, $days, (int) Auth::id());
-        Audit::log((int) Auth::id(), 'renewal', 'user', $id, '+' . $days . ' dias, até ' . $new);
+        $amount = parse_money((string) ($_POST['amount'] ?? ''));
+        if ($amount === false) {
+            flash('err', 'Valor da renovação inválido. Use números, por exemplo 450,00.');
+            redirect('/admin/pacientes/' . $id);
+        }
+        $new = Renewal::renew($id, $days, (int) Auth::id(), $amount, !empty($p['plan_id']) ? (int) $p['plan_id'] : null);
+        Audit::log((int) Auth::id(), 'renewal', 'user', $id, '+' . $days . ' dias, até ' . $new . ($amount !== null ? ', ' . money($amount) : ''));
         flash('ok', 'Renovado até ' . fmt_date($new) . '. O bônus de pontos foi lançado.');
         redirect('/admin/pacientes/' . $id);
     }
