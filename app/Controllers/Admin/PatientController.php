@@ -24,7 +24,7 @@ final class PatientController
 
         $sql = "SELECT u.id, u.name, u.email, u.phone, u.avatar, u.status, u.renewal_date, u.last_seen_at,
                        pl.name AS plan_name, COALESCE(bl.price, pl.price) AS plan_value,
-                       ap.is_athlete, ap.competes, ap.has_coach,
+                       ap.is_athlete, ap.competes, ap.has_coach, ap.coach_name, ap.event_name, ap.event_date,
                        (SELECT COALESCE(SUM(l.points), 0) FROM points_ledger l WHERE l.user_id = u.id) AS balance
                   FROM users u
                   LEFT JOIN plans pl ON pl.id = u.plan_id

@@ -229,7 +229,7 @@ Ideal: faça no celular e depois no computador.
 ### E3. Atletas e perfil esportivo
 - [ ] **Admin → Modalidades:** aparecem Corrida, Musculação, Hyrox e Natação. Criar uma nova (ex.: Ciclismo). Tentar criar "corrida" de novo → recusa (já existe). Desativar uma → some das escolhas, mas quem já tem continua com ela.
 - [ ] **Ficha de um paciente → Perfil esportivo:** ligar **É atleta**, marcar modalidades, assessoria (com nome), "participa de provas" (nome e data) → **Salvar**. Desligar "É atleta" **guarda** os dados (se ligar de novo, voltam).
-- [ ] **Lista de pacientes:** chips de modalidade embaixo do nome; filtros **Atletas**, **Competem**, **Sem assessoria** e o seletor de **modalidade** (dá para combinar).
+- [ ] **Lista de pacientes:** chips de modalidade embaixo do nome; filtros **Atletas**, **Competem**, **Sem assessoria** e o seletor de **modalidade** (dá para combinar). Ao usar um desses filtros, a lista ganha as colunas **Prova** (nome, data e "em N dias") e **Assessoria**.
 - [ ] **Painel:** número de **atletas ativos** e cartão **Próximas provas** em ordem de data (provas que já passaram saem sozinhas).
 - [ ] **Paciente (ex.: Carla):** em **Perfil** aparece o cartão **Perfil esportivo** com **Editar**; mudar modalidades e marcar/desmarcar **Mostrar minhas modalidades no meu perfil da comunidade**.
 - [ ] **Privacidade (importante):** entrar como **outro** paciente e abrir o perfil público da Carla (pelo Feed → nome dela): só aparecem as **modalidades**, e só se ela marcou mostrar. **Assessoria, prova e data nunca aparecem** para outros pacientes.
@@ -246,7 +246,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **313 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **318 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
 > perfil esportivo, privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde

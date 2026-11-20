@@ -1,5 +1,7 @@
 <?php
 $filters = ['all' => 'Todos', 'green' => 'Em dia', 'yellow' => 'Vencem logo', 'red' => 'Críticos', 'away' => 'Sumidos', 'inactive' => 'Desativados', 'athletes' => 'Atletas', 'compete' => 'Competem', 'nocoach' => 'Sem assessoria'];
+// Nos filtros de atletas (ou ao escolher uma modalidade) a lista ganha as colunas Prova e Assessoria
+$athleteCols = in_array($filter, ['athletes', 'compete', 'nocoach'], true) || $sportId > 0;
 $sq = ($q !== '' ? '&q=' . urlencode($q) : '') . ($sportId ? '&s=' . (int) $sportId : '');
 ?>
 <div class="page-head">
@@ -31,7 +33,7 @@ $sq = ($q !== '' ? '&q=' . urlencode($q) : '') . ($sportId ? '&s=' . (int) $spor
 <?php else: ?>
 <div class="tbl-wrap">
     <table class="tbl">
-        <thead><tr><th>Paciente</th><th>Plano</th><th>Renovação</th><th class="r">Pontos</th><th>Visto por último</th></tr></thead>
+        <thead><tr><th>Paciente</th><?php if ($athleteCols): ?><th>Prova</th><th>Assessoria</th><?php endif; ?><th>Plano</th><th>Renovação</th><th class="r">Pontos</th><th>Visto por último</th></tr></thead>
         <tbody>
         <?php foreach ($list as $r): ?>
             <tr>
@@ -40,6 +42,17 @@ $sq = ($q !== '' ? '&q=' . urlencode($q) : '') . ($sportId ? '&s=' . (int) $spor
                         <span><?= e($r['name']) ?><br><span class="small muted" style="font-weight:400"><?= e($r['email']) ?></span>
                             <?php if (!empty($sportNames[(int) $r['id']])): ?><span class="sports"><?php foreach ($sportNames[(int) $r['id']] as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?></span><?php endif; ?></span></a>
                 </td>
+                <?php if ($athleteCols): $isAth = (int) ($r['is_athlete'] ?? 0) === 1; $dd = ($isAth && $r['competes'] && $r['event_date']) ? days_until($r['event_date']) : null; ?>
+                <td>
+                    <?php if (!$isAth || !$r['competes']): ?><span class="muted"><?= $isAth ? 'Não compete' : '-' ?></span>
+                    <?php elseif ($r['event_name'] || $r['event_date']): ?>
+                        <strong><?= e($r['event_name'] ?: 'Prova') ?></strong>
+                        <?php if ($r['event_date']): ?><br><span class="small muted"><?= e(fmt_date($r['event_date'])) ?></span>
+                            <span class="tag<?= ($dd !== null && $dd >= 0 && $dd <= 14) ? ' warn' : '' ?>"><?= $dd < 0 ? 'já passou' : ($dd === 0 ? 'hoje' : ($dd === 1 ? 'amanhã' : 'em ' . (int) $dd . ' dias')) ?></span><?php endif; ?>
+                    <?php else: ?><span class="muted">Compete, sem prova cadastrada</span><?php endif; ?>
+                </td>
+                <td><?php if (!$isAth): ?><span class="muted">-</span><?php elseif ($r['has_coach']): ?><?= e($r['coach_name'] ?: 'Sim') ?><?php else: ?><span class="muted">Sem assessoria</span><?php endif; ?></td>
+                <?php endif; ?>
                 <td><?php if ($r['plan_name']): ?><?= e($r['plan_name']) ?><br><span class="small muted"><?= $r['plan_value'] !== null ? e(money((float) $r['plan_value'], floor((float) $r['plan_value']) == (float) $r['plan_value'] ? 0 : 2)) : 'sem valor' ?></span><?php else: ?><span class="muted">-</span><?php endif; ?></td>
                 <td>
                     <?php if ($r['status'] === 'inactive'): ?><span class="tag">Desativado</span>
