@@ -19,6 +19,8 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
             <div class="row wrap" style="gap:8px;margin-top:6px">
                 <span class="tag<?= $planStatus['tag'] ? ' ' . e($planStatus['tag']) : '' ?>"><?= e($planStatus['label']) ?></span>
                 <?php if ($p['status'] !== 'inactive') { partial('seal', ['renew' => $renew]); } ?>
+                <?php $awayNow = empty($p['last_seen_at']) || $p['last_seen_at'] < date('Y-m-d H:i:s', strtotime('-7 day')); ?>
+                <span class="tag<?= $awayNow ? ' warn' : '' ?>" title="Última vez que o paciente abriu o app"><?= !empty($p['last_seen_at']) ? 'Visto ' . e(time_ago($p['last_seen_at'])) : 'Nunca entrou no app' ?></span>
                 <?php partial('level', ['level' => $level]); ?>
                 <?php foreach ($athleteNames as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?>
                 <?php if ($planRow): ?><span class="tag"><?= $consSummary['quota'] !== null ? (int) $consSummary['done'] . ' de ' . (int) $consSummary['quota'] . ' consultas' : (int) $consSummary['done'] . ' consultas' ?></span><?php endif; ?>

@@ -122,8 +122,6 @@ $th = function (string $key, string $label, string $class = '') use ($sorts, $so
             <?= $th('renewal', 'Vencimento') ?>
             <?= $th('consults', 'Consultas') ?>
             <?= $th('resp', 'Responsável') ?>
-            <?= $th('points', 'Pontos', 'r') ?>
-            <?= $th('seen', 'Visto por último') ?>
         </tr></thead>
         <tbody>
         <?php foreach ($list as $r): ?>
@@ -145,7 +143,7 @@ $th = function (string $key, string $label, string $class = '') use ($sorts, $so
                 </td>
                 <td><?php if (!$isAth): ?><span class="muted">-</span><?php elseif ($r['has_coach']): ?><?= e($r['coach_name'] ?: 'Sim') ?><?php else: ?><span class="muted">Sem assessoria</span><?php endif; ?></td>
                 <?php endif; ?>
-                <td><span class="tag<?= $r['plan_status']['tag'] ? ' ' . e($r['plan_status']['tag']) : '' ?>"><?= e($r['plan_status']['label']) ?></span></td>
+                <td><span class="tag<?= $r['plan_status']['tag'] ? ' ' . e($r['plan_status']['tag']) : '' ?>"><?= e($r['plan_status']['label']) ?></span><?= $r['away'] && $r['status'] === 'active' ? '<br><span class="tag warn" title="Não abre o app há 7 dias ou mais">sumido</span>' : '' ?></td>
                 <td><?php if ($r['plan_name']): ?><?= e($r['plan_name']) ?><br><span class="small muted"><?= $r['plan_value'] !== null ? e(money((float) $r['plan_value'], floor((float) $r['plan_value']) == (float) $r['plan_value'] ? 0 : 2, (string) $r['plan_currency'])) : 'sem valor' ?></span><?php else: ?><span class="muted">-</span><?php endif; ?></td>
                 <td class="num">
                     <?php if ($r['renewal_date']): ?><strong><?= e(fmt_date($r['renewal_date'])) ?></strong><br><?php endif; ?>
@@ -161,8 +159,6 @@ $th = function (string $key, string $label, string $class = '') use ($sorts, $so
                     <?php endif; ?>
                 </td>
                 <td><?php if ($r['responsible_name']): ?><?= e($r['responsible_name']) ?><?= $r['responsible_active'] ? '' : '<br><span class="small muted">(desativada)</span>' ?><?php else: ?><span class="muted">-</span><?php endif; ?></td>
-                <td class="r num"><?= pts($r['balance']) ?></td>
-                <td><?= $r['last_seen_at'] ? e(time_ago($r['last_seen_at'])) : 'Nunca entrou' ?><?= $r['away'] && $r['status'] === 'active' ? ' <span class="tag warn">sumido</span>' : '' ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

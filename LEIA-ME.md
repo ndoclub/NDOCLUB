@@ -177,7 +177,7 @@ Mesmo processo, **depois** das atualizações 01 a 04:
 5. Abra **Admin → Responsáveis** e cadastre as 3 estagiárias.
 
 **Como a lista de pacientes funciona agora**
-- **Colunas:** Paciente · Status · Plano (com valor) · Vencimento (data + quantos dias faltam) · Consultas ("2 de 4", restam, ou "completa") · Responsável · Pontos · Visto por último.
+- **Colunas:** Paciente · Status · Plano (com valor) · Vencimento (data + quantos dias faltam) · Consultas ("2 de 4", restam, ou "completa") · Responsável. **Pontos** ficam no Ranking e na ficha; **Visto por último** fica na ficha do paciente (etiqueta no topo, amarela se ele sumiu). Quem não abre o app há 7 dias ou mais ganha o aviso **sumido** ao lado do status, e o botão **Sumidos** continua filtrando.
 - **Status:** *Ativo* = plano em dia (vence hoje ou depois). *Inativo* = o plano venceu e não renovou. *Desativado* = conta bloqueada pelo Gabriel (não consegue entrar). *Sem data* = ainda sem vencimento. É calculado sozinho pela data de vencimento.
 - **Ordenar:** clique no título da coluna (clicar de novo inverte; a setinha mostra o sentido). Também dá para escolher em **Ordenar** (fica útil no celular). Padrão: nome de A a Z.
 - **Filtros** (combinam entre si e com os botões Em dia, Vencem logo, Atletas...): **Status**, **Vencimento** (vencidos, 0 a 7, 8 a 15, 16 a 30, 31 a 60, mais de 60 dias, sem data: serve para o plano de ação "vence em 15 dias, 30 dias..."), **Responsável** (cada estagiária ou "sem responsável"), **Consultas** (ainda têm a fazer, cota completa, nenhuma feita, plano sem cota), além de Plano e Modalidade. "Limpar filtros" volta ao começo.
@@ -312,6 +312,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Status:** paciente com vencimento no futuro aparece **Ativo**; com data passada aparece **Inativo**; conta bloqueada (ficha → Acesso → Desativado) aparece **Desativado**.
 - [ ] **Vencimento:** filtro **16 a 30 dias** mostra só quem vence nessa faixa. Conferir a data na coluna Vencimento.
 - [ ] **Ordenar:** clicar em **Vencimento** (mais próximo primeiro), clicar de novo (mais distante primeiro). Clicar em **Pontos**, **Consultas**, **Responsável**. O filtro escolhido não se perde ao ordenar.
+- [ ] **Sumido:** paciente que não abre o app há 7+ dias mostra **sumido** ao lado do status; o botão **Sumidos** lista só eles. Na ficha, a etiqueta "Visto ..." mostra a última vez que ele entrou.
 - [ ] **Registrar consulta:** ficha → **Consultas presenciais** → data de hoje → **Registrar consulta**. Mostra "1 de 4", "restam 3". Data futura é recusada. Quantidade 2 lança duas de uma vez. **Apagar** remove.
 - [ ] **Cota completa:** ao chegar em "4 de 4" aparece **cota completa** na ficha e **completa** na lista; o filtro **Cota de consultas completa** lista o paciente.
 - [ ] **Renovar zera o contador:** renovar o paciente → volta para "0 de 4"; o histórico mostra as consultas antigas como **anterior**.
@@ -329,7 +330,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **622 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **623 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
 > perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde

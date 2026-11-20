@@ -32,8 +32,6 @@ final class PatientController
             'renewal'  => ['Vencimento', 'mais próximo primeiro', 'mais distante primeiro', 'asc', 'u.renewal_date', true],
             'consults' => ['Consultas feitas', 'menos primeiro', 'mais primeiro', 'asc', 'done_count', false],
             'resp'     => ['Responsável', 'A a Z', 'Z a A', 'asc', 'rs.name', true],
-            'points'   => ['Pontos', 'menos primeiro', 'mais primeiro', 'desc', 'balance', false],
-            'seen'     => ['Visto por último', 'há mais tempo primeiro', 'mais recente primeiro', 'asc', 'u.last_seen_at', false],
         ];
     }
 
@@ -104,8 +102,7 @@ final class PatientController
                        pl.consultations_included AS quota,
                        rs.name AS responsible_name, rs.active AS responsible_active,
                        ap.is_athlete, ap.competes, ap.has_coach, ap.coach_name, ap.event_name, ap.event_date,
-                       " . Consultations::DONE_SQL . " AS done_count,
-                       (SELECT COALESCE(SUM(l.points), 0) FROM points_ledger l WHERE l.user_id = u.id) AS balance
+                       " . Consultations::DONE_SQL . " AS done_count
                   FROM users u
                   LEFT JOIN plans pl ON pl.id = u.plan_id
                   LEFT JOIN patient_billing bl ON bl.user_id = u.id
