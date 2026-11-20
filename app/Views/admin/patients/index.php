@@ -2,7 +2,7 @@
 $filters = ['all' => 'Todos', 'green' => 'Em dia', 'yellow' => 'Vencem logo', 'red' => 'Críticos', 'away' => 'Sumidos', 'inactive' => 'Desativados', 'athletes' => 'Atletas', 'compete' => 'Competem', 'nocoach' => 'Sem assessoria'];
 // Nos filtros de atletas (ou ao escolher uma modalidade) a lista ganha as colunas Prova e Assessoria
 $athleteCols = in_array($filter, ['athletes', 'compete', 'nocoach'], true) || $sportId > 0;
-$sq = ($q !== '' ? '&q=' . urlencode($q) : '') . ($sportId ? '&s=' . (int) $sportId : '');
+$sq = ($q !== '' ? '&q=' . urlencode($q) : '') . ($sportId ? '&s=' . (int) $sportId : '') . ($planFilter ? '&plan=' . (int) $planFilter : '');
 ?>
 <div class="page-head">
     <h2>Pacientes</h2>
@@ -11,6 +11,13 @@ $sq = ($q !== '' ? '&q=' . urlencode($q) : '') . ($sportId ? '&s=' . (int) $spor
 
 <form class="search" method="get" action="<?= e(url('/admin/pacientes')) ?>">
     <input type="hidden" name="f" value="<?= e($filter) ?>">
+    <label class="sr-only" for="plan">Plano</label>
+    <select id="plan" name="plan" data-autosubmit style="flex:0 0 auto;max-width:170px">
+        <option value="">Todos os planos</option>
+        <?php foreach ($planOptions as $po): ?>
+            <option value="<?= (int) $po['id'] ?>"<?= (int) $planFilter === (int) $po['id'] ? ' selected' : '' ?>><?= e($po['name']) ?></option>
+        <?php endforeach; ?>
+    </select>
     <label class="sr-only" for="s">Modalidade</label>
     <select id="s" name="s" data-autosubmit style="flex:0 0 auto;max-width:215px">
         <option value="">Todas as modalidades</option>
@@ -53,7 +60,7 @@ $sq = ($q !== '' ? '&q=' . urlencode($q) : '') . ($sportId ? '&s=' . (int) $spor
                 </td>
                 <td><?php if (!$isAth): ?><span class="muted">-</span><?php elseif ($r['has_coach']): ?><?= e($r['coach_name'] ?: 'Sim') ?><?php else: ?><span class="muted">Sem assessoria</span><?php endif; ?></td>
                 <?php endif; ?>
-                <td><?php if ($r['plan_name']): ?><?= e($r['plan_name']) ?><br><span class="small muted"><?= $r['plan_value'] !== null ? e(money((float) $r['plan_value'], floor((float) $r['plan_value']) == (float) $r['plan_value'] ? 0 : 2)) : 'sem valor' ?></span><?php else: ?><span class="muted">-</span><?php endif; ?></td>
+                <td><?php if ($r['plan_name']): ?><?= e($r['plan_name']) ?><br><span class="small muted"><?= $r['plan_value'] !== null ? e(money((float) $r['plan_value'], floor((float) $r['plan_value']) == (float) $r['plan_value'] ? 0 : 2, (string) $r['plan_currency'])) : 'sem valor' ?></span><?php else: ?><span class="muted">-</span><?php endif; ?></td>
                 <td>
                     <?php if ($r['status'] === 'inactive'): ?><span class="tag">Desativado</span>
                     <?php else: partial('seal', ['renew' => $r['renew']]); endif; ?>

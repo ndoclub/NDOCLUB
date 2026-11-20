@@ -6,7 +6,13 @@
 <div class="kpis">
     <a class="kpi wide" href="<?= e(url('/admin/pacientes?f=yellow')) ?>">
         <span class="big num"><?= e(money($due30['total'], floor($due30['total']) == $due30['total'] ? 0 : 2)) ?></span>
-        <span class="lbl">a renovar em 30 dias · <?= (int) $due30['count'] ?> <?= $due30['count'] === 1 ? 'paciente' : 'pacientes' ?><?= $due30['missing'] > 0 ? ' · ' . (int) $due30['missing'] . ' sem valor definido' : '' ?></span>
+        <span class="lbl">a renovar em 30 dias · <?= (int) $due30['count'] ?> <?= $due30['count'] === 1 ? 'paciente' : 'pacientes' ?><?= $due30['missing'] > 0 ? ' · ' . (int) $due30['missing'] . ' sem valor definido' : '' ?><?php
+            $foreignDue = array_diff_key($due30['by'], ['BRL' => 1]);
+            if ($foreignDue): ?><br>+ <?= e(money_multi($foreignDue)) ?> (exterior)<?php endif; ?></span>
+    </a>
+    <a class="kpi<?= $late['count'] > 0 ? ' alert' : '' ?>" href="<?= e(url('/admin/financeiro?f=late')) ?>">
+        <span class="big num"><?= (int) $late['count'] ?></span>
+        <span class="lbl">parcelas atrasadas<?= $late['count'] > 0 ? '<br>' . e(money_multi($late['by'])) : '' ?></span>
     </a>
     <a class="kpi" href="<?= e(url('/admin/pacientes')) ?>"><span class="big num"><?= (int) $stats['patients'] ?></span><span class="lbl">pacientes ativos</span></a>
     <div class="kpi"><span class="big num"><?= (int) $stats['active7'] ?></span><span class="lbl">abriram o app em 7 dias</span></div>
@@ -31,7 +37,7 @@
         <?php foreach ($risk as $r): ?>
             <tr>
                 <td><a class="who" href="<?= e(url('/admin/pacientes/' . $r['id'])) ?>"><?= avatar($r, 34) ?><?= e($r['name']) ?></a></td>
-                <td><?php if ($r['plan_name']): ?><?= e($r['plan_name']) ?><br><span class="small muted"><?= $r['plan_value'] !== null ? e(money((float) $r['plan_value'], floor((float) $r['plan_value']) == (float) $r['plan_value'] ? 0 : 2)) : 'sem valor' ?></span><?php else: ?><span class="muted">-</span><?php endif; ?></td>
+                <td><?php if ($r['plan_name']): ?><?= e($r['plan_name']) ?><br><span class="small muted"><?= $r['plan_value'] !== null ? e(money((float) $r['plan_value'], floor((float) $r['plan_value']) == (float) $r['plan_value'] ? 0 : 2, (string) $r['plan_currency'])) : 'sem valor' ?></span><?php else: ?><span class="muted">-</span><?php endif; ?></td>
                 <td><?php partial('seal', ['renew' => $r['renew']]); ?></td>
                 <td>
                     <?= $r['last_seen_at'] ? e(time_ago($r['last_seen_at'])) : 'Nunca entrou' ?>

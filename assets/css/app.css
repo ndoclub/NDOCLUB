@@ -441,3 +441,27 @@ a.kpi:hover { border-color: var(--ink); }
 .inline-form { display: inline; }
 .empty { padding: 36px 16px; text-align: center; color: var(--mute); }
 .empty strong { display: block; color: var(--ink); font-size: 17px; margin-bottom: 4px; }
+
+/* ---------- Financeiro (admin) ---------- */
+.kpis.fin { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.kpis.fin .big { font-size: 28px; }
+.month-nav { display: flex; align-items: center; gap: 10px; }
+.month-nav strong { min-width: 150px; text-align: center; }
+@media (min-width: 720px) { .form-grid .field.align-input { padding-top: 30px; } }
+.inline-form { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.inline-form .input { flex: 0 0 120px; width: 120px; padding: 7px 10px; }
+.tbl tfoot th { border-top: 2px solid var(--line); background: var(--soft); }
+.bar { display: block; height: 5px; margin-top: 5px; background: var(--soft); border-radius: 99px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--ink); border-radius: 99px; }
+details.pay { border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; background: var(--bg); }
+details.pay > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 12px 14px; }
+details.pay > summary::-webkit-details-marker { display: none; }
+details.pay > summary::before { content: '▸'; color: var(--mute); }
+details.pay[open] > summary::before { content: '▾'; }
+details.pay .tbl-wrap { margin: 0; border-radius: 0 0 12px 12px; }
+details.pay-add { margin-top: 14px; }
+details.pay-add > summary { list-style: none; cursor: pointer; display: inline-block; }
+details.pay-add > summary::-webkit-details-marker { display: none; }
+
+.tbl .num { white-space: nowrap; }
+.field > label.checkbox { display: flex; font-weight: 400; margin-bottom: 0; }

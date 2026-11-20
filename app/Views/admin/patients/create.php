@@ -14,8 +14,7 @@
                 <?php endforeach; ?>
             </select>
             <p class="hint">Ao escolher, a data de vencimento é preenchida sozinha (você pode mudar).</p></div>
-        <div class="field"><label for="plan_price">Valor combinado (R$)</label><input class="input" id="plan_price" name="plan_price" inputmode="decimal" value="<?= e(old('plan_price')) ?>" placeholder="Igual ao do plano">
-            <p class="hint">Só preencha se este paciente tem um valor diferente. Só o admin vê.</p></div>
+        <?php partial('price-field', ['value' => old('plan_price'), 'currency' => currency_or_brl(old('plan_currency', 'BRL')), 'placeholder' => 'Igual ao plano', 'hint' => 'Em branco = valor do plano. Só preencha se este paciente tem um valor diferente (ou paga em dólar/euro). Só o admin vê.']); ?>
         <div class="field"><label for="renewal_date">Vence em</label><input class="input" type="date" id="renewal_date" name="renewal_date" value="<?= e(old('renewal_date', $defaultRenewal)) ?>"></div>
         <div class="field"><label for="password">Senha provisória</label><input class="input" id="password" name="password" value="<?= e($password) ?>" minlength="8" required>
             <p class="hint">O paciente troca no primeiro acesso.</p></div>

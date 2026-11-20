@@ -8,6 +8,7 @@ use App\Core\View;
 use App\Services\Athletes;
 use App\Services\Audit;
 use App\Services\Levels;
+use App\Services\Payments;
 use App\Services\Plans;
 use App\Services\Points;
 use App\Services\Ranking;
@@ -21,9 +22,11 @@ final class PatientController
         $q = trim((string) ($_GET['q'] ?? ''));
         $filter = (string) ($_GET['f'] ?? 'all');
         $sportId = (int) ($_GET['s'] ?? 0);
+        $planFilter = (int) ($_GET['plan'] ?? 0);
 
         $sql = "SELECT u.id, u.name, u.email, u.phone, u.avatar, u.status, u.renewal_date, u.last_seen_at,
                        pl.name AS plan_name, COALESCE(bl.price, pl.price) AS plan_value,
+                       CASE WHEN bl.price IS NOT NULL THEN bl.currency ELSE 'BRL' END AS plan_currency,
                        ap.is_athlete, ap.competes, ap.has_coach, ap.coach_name, ap.event_name, ap.event_date,
                        (SELECT COALESCE(SUM(l.points), 0) FROM points_ledger l WHERE l.user_id = u.id) AS balance
                   FROM users u
@@ -35,6 +38,10 @@ final class PatientController
         if ($sportId > 0) {
             $sql .= ' AND ap.is_athlete = 1 AND EXISTS (SELECT 1 FROM user_sports us WHERE us.user_id = u.id AND us.sport_id = ?)';
             $params[] = $sportId;
+        }
+        if ($planFilter > 0) {
+            $sql .= ' AND u.plan_id = ?';
+            $params[] = $planFilter;
         }
         if ($q !== '') {
             $sql .= ' AND (u.name LIKE ? OR u.email LIKE ?)';
@@ -72,6 +79,7 @@ final class PatientController
         View::render('admin/patients/index', [
             'title' => 'Pacientes', 'list' => $list, 'q' => $q, 'filter' => $filter,
             'sportId' => $sportId, 'sports' => Athletes::sports(false),
+            'planFilter' => $planFilter, 'planOptions' => Plans::withCounts(),
             'sportNames' => Athletes::namesFor(array_column($list, 'id')),
         ], 'admin');
     }
@@ -96,6 +104,7 @@ final class PatientController
         $password = input('password');
         $planId = (int) ($_POST['plan_id'] ?? 0);
         $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
+        $customCur = currency_or_brl($_POST['plan_currency'] ?? 'BRL');
         $plan = $planId ? DB::one('SELECT * FROM plans WHERE id = ? AND active = 1', [$planId]) : null;
 
         $errors = [];
@@ -136,7 +145,7 @@ final class PatientController
             [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, $plan ? (int) $plan['id'] : null, now()]
         );
         if ($custom !== null) {
-            Plans::setCustomPrice($id, $custom);
+            Plans::setCustomPrice($id, $custom, $customCur, 'manual');
         }
         Audit::log((int) Auth::id(), 'patient_create', 'user', $id, $name);
         $_SESSION['_creds'] = ['name' => $name, 'email' => $email, 'password' => $password];
@@ -170,11 +179,18 @@ final class PatientController
             }
         }
         $planRow = !empty($p['plan_id']) ? DB::one('SELECT * FROM plans WHERE id = ?', [(int) $p['plan_id']]) : null;
+        $payments = Payments::forUser($id);
+        $priceInfo = Plans::priceInfoFor($id);
+        $suggest = Plans::renewalSuggestion($id);
+        $lastMethod = $payments ? (string) $payments[0]['method'] : 'pix';
         View::render('admin/patients/show', [
             'plans' => $plansList,
             'planRow' => $planRow,
             'customPrice' => Plans::customPrice($id),
-            'planPrice' => Plans::priceFor($id),
+            'priceInfo' => $priceInfo,
+            'suggest' => $suggest,
+            'payments' => $payments,
+            'lastMethod' => $lastMethod,
             'renewChoices' => Plans::renewalChoices(),
             'athlete' => Athletes::profile($id),
             'athleteSportIds' => Athletes::sportIds($id),
@@ -217,6 +233,7 @@ final class PatientController
         $renewal = input('renewal_date');
         $planId = (int) ($_POST['plan_id'] ?? 0);
         $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
+        $customCur = currency_or_brl($_POST['plan_currency'] ?? 'BRL');
 
         $errors = [];
         if ($planId && !DB::one('SELECT id FROM plans WHERE id = ? AND (active = 1 OR id = ?)', [$planId, (int) ($p['plan_id'] ?? 0)])) {
@@ -242,11 +259,18 @@ final class PatientController
             }
             redirect('/admin/pacientes/' . $id);
         }
+        // Trocou de plano? O valor antigo "mantido até renovar" era do plano anterior: não vira valor combinado.
+        if ($planId !== (int) ($p['plan_id'] ?? 0)) {
+            $info = Plans::priceInfoFor($id);
+            if ($info['source'] === 'reajuste' && $custom !== null && abs($custom - (float) $info['amount']) < 0.005 && $customCur === 'BRL') {
+                $custom = null;
+            }
+        }
         DB::run(
             'UPDATE users SET name = ?, email = ?, phone = ?, goal = ?, status = ?, renewal_date = ?, plan_id = ? WHERE id = ?',
             [$name, $email, $phone ?: null, $goal ?: null, $status, $renewal ?: null, $planId ?: null, $id]
         );
-        Plans::setCustomPrice($id, $custom);
+        Plans::setCustomPrice($id, $custom, $customCur);
         Audit::log((int) Auth::id(), 'patient_update', 'user', $id, $p['name']);
         flash('ok', 'Dados salvos.');
         redirect('/admin/pacientes/' . $id);
@@ -265,9 +289,107 @@ final class PatientController
             flash('err', 'Valor da renovação inválido. Use números, por exemplo 450,00.');
             redirect('/admin/pacientes/' . $id);
         }
-        $new = Renewal::renew($id, $days, (int) Auth::id(), $amount, !empty($p['plan_id']) ? (int) $p['plan_id'] : null);
-        Audit::log((int) Auth::id(), 'renewal', 'user', $id, '+' . $days . ' dias, até ' . $new . ($amount !== null ? ', ' . money($amount) : ''));
-        flash('ok', 'Renovado até ' . fmt_date($new) . '. O bônus de pontos foi lançado.');
+        $cur = currency_or_brl($_POST['currency'] ?? 'BRL');
+
+        // Pagamento (opcional): só é registrado se houver valor. Tudo é conferido ANTES de renovar.
+        $pay = null;
+        if ($amount !== null) {
+            $parsed = $this->parsePayment($amount, $cur, 'first_paid');
+            if (is_string($parsed)) {
+                flash('err', $parsed);
+                redirect('/admin/pacientes/' . $id);
+            }
+            $pay = $parsed;
+        }
+
+        $new = Renewal::renew($id, $days, (int) Auth::id(), $amount, !empty($p['plan_id']) ? (int) $p['plan_id'] : null, $pay, $cur);
+        $detail = '+' . $days . ' dias, até ' . $new;
+        if ($amount !== null) {
+            $detail .= ', ' . money($amount, 2, $cur);
+            if ($pay) {
+                $detail .= ' (' . Payments::methodLabel($pay['method']) . ', ' . $pay['installments'] . 'x)';
+            }
+        }
+        Audit::log((int) Auth::id(), 'renewal', 'user', $id, $detail);
+        flash('ok', 'Renovado até ' . fmt_date($new) . '. O bônus de pontos foi lançado.' . ($pay ? ' Pagamento e parcelas registrados em Financeiro.' : ''));
+        redirect('/admin/pacientes/' . $id);
+    }
+
+    /**
+     * Lê e confere os campos de pagamento do formulário: method, installments, first_due e o
+     * recebimento (checkbox $paidKey = 1ª parcela já recebida; ou paid_count no registro avulso).
+     * Para USD/EUR com parcela já recebida é obrigatório informar o R$ creditado (received_brl).
+     * Retorna o array para Payments::create ou um texto de erro.
+     */
+    private function parsePayment(float $total, string $cur, string $paidKey): array|string
+    {
+        $method = Payments::methodOrDefault($_POST['method'] ?? 'outro');
+        $n = (int) ($_POST['installments'] ?? 1);
+        if ($n < 1 || $n > 12) {
+            return 'Parcelas: escolha de 1 a 12.';
+        }
+        $firstDue = trim((string) ($_POST['first_due'] ?? ''));
+        if ($firstDue === '') {
+            $firstDue = today();
+        }
+        if (!Payments::validDate($firstDue)) {
+            return 'Data da 1ª parcela inválida.';
+        }
+        $paid = $paidKey === 'paid_count' ? (int) ($_POST['paid_count'] ?? 0) : (!empty($_POST[$paidKey]) ? 1 : 0);
+        if ($paid < 0 || $paid > $n) {
+            return 'As parcelas já recebidas não podem ser mais que o total de parcelas.';
+        }
+        $brl = null;
+        if ($cur !== 'BRL' && $paid > 0) {
+            $brl = parse_money((string) ($_POST['received_brl'] ?? ''));
+            if ($brl === false || $brl === null || $brl <= 0) {
+                return 'Para ' . currencies()[$cur][1] . ' já recebido, informe quanto caiu em reais (R$).';
+            }
+        }
+        return ['method' => $method, 'installments' => $n, 'first_due' => $firstDue, 'paid_count' => $paid, 'received_brl' => $brl];
+    }
+
+    /** Registrar um pagamento avulso (contratos que já existiam antes do sistema, por exemplo). */
+    public function addPayment(int $id): void
+    {
+        $p = $this->find($id);
+        $total = parse_money((string) ($_POST['total'] ?? ''));
+        $cur = currency_or_brl($_POST['currency'] ?? 'BRL');
+        $soldOn = trim((string) ($_POST['sold_on'] ?? ''));
+        if ($soldOn === '') {
+            $soldOn = today();
+        }
+        if ($total === false || $total === null || $total <= 0) {
+            flash('err', 'Informe o valor total do pagamento. Use números, por exemplo 1200,00.');
+            redirect('/admin/pacientes/' . $id);
+        }
+        if (!Payments::validDate($soldOn) || $soldOn > today()) {
+            flash('err', 'Data da venda inválida (não pode ser no futuro).');
+            redirect('/admin/pacientes/' . $id);
+        }
+        $parsed = $this->parsePayment($total, $cur, 'paid_count');
+        if (is_string($parsed)) {
+            flash('err', $parsed);
+            redirect('/admin/pacientes/' . $id);
+        }
+        DB::tx(function () use ($id, $p, $total, $cur, $soldOn, $parsed) {
+            Payments::create(
+                $id,
+                !empty($p['plan_id']) ? (int) $p['plan_id'] : null,
+                null,
+                $total,
+                $cur,
+                $parsed['method'],
+                $parsed['installments'],
+                $soldOn,
+                $parsed['first_due'],
+                $parsed['paid_count'],
+                $parsed['received_brl'],
+                (int) Auth::id()
+            );
+        });
+        Audit::log((int) Auth::id(), 'payment_add', 'user', $id, money($total, 2, $cur) . ' em ' . $parsed['installments'] . 'x (' . Payments::methodLabel($parsed['method']) . ')');
+        flash('ok', 'Pagamento registrado com ' . $parsed['installments'] . ($parsed['installments'] === 1 ? ' parcela.' : ' parcelas.'));
         redirect('/admin/pacientes/' . $id);
     }
 

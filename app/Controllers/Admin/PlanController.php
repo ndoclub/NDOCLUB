@@ -5,6 +5,7 @@ use App\Core\Auth;
 use App\Core\DB;
 use App\Core\View;
 use App\Services\Audit;
+use App\Services\Plans;
 
 /** Planos do acompanhamento (Trimestral, Semestral, Anual...) com valor em R$ (só o admin vê). */
 final class PlanController
@@ -46,14 +47,21 @@ final class PlanController
             redirect('/admin/planos');
         }
         $d = $this->validated('/admin/planos/' . $id);
+        // Reajuste seguro: quem já está no plano mantém o valor antigo até a próxima renovação
+        $oldPrice = $plan['price'] === null ? null : (float) $plan['price'];
+        $kept = Plans::protectOnPriceChange($id, $oldPrice, $d['price']);
         DB::run(
             'UPDATE plans SET name = ?, duration_days = ?, price = ?, active = ? WHERE id = ?',
             [$d['name'], $d['days'], $d['price'], $d['active'], $id]
         );
         $old = $plan['price'] === null ? 'sem valor' : money((float) $plan['price']);
         $new = $d['price'] === null ? 'sem valor' : money($d['price']);
-        Audit::log((int) Auth::id(), 'plan_update', 'plan', $id, $d['name'] . ': ' . $old . ' -> ' . $new);
-        flash('ok', 'Plano salvo.');
+        Audit::log((int) Auth::id(), 'plan_update', 'plan', $id, $d['name'] . ': ' . $old . ' -> ' . $new . ($kept ? ' (' . $kept . ' paciente(s) mantêm o valor antigo até renovar)' : ''));
+        if ($kept > 0) {
+            flash('ok', 'Plano salvo. ' . $kept . ($kept === 1 ? ' paciente ativo mantém' : ' pacientes ativos mantêm') . ' o valor anterior (' . $old . ') até a próxima renovação; depois passam para ' . $new . '.');
+        } else {
+            flash('ok', 'Plano salvo.');
+        }
         redirect('/admin/planos');
     }
 

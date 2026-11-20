@@ -281,19 +281,55 @@ function parse_decimal(string $s): ?float
     return is_numeric($s) ? (float) $s : null;
 }
 
-/** Valor em reais no padrão brasileiro: R$ 1.234,50. Só usar no painel admin. */
-function money(?float $v, int $dec = 2): string
+/**
+ * Moedas aceitas nos valores (só no painel admin): sigla => [símbolo, nome].
+ * O padrão é o real (BRL).
+ */
+function currencies(): array
 {
-    return $v === null ? '-' : 'R$ ' . number_format($v, $dec, ',', '.');
+    return [
+        'BRL' => ['R$', 'Real (R$)'],
+        'USD' => ['US$', 'Dólar (US$)'],
+        'EUR' => ['€', 'Euro (€)'],
+    ];
+}
+
+/** Sigla válida (BRL, USD, EUR). Qualquer outra coisa vira BRL. */
+function currency_or_brl(?string $cur): string
+{
+    $cur = strtoupper(trim((string) $cur));
+    return isset(currencies()[$cur]) ? $cur : 'BRL';
+}
+
+/** Formata um valor na moeda: money(1234.5) => "R$ 1.234,50"; money(900, 2, 'USD') => "US$ 900,00". */
+function money(?float $v, int $dec = 2, string $cur = 'BRL'): string
+{
+    if ($v === null) {
+        return '-';
+    }
+    $sym = currencies()[currency_or_brl($cur)][0];
+    return $sym . ' ' . number_format($v, $dec, ',', '.');
+}
+
+/** Vários totais de moedas diferentes numa linha: ['BRL' => 100, 'USD' => 50] => "R$ 100,00 · US$ 50,00". */
+function money_multi(array $byCurrency, string $empty = '-'): string
+{
+    $parts = [];
+    foreach (array_keys(currencies()) as $cur) {
+        if (!empty($byCurrency[$cur])) {
+            $parts[] = money((float) $byCurrency[$cur], 2, $cur);
+        }
+    }
+    return $parts ? implode(' · ', $parts) : $empty;
 }
 
 /**
- * Lê um valor digitado ("300", "300,50", "1.234,50", "R$ 300").
+ * Lê um valor digitado ("300", "300,50", "1.234,50", "R$ 300", "US$ 900", "€ 50").
  * Retorna null se estiver vazio e false se for inválido (negativo, texto ou acima de 99.999,99).
  */
 function parse_money(string $s): float|false|null
 {
-    $s = trim(str_ireplace(['R$', ' '], '', $s));
+    $s = trim(str_ireplace(['US$', 'R$', '€', 'USD', 'EUR', 'BRL', ' '], '', $s));
     if ($s === '') {
         return null;
     }
@@ -307,7 +343,6 @@ function parse_money(string $s): float|false|null
     return round((float) $s, 2);
 }
 
-/** Senha provisória fácil de ditar (sem letras parecidas como l/1, O/0). */
 function temp_password(): string
 {
     $chars = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -370,6 +405,7 @@ function icon(string $name, int $size = 24): string
         'doc'      => '<path d="M6 3h9l4 4v14H6z"/><path d="M9 13h6M9 17h6"/>',
         'tag'      => '<path d="M4 4h8l8 8-8 8-8-8z"/><circle cx="8.5" cy="8.5" r="1"/>',
         'card'     => '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>',
+        'cash'     => '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9.5h.01M17.5 14.5h.01"/>',
         'left'     => '<path d="M15 5l-7 7 7 7"/>',
         'right'    => '<path d="M9 5l7 7-7 7"/>',
     ];

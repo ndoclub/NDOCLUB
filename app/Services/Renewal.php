@@ -84,10 +84,25 @@ final class Renewal
     /**
      * Soma dias à renovação: parte da data atual de vencimento
      * (ou de hoje, se já venceu), registra no histórico e dá o bônus de pontos.
+     *
+     * $amount/$currency = valor total vendido nesta renovação (admin). Se vier $pay, também registra
+     * o pagamento e as parcelas (financeiro), tudo na mesma operação. $pay:
+     *   method, installments, first_due (AAAA-MM-DD), paid_count (parcelas já recebidas),
+     *   received_brl (R$ que creditou, para USD/EUR)
+     * Quem estava só mantendo o valor antigo de um plano reajustado passa para o valor atual do plano.
+     * Retorna a nova data de vencimento.
      */
-    public static function renew(int $userId, int $days, ?int $adminId, ?float $amount = null, ?int $planId = null): string
-    {
-        return DB::tx(function () use ($userId, $days, $adminId, $amount, $planId) {
+    public static function renew(
+        int $userId,
+        int $days,
+        ?int $adminId,
+        ?float $amount = null,
+        ?int $planId = null,
+        ?array $pay = null,
+        string $currency = 'BRL'
+    ): string {
+        $currency = currency_or_brl($currency);
+        return DB::tx(function () use ($userId, $days, $adminId, $amount, $planId, $pay, $currency) {
             $u = DB::one('SELECT renewal_date FROM users WHERE id = ?', [$userId]);
             $prev = $u['renewal_date'] ?? null;
             $base = ($prev && substr($prev, 0, 10) > today()) ? substr($prev, 0, 10) : today();
@@ -95,9 +110,26 @@ final class Renewal
 
             DB::run('UPDATE users SET renewal_date = ? WHERE id = ?', [$new, $userId]);
             $rid = DB::insert(
-                'INSERT INTO renewals (user_id, previous_date, new_date, days_added, plan_id, amount, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [$userId, $prev, $new, $days, $planId, $amount, $adminId, now()]
+                'INSERT INTO renewals (user_id, previous_date, new_date, days_added, plan_id, amount, currency, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [$userId, $prev, $new, $days, $planId, $amount, $currency, $adminId, now()]
             );
+            if ($amount !== null && $pay !== null) {
+                Payments::create(
+                    $userId,
+                    $planId,
+                    $rid,
+                    $amount,
+                    $currency,
+                    (string) ($pay['method'] ?? 'outro'),
+                    (int) ($pay['installments'] ?? 1),
+                    today(),
+                    (string) ($pay['first_due'] ?? today()),
+                    (int) ($pay['paid_count'] ?? 0),
+                    isset($pay['received_brl']) ? (float) $pay['received_brl'] : null,
+                    $adminId
+                );
+            }
+            Plans::clearReajuste($userId);
             Points::award($userId, 'renewal', 'renewal', $rid, 'Bônus por renovar');
             return $new;
         });

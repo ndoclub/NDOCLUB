@@ -4,6 +4,7 @@ namespace App\Controllers\Admin;
 use App\Core\DB;
 use App\Core\View;
 use App\Services\Athletes;
+use App\Services\Payments;
 use App\Services\Plans;
 use App\Services\Renewal;
 use App\Services\Settings;
@@ -29,7 +30,9 @@ final class DashboardController
         // Painel de risco: quem vence logo (ou já venceu) e quanto tempo está sem abrir o app
         $rows = DB::all(
             "SELECT u.id, u.name, u.avatar, u.phone, u.renewal_date, u.last_seen_at,
-                    pl.name AS plan_name, COALESCE(bl.price, pl.price) AS plan_value,
+                    pl.name AS plan_name,
+                    CASE WHEN bl.price IS NOT NULL AND bl.source <> 'reajuste' THEN bl.price ELSE pl.price END AS plan_value,
+                    CASE WHEN bl.price IS NOT NULL AND bl.source <> 'reajuste' THEN bl.currency ELSE 'BRL' END AS plan_currency,
                     (SELECT MAX(c.checkin_date) FROM checkins c WHERE c.user_id = u.id) AS last_checkin
                FROM users u
                LEFT JOIN plans pl ON pl.id = u.plan_id
@@ -51,7 +54,7 @@ final class DashboardController
         $events = Athletes::upcoming(8);
         $stats['athletes'] = Athletes::countAthletes();
 
-        View::render('admin/dashboard', ['title' => 'Painel', 'stats' => $stats, 'risk' => $risk, 'yellow' => $yellow, 'due30' => Plans::dueWithin(30),
+        View::render('admin/dashboard', ['title' => 'Painel', 'stats' => $stats, 'risk' => $risk, 'yellow' => $yellow, 'due30' => Plans::dueWithin(30), 'late' => Payments::late(),
             'events' => $events, 'eventSports' => Athletes::namesFor(array_column($events, 'id')),
         ], 'admin');
     }

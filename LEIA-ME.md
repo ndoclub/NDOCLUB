@@ -35,7 +35,8 @@ Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)*
 WhatsApp) · **planos e valores** (só o admin vê R$) · pacientes (cadastro com plano e "valor combinado",
 renovar com a duração do plano e bônus, pontos manuais, dieta, senha provisória, exclusão LGPD) ·
 **atletas** (etiquetas de modalidade nos pacientes, filtros Atletas / Competem / Sem assessoria / por modalidade,
-cartão **Próximas provas** no painel, tela Modalidades) · treinos · moderação do feed e denúncias · mural fixado · loja e
+cartão **Próximas provas** no painel, tela Modalidades) · **financeiro** (faturamento do mês, parcelas no cartão/Pix até 12x,
+agenda de recebíveis dos próximos 12 meses, "Recebi" para conferir o que caiu, atrasadas, e valores em R$, US$ e €) · treinos · moderação do feed e denúncias · mural fixado · loja e
 resgates · regras de pontos · ranking · configurações (limites dos selos, WhatsApp, níveis, versão
 do termo) · auditoria.
 
@@ -129,6 +130,25 @@ Mesmo processo da atualização 01, **depois** dela (se ainda não rodou a 01, r
    Cria as tabelas de modalidades e perfil esportivo e as 4 modalidades iniciais. Não apaga nada.
    *(O final do arquivo tem um bloco opcional que transforma alguns pacientes de teste em atletas, para você ver na tela.)*
 3. **Ctrl + F5** e abra **Admin → Modalidades**.
+
+### Atualização 03 (financeiro: moedas, parcelas e recebíveis)
+Mesmo processo, **depois** das atualizações 01 e 02:
+1. Atualize os arquivos do projeto (`git pull`, ou copie a pasta nova por cima).
+2. phpMyAdmin → banco **nodaysoffclub** → aba **Importar** → `database/atualizacao_03_financeiro.sql` → **Executar**.
+   Cria as tabelas de pagamentos e parcelas e acrescenta a moeda aos valores. Não apaga nada.
+3. *(Opcional, só para ver as telas cheias)* importe também `database/demo_financeiro.sql`: cria pagamentos **fictícios** só para os pacientes de teste. Rode uma vez.
+4. **Ctrl + F5** e abra **Admin → Financeiro**.
+
+**Como o Financeiro funciona**
+- **Faturamento do mês** = tudo que foi **vendido** no mês (o valor total da renovação, mesmo parcelado).
+- **Recebíveis** = as **parcelas**: cada uma tem data, valor e se já caiu. Cartão cai mês a mês (sem antecipar); no Pix você confere se caiu.
+- Ao **renovar** um paciente com valor preenchido, escolha a **moeda**, a **forma**, as **parcelas** e a data da 1ª. As parcelas aparecem em Financeiro e na ficha (painel **Pagamentos**).
+- Clicou **Recebi** quando caiu. Parcela que passou da data e não foi marcada vira **Atrasada** (aparece no Painel). Marcou sem querer? **Desfazer**.
+- **Dólar/euro:** o valor fica na moeda original e, ao marcar "Recebi", você informa **quanto caiu em reais** (o que creditou na conta). É esse R$ que entra em "recebido no mês". Dólar e euro nunca são somados ao real.
+- Contrato que já existia antes do sistema (ex.: anual no cartão com 3 parcelas já pagas): na ficha, **Registrar pagamento sem renovar**.
+- **Valores brutos** (sem taxas). Um campo de taxa pode entrar numa próxima etapa.
+- **Reajuste de plano:** se você mudar o valor de um plano, quem já está nele **mantém o valor antigo até a próxima renovação**; ao renovar, passa para o valor novo.
+- Tudo isso é **só do admin**. O paciente nunca vê valores nem parcelas.
 
 ### Acessos para teste
 | Perfil | E-mail | Senha |
@@ -234,6 +254,17 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Paciente (ex.: Carla):** em **Perfil** aparece o cartão **Perfil esportivo** com **Editar**; mudar modalidades e marcar/desmarcar **Mostrar minhas modalidades no meu perfil da comunidade**.
 - [ ] **Privacidade (importante):** entrar como **outro** paciente e abrir o perfil público da Carla (pelo Feed → nome dela): só aparecem as **modalidades**, e só se ela marcou mostrar. **Assessoria, prova e data nunca aparecem** para outros pacientes.
 
+### E4. Financeiro (só o Gabriel vê)
+- [ ] **Admin → Financeiro:** abre com 4 números (faturamento do mês, recebido no mês, a receber no mês, parcelas atrasadas), filtros, lista de parcelas e a agenda dos próximos 12 meses. As setas ‹ › mudam o mês.
+- [ ] **Renovar com pagamento:** na ficha, preencher valor, forma **Cartão**, **12x** → Renovar. Em **Pagamentos** aparecem 12 parcelas (a 1ª daqui a 30 dias); em **Financeiro** elas entram na agenda mês a mês.
+- [ ] **Pix à vista já recebido:** forma **Pix**, 1x, marcar "1ª parcela já recebida" → a parcela entra como recebida hoje.
+- [ ] **Recebi / Desfazer:** clicar **Recebi** numa parcela → vira "Recebida" e o "recebido no mês" sobe; **Desfazer** volta para "A receber".
+- [ ] **Atrasadas:** parcela com data passada que não foi marcada aparece em vermelho, no filtro **Atrasadas** e no **Painel**.
+- [ ] **Dólar/euro:** renovar com moeda **US$** e forma **Wise**; ao marcar "Recebi", informar o **R$ que caiu**. O "recebido no mês" usa esse R$; o dólar aparece à parte (coluna Exterior).
+- [ ] **Registrar pagamento sem renovar:** contrato antigo com algumas parcelas já recebidas.
+- [ ] **Planos:** coluna **≈ por mês**; clicar no número de pacientes abre a lista filtrada por plano. Mudar o valor de um plano → aviso de quantos pacientes mantêm o valor antigo até renovar.
+- [ ] **Privacidade (importante):** entrar como paciente e passar pelas telas → **nenhum R$, US$ ou € em lugar nenhum**. Abrir `/admin/financeiro` como paciente → bloqueado.
+
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
 - [ ] O painel admin no celular abre o menu pelo botão ☰ (gaveta lateral).
@@ -246,12 +277,12 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **318 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **415 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
-> perfil esportivo, privacidade dos valores e das provas, segurança e CSRF),
+> perfil esportivo, financeiro (parcelas, moedas, recebíveis, atrasadas), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
 > ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, os
-> arquivos `atualizacao_01_planos.sql` e `atualizacao_02_atletas.sql`) é o primeiro teste a fazer.
+> arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql` e `atualizacao_03_financeiro.sql`) é o primeiro teste a fazer.
 > Se o phpMyAdmin acusar algum erro, copie a mensagem e me envie que eu corrijo.
 
 ---
@@ -284,6 +315,8 @@ Ideal: faça no celular e depois no computador.
 | Extras da Fase 1 — painel de risco de renovação, streak, check-in de 10 s, níveis, bônus de renovação, mural fixado, evolução de peso | ✅ **Neste MVP** |
 | Planos (Trimestral/Semestral/Anual), valores só para o admin, previsão de renovações em R$, faixa de alerta de renovação para o paciente | ✅ **Neste MVP** (atualização 01) |
 | Perfil esportivo (atletas): modalidades, assessoria, próximas provas, filtros no painel, edição pelo paciente | ✅ **Neste MVP** (atualização 02) |
+| Financeiro: moedas (R$, US$, €), pagamentos parcelados, agenda de recebíveis, "Recebi", atrasadas, reajuste de plano só na renovação | ✅ **Neste MVP** (atualização 03) |
+| Financeiro, próximos passos: campo de **taxas** (cartão/Pix/Wise) para ver o líquido, taxa de renovação, previsão por mês, acompanhamento da renovação (conversei / vai renovar / não vai) | ⏭️ Próxima rodada |
 | Contagem regressiva da prova no Início do paciente, temas do dia por modalidade, ranking por modalidade | ⏭️ Próxima rodada (dados já estão no banco) |
 | Fase 2 — notificações push, medalhas/conquistas, desafios mensais, cupons de parceiros, fotos de evolução (privadas), indicação com link | ⏭️ Tabelas e serviços já preparados (`Points::award`, `point_rules`, `audit_log`); falta construir as telas |
 | Fase 3 — Laravel + Filament, relatórios, integrações (WhatsApp automático, pagamento) | ⏭️ Estrutura pronta para migrar (seção 2) |
@@ -327,7 +360,7 @@ fotos, PDFs de dieta ou backups do banco.
 - O **Termo de Consentimento** (`/termos`) é um **modelo**: precisa de revisão de profissional jurídico
   antes do uso com pacientes reais. Mudou o texto? Suba a versão em *Admin → Configurações* para
   todos aceitarem de novo.
-- O paciente pode pedir exclusão: *Admin → Paciente → Excluir paciente e dados* apaga tudo dele.
+- O paciente pode pedir exclusão: *Admin → Paciente → Excluir paciente e dados* apaga tudo dele (inclusive pagamentos e parcelas).
 - Durante o desenvolvimento e o piloto interno use **somente pacientes fictícios**.
 - **Antes de abrir para pacientes reais**, peça uma revisão de segurança ao desenvolvedor da equipe.
 

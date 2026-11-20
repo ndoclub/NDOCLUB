@@ -20,7 +20,7 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
                 <?php if ($p['status'] === 'inactive'): ?><span class="tag">Desativado</span><?php else: partial('seal', ['renew' => $renew]); endif; ?>
                 <?php partial('level', ['level' => $level]); ?>
                 <?php foreach ($athleteNames as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?>
-                <?php if ($planRow): ?><span class="tag"><?= e($planRow['name']) ?><?= $planPrice !== null ? ' · ' . e(money($planPrice)) . ($customPrice !== null ? ' (combinado)' : '') : ' · sem valor' ?></span><?php endif; ?>
+                <?php if ($planRow): ?><span class="tag"><?= e($planRow['name']) ?><?= $priceInfo['amount'] !== null ? ' · ' . e(money($priceInfo['amount'], 2, $priceInfo['currency'])) . ($priceInfo['source'] === 'manual' ? ' (combinado)' : ($priceInfo['source'] === 'reajuste' ? ' (mantido até renovar)' : '')) : ' · sem valor' ?></span><?php endif; ?>
             </div>
         </div>
     </div>
@@ -65,8 +65,14 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
                         <option value="<?= (int) $pl['id'] ?>" data-days="<?= (int) $pl['duration_days'] ?>" data-price="<?= $pl['price'] !== null ? e(number_format((float) $pl['price'], 2, ',', '')) : '' ?>"<?= (int) ($p['plan_id'] ?? 0) === (int) $pl['id'] ? ' selected' : '' ?>><?= e($pl['name']) ?> · <?= (int) $pl['duration_days'] ?> dias<?= !$pl['active'] ? ' (desativado)' : '' ?></option>
                     <?php endforeach; ?>
                 </select></div>
-            <div class="field"><label for="plan_price">Valor combinado (R$)</label><input class="input" id="plan_price" name="plan_price" inputmode="decimal" value="<?= $customPrice !== null ? e(number_format($customPrice, 2, ',', '')) : '' ?>" placeholder="<?= $planRow && $planRow['price'] !== null ? e('Padrão do plano: ' . money((float) $planRow['price'])) : 'Igual ao do plano' ?>">
-                <p class="hint">Só se for diferente do plano. Só o admin vê.</p></div>
+            <?php partial('price-field', [
+                'value' => $customPrice !== null ? number_format($customPrice, 2, ',', '') : '',
+                'currency' => $priceInfo['source'] === 'plan' ? 'BRL' : $priceInfo['currency'],
+                'placeholder' => $planRow && $planRow['price'] !== null ? number_format((float) $planRow['price'], 2, ',', '') : 'Igual ao do plano',
+                'hint' => $priceInfo['source'] === 'reajuste'
+                    ? 'Mantendo o valor antigo até renovar; depois passa para ' . ($priceInfo['planPrice'] !== null ? money($priceInfo['planPrice']) : 'o valor do plano') . '. Só o admin vê.'
+                    : 'Em branco = valor do plano' . ($planRow && $planRow['price'] !== null ? ' (' . money((float) $planRow['price']) . ')' : '') . '. Só se for diferente (ou em dólar/euro). Só o admin vê.',
+            ]); ?>
             <div class="field"><label for="renewal_date">Vence em</label><input class="input" type="date" id="renewal_date" name="renewal_date" value="<?= e(substr((string) $p['renewal_date'], 0, 10)) ?>"></div>
             <div class="field"><label for="status">Acesso</label>
                 <select id="status" name="status">
@@ -92,32 +98,141 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
 
     <div class="panel">
         <h3>Renovar acompanhamento</h3>
-        <p class="muted small">Soma os dias a partir do vencimento atual (ou de hoje, se já venceu) e lança o bônus de pontos.</p>
-        <form class="search" method="post" action="<?= e(url('/admin/pacientes/' . $id . '/renovar')) ?>" data-confirm="Confirmar a renovação?">
+        <p class="muted small">Soma os dias a partir do vencimento atual (ou de hoje, se já venceu) e lança o bônus de pontos. Com valor preenchido, também registra o pagamento e as parcelas em Financeiro.</p>
+        <?php
+        $sugAmount = $suggest['amount'];
+        $sugCur = $suggest['currency'];
+        $defMethod = array_key_exists($lastMethod, \App\Services\Payments::methods()) ? $lastMethod : 'pix';
+        $defDue = $defMethod === 'cartao' ? date('Y-m-d', strtotime('+30 day')) : today();
+        $planDays = $planRow ? (int) $planRow['duration_days'] : 90;
+        if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
+        ?>
+        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/renovar')) ?>" data-confirm="Confirmar a renovação?" data-pay-form>
             <?= csrf_field() ?>
-            <select name="days" aria-label="Período">
-                <?php
-                $planDays = $planRow ? (int) $planRow['duration_days'] : 90;
-                if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
-                foreach ($renewChoices as $d): ?>
-                    <option value="<?= (int) $d ?>"<?= $d === $planDays ? ' selected' : '' ?>>+<?= (int) $d ?> dias<?= ($planRow && $d === (int) $planRow['duration_days']) ? ' (' . e($planRow['name']) . ')' : '' ?></option>
-                <?php endforeach; ?>
-            </select>
-            <input class="input" name="amount" inputmode="decimal" aria-label="Valor recebido (R$)" placeholder="R$" value="<?= $planPrice !== null ? e(number_format($planPrice, 2, ',', '')) : '' ?>" style="flex:0 0 120px;width:120px">
-            <button class="btn btn-sm" type="submit">Renovar</button>
+            <div class="form-grid">
+                <div class="field"><label for="days">Período</label>
+                    <select id="days" name="days">
+                        <?php foreach ($renewChoices as $d): ?>
+                            <option value="<?= (int) $d ?>"<?= $d === $planDays ? ' selected' : '' ?>>+<?= (int) $d ?> dias<?= ($planRow && $d === (int) $planRow['duration_days']) ? ' (' . e($planRow['name']) . ')' : '' ?></option>
+                        <?php endforeach; ?>
+                    </select></div>
+                <div class="field"><label for="amount">Valor total vendido</label>
+                    <div class="row" style="gap:8px">
+                        <select name="currency" aria-label="Moeda" data-pay-currency style="flex:0 0 96px">
+                            <?php foreach (currencies() as $code => $c): ?>
+                                <option value="<?= e($code) ?>"<?= $sugCur === $code ? ' selected' : '' ?>><?= e($c[0]) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <input class="input" id="amount" name="amount" inputmode="decimal" placeholder="Ex.: 1200,00" value="<?= $sugAmount !== null ? e(number_format($sugAmount, 2, ',', '')) : '' ?>">
+                    </div></div>
+                <div class="field"><label for="method">Forma de pagamento</label>
+                    <select id="method" name="method" data-pay-method>
+                        <?php foreach (\App\Services\Payments::methods() as $k => $label): ?>
+                            <option value="<?= e($k) ?>"<?= $defMethod === $k ? ' selected' : '' ?>><?= e($label) ?></option>
+                        <?php endforeach; ?>
+                    </select></div>
+                <div class="field"><label for="installments">Parcelas</label>
+                    <select id="installments" name="installments">
+                        <?php for ($n = 1; $n <= 12; $n++): ?>
+                            <option value="<?= $n ?>"><?= $n === 1 ? 'À vista (1x)' : $n . 'x' ?></option>
+                        <?php endfor; ?>
+                    </select></div>
+                <div class="field"><label for="first_due">1ª parcela em</label>
+                    <input class="input" type="date" id="first_due" name="first_due" value="<?= e($defDue) ?>" data-pay-due>
+                    <p class="hint">As próximas caem todo mês, no mesmo dia. No cartão, a 1ª costuma cair 30 dias depois.</p></div>
+                <div class="field align-input"><label class="checkbox"><input type="checkbox" name="first_paid" value="1" data-pay-paid<?= $defMethod === 'cartao' ? '' : ' checked' ?>><span>1ª parcela já recebida</span></label></div>
+                <div class="field" data-brl-field<?= $sugCur === 'BRL' ? ' hidden' : '' ?>><label for="received_brl">Quanto caiu em reais (R$)</label>
+                    <input class="input" id="received_brl" name="received_brl" inputmode="decimal" placeholder="Ex.: 4950,00">
+                    <p class="hint">Em dólar/euro, o total em R$ usa o valor que creditou na conta.</p></div>
+            </div>
+            <div class="form-actions"><button class="btn btn-sm" type="submit">Renovar</button></div>
         </form>
-        <p class="hint">O valor é só para o seu controle (opcional) e fica no histórico abaixo. O paciente nunca vê.</p>
+        <p class="hint">Deixe o valor em branco para só somar os dias, sem registrar pagamento. O paciente nunca vê valores.</p>
         <?php if ($renewals): ?>
             <div class="tbl-wrap"><table class="tbl" style="min-width:0">
                 <thead><tr><th>Quando</th><th>De</th><th>Até</th><th class="r">Valor</th></tr></thead>
                 <tbody>
                 <?php foreach ($renewals as $r): ?>
                     <tr><td><?= e(fmt_date($r['created_at'])) ?></td><td><?= e(fmt_date($r['previous_date'])) ?></td><td><?= e(fmt_date($r['new_date'])) ?> <span class="tag">+<?= (int) $r['days_added'] ?> d</span><?= !empty($r['plan_name']) ? '<br><span class="small muted">' . e($r['plan_name']) . '</span>' : '' ?></td>
-                        <td class="r num"><?= $r['amount'] !== null ? e(money((float) $r['amount'])) : '-' ?></td></tr>
+                        <td class="r num"><?= $r['amount'] !== null ? e(money((float) $r['amount'], 2, (string) ($r['currency'] ?? 'BRL'))) : '-' ?></td></tr>
                 <?php endforeach; ?>
                 </tbody>
             </table></div>
         <?php endif; ?>
+    </div>
+
+    <div class="panel">
+        <h3>Pagamentos</h3>
+        <p class="muted small">Cada pagamento tem as parcelas (recebíveis). Quando cair, clique em "Recebi"; se marcou sem querer, "Desfazer". Só o admin vê.</p>
+        <?php $backHere = '/admin/pacientes/' . $id; ?>
+        <?php if (!$payments): ?>
+            <p class="muted small" style="margin:0 0 12px">Nenhum pagamento registrado ainda.</p>
+        <?php endif; ?>
+        <?php foreach ($payments as $pay): ?>
+            <details class="pay"<?= $pay['late_count'] > 0 ? ' open' : '' ?>>
+                <summary>
+                    <strong class="num"><?= e(money((float) $pay['total'], 2, $pay['currency'])) ?></strong>
+                    <span class="muted small"><?= e(\App\Services\Payments::methodLabel($pay['method'])) ?> · <?= (int) $pay['installments'] === 1 ? 'à vista' : (int) $pay['installments'] . 'x' ?> · vendido em <?= e(fmt_date($pay['sold_on'])) ?><?= !empty($pay['plan_name']) ? ' · ' . e($pay['plan_name']) : '' ?></span>
+                    <span class="tag<?= $pay['received_count'] === (int) $pay['installments'] ? ' ok' : '' ?>"><?= (int) $pay['received_count'] ?>/<?= (int) $pay['installments'] ?> recebidas</span>
+                    <?php if ($pay['late_count'] > 0): ?><span class="tag bad"><?= (int) $pay['late_count'] ?> <?= $pay['late_count'] === 1 ? 'atrasada' : 'atrasadas' ?></span><?php endif; ?>
+                </summary>
+                <div class="tbl-wrap"><table class="tbl" style="min-width:0">
+                    <thead><tr><th>Parcela</th><th>Vence</th><th class="r">Valor</th><th>Situação</th><th class="r">Ação</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($pay['items'] as $it): ?>
+                        <tr>
+                            <td class="num"><?= (int) $it['number'] ?>/<?= (int) $pay['installments'] ?></td>
+                            <td><?= e(fmt_date($it['due_on'])) ?></td>
+                            <td class="r num"><?= e(money((float) $it['amount'], 2, $it['currency'])) ?></td>
+                            <td>
+                                <?php if ($it['status'] === 'received'): ?>
+                                    <span class="tag ok">Recebida <?= e(fmt_date($it['received_on'])) ?></span>
+                                    <?php if ($it['currency'] !== 'BRL'): ?><br><span class="small muted"><?= $it['received_brl'] !== null ? 'Caiu ' . e(money((float) $it['received_brl'])) : 'falta informar o R$' ?></span><?php endif; ?>
+                                <?php elseif ($it['late']): ?><span class="tag bad">Atrasada</span>
+                                <?php else: ?><span class="tag">A receber</span><?php endif; ?>
+                            </td>
+                            <td class="r"><?php partial('installment-actions', ['i' => $it, 'back' => $backHere]); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table></div>
+            </details>
+        <?php endforeach; ?>
+
+        <details class="pay-add">
+            <summary class="btn btn-ghost btn-sm">+ Registrar pagamento sem renovar</summary>
+            <p class="muted small" style="margin-top:12px">Para contratos que já existiam antes do sistema (ex.: anual no cartão em 12x que já tem parcelas recebidas).</p>
+            <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/pagamentos')) ?>" data-pay-form>
+                <?= csrf_field() ?>
+                <div class="form-grid">
+                    <div class="field"><label for="total">Valor total</label>
+                        <div class="row" style="gap:8px">
+                            <select name="currency" aria-label="Moeda" data-pay-currency style="flex:0 0 96px">
+                                <?php foreach (currencies() as $code => $c): ?><option value="<?= e($code) ?>"><?= e($c[0]) ?></option><?php endforeach; ?>
+                            </select>
+                            <input class="input" id="total" name="total" inputmode="decimal" placeholder="Ex.: 4500,00" required>
+                        </div></div>
+                    <div class="field"><label for="p_method">Forma de pagamento</label>
+                        <select id="p_method" name="method" data-pay-method>
+                            <?php foreach (\App\Services\Payments::methods() as $k => $label): ?><option value="<?= e($k) ?>"<?= $defMethod === $k ? ' selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
+                        </select></div>
+                    <div class="field"><label for="p_installments">Parcelas</label>
+                        <select id="p_installments" name="installments">
+                            <?php for ($n = 1; $n <= 12; $n++): ?><option value="<?= $n ?>"><?= $n === 1 ? 'À vista (1x)' : $n . 'x' ?></option><?php endfor; ?>
+                        </select></div>
+                    <div class="field"><label for="sold_on">Data da venda</label><input class="input" type="date" id="sold_on" name="sold_on" value="<?= e(today()) ?>" max="<?= e(today()) ?>"></div>
+                    <div class="field"><label for="p_first_due">Vencimento da 1ª parcela</label><input class="input" type="date" id="p_first_due" name="first_due" value="<?= e($defDue) ?>" data-pay-due></div>
+                    <div class="field"><label for="paid_count">Parcelas já recebidas</label>
+                        <select id="paid_count" name="paid_count" data-pay-paidcount>
+                            <?php for ($n = 0; $n <= 12; $n++): ?><option value="<?= $n ?>"><?= $n === 0 ? 'Nenhuma' : $n ?></option><?php endfor; ?>
+                        </select>
+                        <p class="hint">As primeiras parcelas, na ordem.</p></div>
+                    <div class="field" data-brl-field hidden><label for="p_received_brl">Total que caiu em reais (R$)</label>
+                        <input class="input" id="p_received_brl" name="received_brl" inputmode="decimal" placeholder="Soma do R$ das parcelas recebidas"></div>
+                </div>
+                <div class="form-actions"><button class="btn btn-sm" type="submit">Registrar pagamento</button></div>
+            </form>
+        </details>
     </div>
 
     <form class="panel" method="post" action="<?= e(url('/admin/pacientes/' . $id . '/dieta')) ?>" enctype="multipart/form-data">

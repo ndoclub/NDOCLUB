@@ -69,6 +69,7 @@ $router->post('/admin/pacientes/{id}/senha', 'Admin\PatientController@resetPassw
 $router->post('/admin/pacientes/{id}/dieta', 'Admin\PatientController@diet', $A);
 $router->post('/admin/pacientes/{id}/dieta/pdf-remover', 'Admin\PatientController@removeDietPdf', $A);
 $router->post('/admin/pacientes/{id}/esporte', 'Admin\PatientController@sport', $A);
+$router->post('/admin/pacientes/{id}/pagamentos', 'Admin\PatientController@addPayment', $A);
 $router->post('/admin/pacientes/{id}/excluir', 'Admin\PatientController@delete', $A);
 
 $router->get('/admin/planos', 'Admin\PlanController@index', $A);
@@ -76,6 +77,10 @@ $router->get('/admin/planos/novo', 'Admin\PlanController@form', $A);
 $router->post('/admin/planos', 'Admin\PlanController@store', $A);
 $router->get('/admin/planos/{id}', 'Admin\PlanController@form', $A);
 $router->post('/admin/planos/{id}', 'Admin\PlanController@update', $A);
+
+$router->get('/admin/financeiro', 'Admin\FinanceController@index', $A);
+$router->post('/admin/parcelas/{id}/receber', 'Admin\FinanceController@receive', $A);
+$router->post('/admin/parcelas/{id}/desfazer', 'Admin\FinanceController@undo', $A);
 
 $router->get('/admin/modalidades', 'Admin\SportController@index', $A);
 $router->get('/admin/modalidades/novo', 'Admin\SportController@form', $A);

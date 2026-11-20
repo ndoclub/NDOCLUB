@@ -95,7 +95,7 @@
             var price = document.querySelector(priceSel);
             if (price) {
                 var p = opt.getAttribute('data-price');
-                price.placeholder = p ? 'Padrão do plano: R$ ' + p : 'Igual ao do plano';
+                price.placeholder = p ? p : 'Igual ao plano';
             }
         }
     });
@@ -106,6 +106,49 @@
         if (!box || !box.hasAttribute || !box.hasAttribute('data-reveal')) { return; }
         var target = document.querySelector(box.getAttribute('data-reveal'));
         if (target) { target.hidden = !box.checked; }
+    });
+
+    // Financeiro: formulário de pagamento (renovar / registrar)
+    //  - forma "cartão": 1ª parcela daqui a 30 dias e sem marcar "já recebida"; outras formas: hoje e marcada
+    //  - moeda estrangeira com parcela recebida: pede quanto caiu em reais
+    function isoDate(d) {
+        var mm = ('0' + (d.getMonth() + 1)).slice(-2), dd = ('0' + d.getDate()).slice(-2);
+        return d.getFullYear() + '-' + mm + '-' + dd;
+    }
+    function syncPayBrl(form) {
+        var cur = form.querySelector('[data-pay-currency]');
+        var box = form.querySelector('[data-pay-paid]');
+        var cnt = form.querySelector('[data-pay-paidcount]');
+        var field = form.querySelector('[data-brl-field]');
+        if (!cur || !field) { return; }
+        var paid = box ? box.checked : (cnt ? parseInt(cnt.value, 10) > 0 : false);
+        field.hidden = !(cur.value !== 'BRL' && paid);
+    }
+    document.addEventListener('input', function (ev) {
+        var t = ev.target;
+        if (t && t.hasAttribute && t.hasAttribute('data-pay-due')) { t.setAttribute('data-touched', '1'); }
+    });
+    document.addEventListener('change', function (ev) {
+        var t = ev.target;
+        if (!t || !t.closest) { return; }
+        var form = t.closest('[data-pay-form]');
+        if (!form) { return; }
+        if (t.hasAttribute('data-pay-method')) {
+            var card = t.value === 'cartao';
+            var due = form.querySelector('[data-pay-due]');
+            if (due && !due.getAttribute('data-touched')) {
+                var d = new Date();
+                if (card) { d.setDate(d.getDate() + 30); }
+                due.value = isoDate(d);
+            }
+            var box = form.querySelector('[data-pay-paid]');
+            if (box) { box.checked = !card; }
+        }
+        syncPayBrl(form);
+    });
+    document.addEventListener('DOMContentLoaded', function () {
+        var forms = document.querySelectorAll('[data-pay-form]');
+        for (var i = 0; i < forms.length; i++) { syncPayBrl(forms[i]); }
     });
 
     // Copiar texto (mensagem de boas-vindas)
