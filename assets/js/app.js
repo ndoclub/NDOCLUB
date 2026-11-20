@@ -100,6 +100,14 @@
         }
     });
 
+    // Mostrar/esconder campos conforme uma caixa de marcar (ex.: "É atleta" abre o perfil esportivo)
+    document.addEventListener('change', function (ev) {
+        var box = ev.target;
+        if (!box || !box.hasAttribute || !box.hasAttribute('data-reveal')) { return; }
+        var target = document.querySelector(box.getAttribute('data-reveal'));
+        if (target) { target.hidden = !box.checked; }
+    });
+
     // Copiar texto (mensagem de boas-vindas)
     document.addEventListener('click', function (ev) {
         var b = ev.target.closest ? ev.target.closest('[data-copy]') : null;

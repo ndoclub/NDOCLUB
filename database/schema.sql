@@ -58,6 +58,42 @@ CREATE TABLE patient_billing (
   CONSTRAINT fk_billing_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------------------------------------------------------------------
+-- Perfil esportivo (atletas). Modalidades são cadastradas pelo Gabriel (Admin > Modalidades)
+-- e NÃO são apagadas, só desativadas. Cada paciente pode ter várias modalidades.
+-- ---------------------------------------------------------------------
+CREATE TABLE sports (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(40) NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_sports_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE athlete_profiles (
+  user_id INT UNSIGNED NOT NULL,
+  is_athlete TINYINT(1) NOT NULL DEFAULT 1,
+  has_coach TINYINT(1) NOT NULL DEFAULT 0,
+  coach_name VARCHAR(80) NULL,
+  competes TINYINT(1) NOT NULL DEFAULT 0,
+  event_name VARCHAR(100) NULL,
+  event_date DATE NULL,
+  show_public TINYINT(1) NOT NULL DEFAULT 0,
+  updated_at DATETIME NOT NULL,
+  PRIMARY KEY (user_id),
+  KEY idx_athlete_event (event_date),
+  CONSTRAINT fk_athlete_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_sports (
+  user_id INT UNSIGNED NOT NULL,
+  sport_id INT UNSIGNED NOT NULL,
+  PRIMARY KEY (user_id, sport_id),
+  CONSTRAINT fk_usersports_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_usersports_sport FOREIGN KEY (sport_id) REFERENCES sports (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Tentativas de login (limite contra força bruta)
 CREATE TABLE login_attempts (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -320,6 +356,13 @@ INSERT INTO plans (name, duration_days, price, active, created_at) VALUES
 ('Trimestral', 90, NULL, 1, NOW()),
 ('Semestral', 180, NULL, 1, NOW()),
 ('Anual', 365, NULL, 1, NOW());
+
+-- Modalidades iniciais (o Gabriel cria outras em Admin > Modalidades)
+INSERT INTO sports (name, active, created_at) VALUES
+('Corrida', 1, NOW()),
+('Musculação', 1, NOW()),
+('Hyrox', 1, NOW()),
+('Natação', 1, NOW());
 
 -- Configurações
 INSERT INTO settings (skey, svalue) VALUES

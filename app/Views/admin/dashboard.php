@@ -13,6 +13,7 @@
     <div class="kpi"><span class="big num"><?= (int) $stats['checkins'] ?></span><span class="lbl">check-ins hoje</span></div>
     <a class="kpi" href="<?= e(url('/admin/pacientes?f=yellow')) ?>"><span class="big num"><?= (int) $stats['expiring'] ?></span><span class="lbl">vencem em até <?= (int) $yellow ?> dias</span></a>
     <a class="kpi<?= $stats['expired'] > 0 ? ' alert' : '' ?>" href="<?= e(url('/admin/pacientes?f=red')) ?>"><span class="big num"><?= (int) $stats['expired'] ?></span><span class="lbl">vencidos</span></a>
+    <a class="kpi" href="<?= e(url('/admin/pacientes?f=athletes')) ?>"><span class="big num"><?= (int) $stats['athletes'] ?></span><span class="lbl">atletas ativos</span></a>
     <a class="kpi" href="<?= e(url('/admin/resgates')) ?>"><span class="big num"><?= (int) $stats['redemptions'] ?></span><span class="lbl">resgates pendentes</span></a>
     <a class="kpi<?= $stats['reports'] > 0 ? ' alert' : '' ?>" href="<?= e(url('/admin/moderacao')) ?>"><span class="big num"><?= (int) $stats['reports'] ?></span><span class="lbl">denúncias abertas</span></a>
 </div>
@@ -41,6 +42,28 @@
                     <?php if ($r['wa']): ?><a class="btn btn-ghost btn-sm" href="<?= e($r['wa']) ?>" target="_blank" rel="noopener">WhatsApp</a><?php endif; ?>
                     <a class="btn btn-ghost btn-sm" href="<?= e(url('/admin/pacientes/' . $r['id'])) ?>">Abrir</a>
                 </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+<?php endif; ?>
+
+<?php if ($events): ?>
+<h3 class="sub" style="margin-top:32px">Próximas provas</h3>
+<p class="muted small">Atletas que competem, da prova mais perto para a mais longe. É a hora de ajustar a dieta e mandar uma mensagem.</p>
+<div class="tbl-wrap">
+    <table class="tbl">
+        <thead><tr><th>Paciente</th><th>Prova</th><th>Data</th><th>Assessoria</th><th class="r">Ação</th></tr></thead>
+        <tbody>
+        <?php foreach ($events as $ev): $dd = days_until($ev['event_date']); ?>
+            <tr>
+                <td><a class="who" href="<?= e(url('/admin/pacientes/' . $ev['id'])) ?>"><?= avatar($ev, 34) ?>
+                    <span><?= e($ev['name']) ?><?php if (!empty($eventSports[(int) $ev['id']])): ?><span class="sports"><?php foreach ($eventSports[(int) $ev['id']] as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?></span><?php endif; ?></span></a></td>
+                <td><?= $ev['event_name'] ? e($ev['event_name']) : '<span class="muted">-</span>' ?></td>
+                <td><?= e(fmt_date($ev['event_date'])) ?> <span class="tag<?= $dd <= 14 ? ' warn' : '' ?>"><?= $dd === 0 ? 'hoje' : ($dd === 1 ? 'amanhã' : 'em ' . (int) $dd . ' dias') ?></span></td>
+                <td><?= $ev['has_coach'] ? e($ev['coach_name'] ?: 'Sim') : '<span class="muted">Sem assessoria</span>' ?></td>
+                <td class="r"><a class="btn btn-ghost btn-sm" href="<?= e(url('/admin/pacientes/' . $ev['id'])) ?>">Abrir</a></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

@@ -5,6 +5,7 @@ use App\Core\Auth;
 use App\Core\DB;
 use App\Core\Upload;
 use App\Core\View;
+use App\Services\Athletes;
 use App\Services\Levels;
 use App\Services\Plans;
 use App\Services\Points;
@@ -59,14 +60,44 @@ final class ProfileController
             'streak' => $isPatient ? Streak::current($id) : 0,
             'rank' => $isPatient ? Ranking::positionOf($id) : null,
             'since' => $u['created_at'],
+            // modalidades: o dono vê as dele sempre; os outros só veem se ele escolheu mostrar
+            'sportNames' => $isPatient ? (Athletes::namesFor([$id], !$isMe)[$id] ?? []) : [],
         ];
         if ($isMe && $isPatient) {
             $data['renew'] = Renewal::info($u['renewal_date']);
             $data['planName'] = !empty($u['plan_id']) ? Plans::name((int) $u['plan_id']) : null;
             $data['whatsapp'] = Renewal::whatsappUrl($u);
             $data['balance'] = Points::balance($id);
+            $data['athlete'] = Athletes::profile($id);
         }
         View::render('patient/profile', $data, Auth::isAdmin() ? 'admin' : 'app');
+    }
+
+    /** Meu perfil esportivo (o paciente edita o dele). */
+    public function sportForm(): void
+    {
+        $id = (int) Auth::id();
+        View::render('patient/profile_sport', [
+            'title' => 'Perfil esportivo',
+            'athlete' => Athletes::profile($id),
+            'choices' => Athletes::choicesFor($id),
+            'selected' => Athletes::sportIds($id),
+        ]);
+    }
+
+    public function sportSave(): void
+    {
+        $id = (int) Auth::id();
+        $parsed = Athletes::parse($id);
+        if ($parsed['errors']) {
+            foreach ($parsed['errors'] as $e) {
+                flash('err', $e);
+            }
+            redirect('/perfil/esporte');
+        }
+        Athletes::save($id, $parsed, !empty($_POST['show_public']) ? 1 : 0);
+        flash('ok', 'Perfil esportivo salvo.');
+        redirect('/perfil');
     }
 
     public function editForm(): void

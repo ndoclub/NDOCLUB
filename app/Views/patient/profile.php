@@ -7,6 +7,7 @@ $bio = trim((string) ($p['bio'] ?? ''));
         <h2 class="profile-name"><?= e($p['name']) ?></h2>
         <?php if (!empty($p['goal'])): ?><p class="profile-goal" style="margin:0 0 8px"><?= e($p['goal']) ?></p><?php endif; ?>
         <?php if ($isPatient && $level): partial('level', ['level' => $level]); else: ?><span class="tag">Equipe</span><?php endif; ?>
+        <?php if (!empty($sportNames)): ?><div class="sports"><?php foreach ($sportNames as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?></div><?php endif; ?>
     </div>
 </section>
 <?php if ($bio !== ''): ?><p class="profile-bio"><?= text_html($bio) ?></p><?php endif; ?>
@@ -29,6 +30,26 @@ $bio = trim((string) ($p['bio'] ?? ''));
         <?php if ($level && $level['next_name']): ?>
             <p class="small muted mt" style="margin-bottom:0">Faltam <?= pts($level['missing']) ?> pontos para o nível <?= e($level['next_name']) ?>. O nível nunca cai.</p>
             <div class="meter" aria-hidden="true"><i style="width:<?= (int) $level['progress'] ?>%"></i></div>
+        <?php endif; ?>
+    </section>
+
+    <?php
+    $isAthlete = $athlete && (int) $athlete['is_athlete'] === 1;
+    $evDays = ($isAthlete && $athlete['competes'] && $athlete['event_date']) ? days_until($athlete['event_date']) : null;
+    ?>
+    <section class="section">
+        <div class="row-between"><h2 class="section-title" style="margin:0">Perfil esportivo</h2>
+            <a class="small" href="<?= e(url('/perfil/esporte')) ?>"><?= $isAthlete ? 'Editar' : 'Adicionar' ?></a></div>
+        <?php if ($isAthlete): ?>
+            <?php if ($sportNames): ?><div class="sports" style="margin-top:12px"><?php foreach ($sportNames as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?></div><?php endif; ?>
+            <?php if ($athlete['has_coach']): ?><p class="muted small mt" style="margin-bottom:0">Assessoria: <?= e($athlete['coach_name'] ?: 'sim') ?></p><?php endif; ?>
+            <?php if ($evDays !== null && $evDays >= 0): ?>
+                <p class="mt" style="margin-bottom:0"><strong><?= e($athlete['event_name'] ?: 'Próxima prova') ?></strong> · <?= e(fmt_date($athlete['event_date'])) ?>
+                    <span class="tag"><?= $evDays === 0 ? 'hoje' : ($evDays === 1 ? 'amanhã' : 'em ' . (int) $evDays . ' dias') ?></span></p>
+            <?php endif; ?>
+            <p class="hint" style="margin-bottom:0"><?= $athlete['show_public'] ? 'As modalidades aparecem no seu perfil da comunidade.' : 'As modalidades não aparecem para os outros membros.' ?></p>
+        <?php else: ?>
+            <p class="muted mt" style="margin-bottom:0">Você pratica corrida, natação, Hyrox ou outro esporte? Adicione aqui para o Gabriel acompanhar melhor.</p>
         <?php endif; ?>
     </section>
 

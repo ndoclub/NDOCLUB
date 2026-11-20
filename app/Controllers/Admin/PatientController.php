@@ -5,6 +5,7 @@ use App\Core\Auth;
 use App\Core\DB;
 use App\Core\Upload;
 use App\Core\View;
+use App\Services\Athletes;
 use App\Services\Audit;
 use App\Services\Levels;
 use App\Services\Plans;
@@ -19,15 +20,22 @@ final class PatientController
     {
         $q = trim((string) ($_GET['q'] ?? ''));
         $filter = (string) ($_GET['f'] ?? 'all');
+        $sportId = (int) ($_GET['s'] ?? 0);
 
         $sql = "SELECT u.id, u.name, u.email, u.phone, u.avatar, u.status, u.renewal_date, u.last_seen_at,
                        pl.name AS plan_name, COALESCE(bl.price, pl.price) AS plan_value,
+                       ap.is_athlete, ap.competes, ap.has_coach,
                        (SELECT COALESCE(SUM(l.points), 0) FROM points_ledger l WHERE l.user_id = u.id) AS balance
                   FROM users u
                   LEFT JOIN plans pl ON pl.id = u.plan_id
                   LEFT JOIN patient_billing bl ON bl.user_id = u.id
+                  LEFT JOIN athlete_profiles ap ON ap.user_id = u.id
                  WHERE u.role = 'patient'";
         $params = [];
+        if ($sportId > 0) {
+            $sql .= ' AND ap.is_athlete = 1 AND EXISTS (SELECT 1 FROM user_sports us WHERE us.user_id = u.id AND us.sport_id = ?)';
+            $params[] = $sportId;
+        }
         if ($q !== '') {
             $sql .= ' AND (u.name LIKE ? OR u.email LIKE ?)';
             $params[] = '%' . $q . '%';
@@ -49,9 +57,23 @@ final class PatientController
             if ($filter === 'away' && ($r['status'] !== 'active' || !$r['away'])) {
                 continue;
             }
+            $isAthlete = (int) ($r['is_athlete'] ?? 0) === 1;
+            if ($filter === 'athletes' && !$isAthlete) {
+                continue;
+            }
+            if ($filter === 'compete' && !($isAthlete && (int) $r['competes'] === 1)) {
+                continue;
+            }
+            if ($filter === 'nocoach' && !($isAthlete && (int) $r['has_coach'] === 0)) {
+                continue;
+            }
             $list[] = $r;
         }
-        View::render('admin/patients/index', ['title' => 'Pacientes', 'list' => $list, 'q' => $q, 'filter' => $filter], 'admin');
+        View::render('admin/patients/index', [
+            'title' => 'Pacientes', 'list' => $list, 'q' => $q, 'filter' => $filter,
+            'sportId' => $sportId, 'sports' => Athletes::sports(false),
+            'sportNames' => Athletes::namesFor(array_column($list, 'id')),
+        ], 'admin');
     }
 
     public function create(): void
@@ -154,6 +176,9 @@ final class PatientController
             'customPrice' => Plans::customPrice($id),
             'planPrice' => Plans::priceFor($id),
             'renewChoices' => Plans::renewalChoices(),
+            'athlete' => Athletes::profile($id),
+            'athleteSportIds' => Athletes::sportIds($id),
+            'sportChoices' => Athletes::choicesFor($id),
             'title' => $p['name'],
             'p' => $p,
             'welcome' => $welcome,
@@ -328,6 +353,24 @@ final class PatientController
             DB::run('UPDATE diets SET pdf_file = NULL, updated_at = ? WHERE user_id = ?', [now(), $id]);
         }
         flash('ok', 'PDF removido.');
+        redirect('/admin/pacientes/' . $id);
+    }
+
+    /** Perfil esportivo (atleta) preenchido pelo admin. A escolha de "mostrar no perfil" é do paciente e não muda aqui. */
+    public function sport(int $id): void
+    {
+        $this->find($id);
+        $parsed = Athletes::parse($id);
+        if ($parsed['errors']) {
+            foreach ($parsed['errors'] as $e) {
+                flash('err', $e);
+            }
+            redirect('/admin/pacientes/' . $id);
+        }
+        Athletes::save($id, $parsed, null);
+        $d = $parsed['data'];
+        Audit::log((int) Auth::id(), 'athlete_update', 'user', $id, $d['is_athlete'] ? count($parsed['sports']) . ' modalidade(s)' . ($d['competes'] ? ', compete' : '') : 'não é atleta');
+        flash('ok', 'Perfil esportivo salvo.');
         redirect('/admin/pacientes/' . $id);
     }
 

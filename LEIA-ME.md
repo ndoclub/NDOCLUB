@@ -28,11 +28,14 @@ Gabriel. A ideia central é um ciclo simples:
 | **Loja** | Troca pontos por brindes; o Gabriel aprova/entrega manualmente. |
 | **Evolução** | Peso e cintura com gráfico (só o paciente e a equipe veem). |
 | **Perfil** | Foto, dados, trocar senha. |
+| **Perfil esportivo** | Para quem treina: modalidades (Corrida, Musculação, Hyrox, Natação...), se tem assessoria, se compete e a próxima prova. O paciente edita o dele e escolhe se mostra as **modalidades** no perfil da comunidade (assessoria e provas nunca aparecem para outros). |
 
 ### Para o Gabriel (painel `/admin`, funciona no celular e no computador)
 Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)** · **risco de renovação** (quem vence logo e quem sumiu há 7+ dias, com botão de
 WhatsApp) · **planos e valores** (só o admin vê R$) · pacientes (cadastro com plano e "valor combinado",
-renovar com a duração do plano e bônus, pontos manuais, dieta, senha provisória, exclusão LGPD) · treinos · moderação do feed e denúncias · mural fixado · loja e
+renovar com a duração do plano e bônus, pontos manuais, dieta, senha provisória, exclusão LGPD) ·
+**atletas** (etiquetas de modalidade nos pacientes, filtros Atletas / Competem / Sem assessoria / por modalidade,
+cartão **Próximas provas** no painel, tela Modalidades) · treinos · moderação do feed e denúncias · mural fixado · loja e
 resgates · regras de pontos · ranking · configurações (limites dos selos, WhatsApp, níveis, versão
 do termo) · auditoria.
 
@@ -118,6 +121,14 @@ Quem já importou o `schema.sql` **não precisa refazer o banco** (e não perde 
    escolha `database/atualizacao_01_planos.sql` → **Executar**. Pode rodar de novo sem problema.
    *(Funciona no MariaDB que vem no XAMPP. Se usar MySQL 8 puro, avise o desenvolvedor.)*
 3. Abra o app com **Ctrl + F5** (limpa o cache) e vá em **Admin → Planos** preencher os valores.
+
+### Atualização 02 (perfil esportivo / atletas)
+Mesmo processo da atualização 01, **depois** dela (se ainda não rodou a 01, rode primeiro):
+1. Atualize os arquivos do projeto (`git pull`, ou copie a pasta nova por cima).
+2. phpMyAdmin → banco **nodaysoffclub** → aba **Importar** → `database/atualizacao_02_atletas.sql` → **Executar**.
+   Cria as tabelas de modalidades e perfil esportivo e as 4 modalidades iniciais. Não apaga nada.
+   *(O final do arquivo tem um bloco opcional que transforma alguns pacientes de teste em atletas, para você ver na tela.)*
+3. **Ctrl + F5** e abra **Admin → Modalidades**.
 
 ### Acessos para teste
 | Perfil | E-mail | Senha |
@@ -215,6 +226,14 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Painel:** cartão **"a renovar em 30 dias"** com o total em R$ (usa o valor combinado, ou o do plano) e aviso de quantos pacientes estão **sem valor definido**. A tabela de risco mostra o plano e o valor de cada um.
 - [ ] **Privacidade (importante):** entrar como paciente e passar por Início, Perfil, Extrato, Dieta, Feed, Treino, Ranking, Loja e Evolução → **nenhum R$ aparece em lugar nenhum**. Tentar abrir `/admin/planos` como paciente → bloqueado.
 
+### E3. Atletas e perfil esportivo
+- [ ] **Admin → Modalidades:** aparecem Corrida, Musculação, Hyrox e Natação. Criar uma nova (ex.: Ciclismo). Tentar criar "corrida" de novo → recusa (já existe). Desativar uma → some das escolhas, mas quem já tem continua com ela.
+- [ ] **Ficha de um paciente → Perfil esportivo:** ligar **É atleta**, marcar modalidades, assessoria (com nome), "participa de provas" (nome e data) → **Salvar**. Desligar "É atleta" **guarda** os dados (se ligar de novo, voltam).
+- [ ] **Lista de pacientes:** chips de modalidade embaixo do nome; filtros **Atletas**, **Competem**, **Sem assessoria** e o seletor de **modalidade** (dá para combinar).
+- [ ] **Painel:** número de **atletas ativos** e cartão **Próximas provas** em ordem de data (provas que já passaram saem sozinhas).
+- [ ] **Paciente (ex.: Carla):** em **Perfil** aparece o cartão **Perfil esportivo** com **Editar**; mudar modalidades e marcar/desmarcar **Mostrar minhas modalidades no meu perfil da comunidade**.
+- [ ] **Privacidade (importante):** entrar como **outro** paciente e abrir o perfil público da Carla (pelo Feed → nome dela): só aparecem as **modalidades**, e só se ela marcou mostrar. **Assessoria, prova e data nunca aparecem** para outros pacientes.
+
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
 - [ ] O painel admin no celular abre o menu pelo botão ☰ (gaveta lateral).
@@ -227,12 +246,12 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **262 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **313 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
-> privacidade dos valores, segurança e CSRF),
+> perfil esportivo, privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
-> ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, o
-> arquivo `atualizacao_01_planos.sql`) é o primeiro teste a fazer.
+> ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, os
+> arquivos `atualizacao_01_planos.sql` e `atualizacao_02_atletas.sql`) é o primeiro teste a fazer.
 > Se o phpMyAdmin acusar algum erro, copie a mensagem e me envie que eu corrijo.
 
 ---
@@ -264,6 +283,8 @@ Ideal: faça no celular e depois no computador.
 | Fase 1 — login, perfil, renovação, dieta, treino, feed + moderação, pontos/extrato, ranking mensal, loja manual, admin básico, PWA | ✅ **Neste MVP** |
 | Extras da Fase 1 — painel de risco de renovação, streak, check-in de 10 s, níveis, bônus de renovação, mural fixado, evolução de peso | ✅ **Neste MVP** |
 | Planos (Trimestral/Semestral/Anual), valores só para o admin, previsão de renovações em R$, faixa de alerta de renovação para o paciente | ✅ **Neste MVP** (atualização 01) |
+| Perfil esportivo (atletas): modalidades, assessoria, próximas provas, filtros no painel, edição pelo paciente | ✅ **Neste MVP** (atualização 02) |
+| Contagem regressiva da prova no Início do paciente, temas do dia por modalidade, ranking por modalidade | ⏭️ Próxima rodada (dados já estão no banco) |
 | Fase 2 — notificações push, medalhas/conquistas, desafios mensais, cupons de parceiros, fotos de evolução (privadas), indicação com link | ⏭️ Tabelas e serviços já preparados (`Points::award`, `point_rules`, `audit_log`); falta construir as telas |
 | Fase 3 — Laravel + Filament, relatórios, integrações (WhatsApp automático, pagamento) | ⏭️ Estrutura pronta para migrar (seção 2) |
 

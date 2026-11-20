@@ -34,6 +34,8 @@ $router->post('/evolucao/{id}/excluir', 'ProgressController@delete', $P);
 $router->get('/perfil', 'ProfileController@me', $P);
 $router->get('/perfil/editar', 'ProfileController@editForm', $P);
 $router->post('/perfil/editar', 'ProfileController@edit', $P);
+$router->get('/perfil/esporte', 'ProfileController@sportForm', $P);
+$router->post('/perfil/esporte', 'ProfileController@sportSave', $P);
 $router->post('/perfil/senha', 'ProfileController@password', $P);
 $router->post('/perfil/excluir-foto', 'ProfileController@removePhoto', $P);
 
@@ -66,6 +68,7 @@ $router->post('/admin/pacientes/{id}/pontos', 'Admin\PatientController@points', 
 $router->post('/admin/pacientes/{id}/senha', 'Admin\PatientController@resetPassword', $A);
 $router->post('/admin/pacientes/{id}/dieta', 'Admin\PatientController@diet', $A);
 $router->post('/admin/pacientes/{id}/dieta/pdf-remover', 'Admin\PatientController@removeDietPdf', $A);
+$router->post('/admin/pacientes/{id}/esporte', 'Admin\PatientController@sport', $A);
 $router->post('/admin/pacientes/{id}/excluir', 'Admin\PatientController@delete', $A);
 
 $router->get('/admin/planos', 'Admin\PlanController@index', $A);
@@ -73,6 +76,12 @@ $router->get('/admin/planos/novo', 'Admin\PlanController@form', $A);
 $router->post('/admin/planos', 'Admin\PlanController@store', $A);
 $router->get('/admin/planos/{id}', 'Admin\PlanController@form', $A);
 $router->post('/admin/planos/{id}', 'Admin\PlanController@update', $A);
+
+$router->get('/admin/modalidades', 'Admin\SportController@index', $A);
+$router->get('/admin/modalidades/novo', 'Admin\SportController@form', $A);
+$router->post('/admin/modalidades', 'Admin\SportController@store', $A);
+$router->get('/admin/modalidades/{id}', 'Admin\SportController@form', $A);
+$router->post('/admin/modalidades/{id}', 'Admin\SportController@update', $A);
 
 $router->get('/admin/treinos', 'Admin\WorkoutController@index', $A);
 $router->get('/admin/treinos/novo', 'Admin\WorkoutController@form', $A);

@@ -1,5 +1,13 @@
 <?php
 $id = (int) $p['id'];
+$athleteOn = $athlete && (int) $athlete['is_athlete'] === 1;
+$athleteNames = [];
+if ($athleteOn) {
+    foreach ($sportChoices as $sc) {
+        if (in_array((int) $sc['id'], $athleteSportIds, true)) { $athleteNames[] = $sc['name']; }
+    }
+}
+$daysToEvent = ($athleteOn && $athlete['competes'] && $athlete['event_date']) ? days_until($athlete['event_date']) : null;
 $waWelcome = $welcome ? wa_phone_url($p['phone'], $welcome) : null;
 $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'Sáb', 7 => 'Dom'];
 ?>
@@ -11,6 +19,7 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
             <div class="row wrap" style="gap:8px;margin-top:6px">
                 <?php if ($p['status'] === 'inactive'): ?><span class="tag">Desativado</span><?php else: partial('seal', ['renew' => $renew]); endif; ?>
                 <?php partial('level', ['level' => $level]); ?>
+                <?php foreach ($athleteNames as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?>
                 <?php if ($planRow): ?><span class="tag"><?= e($planRow['name']) ?><?= $planPrice !== null ? ' · ' . e(money($planPrice)) . ($customPrice !== null ? ' (combinado)' : '') : ' · sem valor' ?></span><?php endif; ?>
             </div>
         </div>
@@ -66,6 +75,19 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
                 </select></div>
         </div>
         <div class="form-actions"><button class="btn btn-sm" type="submit">Salvar dados</button></div>
+    </form>
+
+    <form class="panel" method="post" action="<?= e(url('/admin/pacientes/' . $id . '/esporte')) ?>">
+        <?= csrf_field() ?>
+        <h3>Perfil esportivo</h3>
+        <?php partial('athlete-fields', ['athlete' => $athlete, 'choices' => $sportChoices, 'selected' => $athleteSportIds]); ?>
+        <?php if ($athleteOn): ?>
+            <p class="hint">
+                <?= $athlete['show_public'] ? 'O paciente mostra as modalidades no perfil da comunidade.' : 'O paciente não mostra as modalidades no perfil da comunidade (escolha dele).' ?>
+                <?php if ($daysToEvent !== null && $daysToEvent >= 0): ?> Prova em <?= (int) $daysToEvent ?> <?= $daysToEvent === 1 ? 'dia' : 'dias' ?>.<?php endif; ?>
+            </p>
+        <?php endif; ?>
+        <div class="form-actions"><button class="btn btn-sm" type="submit">Salvar perfil esportivo</button></div>
     </form>
 
     <div class="panel">

@@ -3,6 +3,7 @@ namespace App\Controllers\Admin;
 
 use App\Core\DB;
 use App\Core\View;
+use App\Services\Athletes;
 use App\Services\Plans;
 use App\Services\Renewal;
 use App\Services\Settings;
@@ -47,6 +48,11 @@ final class DashboardController
         // Quem está sumido do app aparece primeiro
         usort($risk, fn($a, $b) => [(int) !$a['away'], $a['renewal_date']] <=> [(int) !$b['away'], $b['renewal_date']]);
 
-        View::render('admin/dashboard', ['title' => 'Painel', 'stats' => $stats, 'risk' => $risk, 'yellow' => $yellow, 'due30' => Plans::dueWithin(30)], 'admin');
+        $events = Athletes::upcoming(8);
+        $stats['athletes'] = Athletes::countAthletes();
+
+        View::render('admin/dashboard', ['title' => 'Painel', 'stats' => $stats, 'risk' => $risk, 'yellow' => $yellow, 'due30' => Plans::dueWithin(30),
+            'events' => $events, 'eventSports' => Athletes::namesFor(array_column($events, 'id')),
+        ], 'admin');
     }
 }

@@ -304,3 +304,23 @@ INSERT INTO reports (reporter_id, target_type, target_id, reason, status, create
 UPDATE users SET plan_id = (SELECT id FROM plans WHERE name = 'Anual')      WHERE email IN ('ana.teste@exemplo.com', 'karen.teste@exemplo.com');
 UPDATE users SET plan_id = (SELECT id FROM plans WHERE name = 'Semestral')  WHERE email IN ('bruno.teste@exemplo.com', 'elisa.teste@exemplo.com', 'isabela.teste@exemplo.com');
 UPDATE users SET plan_id = (SELECT id FROM plans WHERE name = 'Trimestral') WHERE email IN ('carla.teste@exemplo.com', 'diego.teste@exemplo.com', 'felipe.teste@exemplo.com', 'gabi.teste@exemplo.com', 'heitor.teste@exemplo.com', 'joao.teste@exemplo.com', 'lucas.teste@exemplo.com', 'novo.teste@exemplo.com');
+
+-- ---------------------------------------------------------------------
+-- Perfil esportivo dos pacientes de teste (atletas)
+-- ---------------------------------------------------------------------
+INSERT INTO athlete_profiles (user_id, is_athlete, has_coach, coach_name, competes, event_name, event_date, show_public, updated_at)
+SELECT id, 1, 1, 'Assessoria Pace', 1, 'Maratona de São Paulo', CURDATE() + INTERVAL 25 DAY, 1, NOW() FROM users WHERE email = 'ana.teste@exemplo.com';
+INSERT INTO athlete_profiles (user_id, is_athlete, has_coach, coach_name, competes, event_name, event_date, show_public, updated_at)
+SELECT id, 1, 0, NULL, 0, NULL, NULL, 0, NOW() FROM users WHERE email = 'bruno.teste@exemplo.com';
+INSERT INTO athlete_profiles (user_id, is_athlete, has_coach, coach_name, competes, event_name, event_date, show_public, updated_at)
+SELECT id, 1, 1, 'Team Aqua', 1, 'Travessia do Forte', CURDATE() + INTERVAL 48 DAY, 1, NOW() FROM users WHERE email = 'carla.teste@exemplo.com';
+INSERT INTO athlete_profiles (user_id, is_athlete, has_coach, coach_name, competes, event_name, event_date, show_public, updated_at)
+SELECT id, 1, 0, NULL, 1, 'Meia Maratona de Floripa', CURDATE() + INTERVAL 12 DAY, 0, NOW() FROM users WHERE email = 'diego.teste@exemplo.com';
+INSERT INTO athlete_profiles (user_id, is_athlete, has_coach, coach_name, competes, event_name, event_date, show_public, updated_at)
+SELECT id, 1, 0, NULL, 0, NULL, NULL, 1, NOW() FROM users WHERE email = 'karen.teste@exemplo.com';
+
+INSERT INTO user_sports (user_id, sport_id) SELECT u.id, s.id FROM users u, sports s WHERE u.email = 'ana.teste@exemplo.com' AND s.name IN ('Corrida', 'Hyrox');
+INSERT INTO user_sports (user_id, sport_id) SELECT u.id, s.id FROM users u, sports s WHERE u.email = 'bruno.teste@exemplo.com' AND s.name IN ('Musculação');
+INSERT INTO user_sports (user_id, sport_id) SELECT u.id, s.id FROM users u, sports s WHERE u.email = 'carla.teste@exemplo.com' AND s.name IN ('Natação');
+INSERT INTO user_sports (user_id, sport_id) SELECT u.id, s.id FROM users u, sports s WHERE u.email = 'diego.teste@exemplo.com' AND s.name IN ('Corrida', 'Musculação');
+INSERT INTO user_sports (user_id, sport_id) SELECT u.id, s.id FROM users u, sports s WHERE u.email = 'karen.teste@exemplo.com' AND s.name IN ('Hyrox');

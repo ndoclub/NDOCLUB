@@ -368,6 +368,7 @@ function icon(string $name, int $size = 24): string
         'pin'      => '<path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v8"/>',
         'external' => '<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>',
         'doc'      => '<path d="M6 3h9l4 4v14H6z"/><path d="M9 13h6M9 17h6"/>',
+        'tag'      => '<path d="M4 4h8l8 8-8 8-8-8z"/><circle cx="8.5" cy="8.5" r="1"/>',
         'card'     => '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>',
         'left'     => '<path d="M15 5l-7 7 7 7"/>',
         'right'    => '<path d="M9 5l7 7-7 7"/>',
