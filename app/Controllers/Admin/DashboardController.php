@@ -4,6 +4,7 @@ namespace App\Controllers\Admin;
 use App\Core\DB;
 use App\Core\View;
 use App\Services\Athletes;
+use App\Services\Birthdays;
 use App\Services\Insights;
 use App\Services\Payments;
 use App\Services\Plans;
@@ -69,8 +70,14 @@ final class DashboardController
         $events = Athletes::upcoming(8);
         $stats['athletes'] = Athletes::countAthletes();
 
+        $birthdays = Birthdays::forWindow('7');
+        foreach ($birthdays as &$b) {
+            $b['wa'] = Birthdays::whatsappUrl($b['phone'] ?? null, (string) $b['name']);
+        }
+        unset($b);
+
         View::render('admin/dashboard', ['title' => 'Painel', 'aba' => 'operacao', 'stats' => $stats, 'risk' => $risk, 'yellow' => $yellow, 'due30' => Plans::dueWithin(30), 'pix' => Payments::attentionStats(),
-            'events' => $events, 'eventSports' => Athletes::namesFor(array_column($events, 'id')),
+            'events' => $events, 'eventSports' => Athletes::namesFor(array_column($events, 'id')), 'birthdays' => $birthdays,
         ], 'admin');
     }
 }

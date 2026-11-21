@@ -382,6 +382,7 @@ function icon(string $name, int $size = 24): string
         'dumbbell' => '<path d="M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12"/>',
         'trophy'   => '<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/><path d="M12 14v4M8 20h8"/>',
         'bag'      => '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+        'gift'     => '<path d="M4 9h16v4H4z"/><path d="M5 13v7h14v-7"/><path d="M12 9v11"/><path d="M12 9C10 5.5 6 6 7 8.2c.6 1.2 3 1 5 .8zM12 9c2-3.5 6-3 5-.8-.6 1.2-3 1-5 .8z"/>',
         'user'     => '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
         'users'    => '<circle cx="9" cy="8" r="3.5"/><path d="M2 20c.8-3.5 3.3-5 7-5s6.2 1.5 7 5"/><path d="M16 5a3.5 3.5 0 0 1 0 7M18 15c2 .5 3.4 2 4 5"/>',
         'heart'    => '<path d="M12 20s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z"/>',

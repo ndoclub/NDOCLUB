@@ -31,7 +31,7 @@ Gabriel. A ideia central é um ciclo simples:
 | **Perfil esportivo** | Para quem treina: modalidades (Corrida, Musculação, Hyrox, Natação...), se tem assessoria, se compete e a próxima prova. O paciente edita o dele e escolhe se mostra as **modalidades** no perfil da comunidade (assessoria e provas nunca aparecem para outros). |
 
 ### Para o Gabriel (painel `/admin`, funciona no celular e no computador)
-**Painel gerencial** (tela inicial, aba **Visão executiva**: pacientes ativos, vendido, recebido, a receber, novos e taxa de renovação, evolução financeira, carteira por plano/modalidade, crescimento, equipe e alertas; a aba **Operação** mantém o painel do dia a dia) · Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)** · **risco de renovação** (quem vence logo e quem sumiu há 7+ dias, com botão de
+**Painel gerencial** (tela inicial, aba **Visão executiva**: pacientes ativos, vendido, recebido, a receber, novos e taxa de renovação, evolução financeira, carteira por plano/modalidade, crescimento, equipe e alertas; a aba **Operação** mantém o painel do dia a dia) · **Aniversários** (data de nascimento opcional na ficha, aniversariantes de hoje e dos próximos dias com botão de WhatsApp e mensagem pronta e editável, caixinha de autorização para receber mensagens) · Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)** · **risco de renovação** (quem vence logo e quem sumiu há 7+ dias, com botão de
 WhatsApp) · **planos e valores** (só o admin vê R$) · pacientes (cadastro com plano e "valor combinado",
 renovar com a duração do plano e bônus, pontos manuais, dieta, senha provisória, exclusão LGPD) · **lista de pacientes completa** (status Ativo/Inativo, vencimento, consultas "x de y" por plano, responsável da equipe, ordenar clicando na coluna, filtros por vencimento 15/30 dias, status, responsável e consultas, atribuição em lote) · **responsáveis** ("modo babá": quem cuida de quais pacientes) · **importação de pacientes por planilha** (modelo oficial em Excel, prévia antes de salvar, duplicados e erros) ·
 **atletas** (etiquetas de modalidade nos pacientes, filtros Atletas / Competem / Sem assessoria / por modalidade,
@@ -67,7 +67,7 @@ nodaysoffclub/
 ├─ app/
 │   ├─ routes.php          ← mapa de URLs (uma linha por página)
 │   ├─ Core/               ← motor: DB, Router, Auth, View, Upload, Middleware, Xlsx (leitor de planilha), Charts (gráficos SVG do painel)
-│   ├─ Services/           ← regras de negócio: Points, Ranking, Levels, Streak, Renewal, Settings, Audit, PatientImport (importação), ImportTemplate, Insights (números do painel gerencial)
+│   ├─ Services/           ← regras de negócio: Points, Ranking, Levels, Streak, Renewal, Settings, Audit, PatientImport (importação), ImportTemplate, Insights (números do painel gerencial), Birthdays (aniversariantes)
 │   ├─ Resources/          ← modelo-importacao-pacientes.xlsx (modelo oficial; só baixa pelo painel admin)
 │   ├─ Controllers/        ← uma classe por módulo (+ Admin/)
 │   └─ Views/              ← telas (HTML + PHP)
@@ -235,6 +235,24 @@ Mesmo processo, **depois** das atualizações 01 a 06 (se ainda não aplicou a 0
 - **Privacidade:** os valores (R$) e a equipe ficam **só no painel do admin**; nenhuma tela do paciente mostra ou acessa isso.
 - Na **importação por planilha** há a coluna nova **Paciente desde** (opcional; vazia = data de hoje). Se você baixou o modelo antes, baixe de novo.
 
+### Atualização 08 (Aniversários)
+Mesmo processo, **depois** das atualizações 01 a 07 (se ainda não aplicou 05, 06 e 07, aplique **nesta ordem**: 05 → 06 → 07 → 08):
+1. Atualize os arquivos do projeto (`git pull`, ou copie a pasta nova por cima).
+2. phpMyAdmin → clique no banco **nodaysoffclub** (menu da esquerda) → aba **Importar** → `database/atualizacao_08_aniversarios.sql` → **Executar**.
+   Acrescenta 3 campos (`birth_date`, `msg_optin`, `msg_optin_at`) e o texto padrão da mensagem de aniversário. Não apaga nada. **Importe antes de abrir o sistema.**
+3. **Ctrl + F5** e abra **Admin → Aniversários**.
+
+**Como funciona**
+- **Data de nascimento** (opcional): no cadastro do paciente e na ficha. Só o admin vê; o paciente nunca vê. Não pode ser futura nem antes de 1900.
+- **Caixinha "Autorizou receber mensagens (aniversário e novidades)"**: começa **desmarcada**. Marque só se o paciente disse que aceita; o sistema guarda o **dia** em que foi marcada. Ela ainda não bloqueia nada (o botão de WhatsApp funciona para todos); vai servir de trava quando o envio passar a ser automático.
+- **Admin → Aniversários**: escolha **Hoje**, **Próximos 7 dias**, **Próximos 30 dias**, **Este mês** ou **Mês que vem**. Aparece quem tem plano em dia (ou sem data de vencimento); plano vencido e conta desativada não entram. Mostra a idade que a pessoa faz, se autorizou, e o botão **Dar parabéns**, que abre o WhatsApp com a mensagem pronta e o primeiro nome. Você confere e envia.
+- Quem nasceu em **29/02** é lembrado em **28/02** nos anos que não são bissextos.
+- **Painel → aba Operação** mostra os aniversariantes de hoje e dos próximos 7 dias. A **Visão executiva** tem o alerta "aniversariantes hoje".
+- **Texto da mensagem**: Admin → Configurações → **Mensagem de aniversário**. Use `{nome}` para o primeiro nome. Em branco = texto padrão.
+- **Planilha de importação**: nova coluna **Data de nascimento** (opcional; baixe o modelo de novo). A autorização de mensagens **não** vem da planilha, de propósito: marque na ficha de cada paciente.
+- **Ainda não existe:** envio **automático** de e-mail e de WhatsApp. Pede hospedagem (tarefa agendada no servidor), serviço de e-mail e a API oficial do WhatsApp (que exige autorização do paciente e cobra por mensagem). Por isso a Atualização 08 é o botão com a mensagem pronta.
+- **LGPD:** confirme com a revisão jurídica a base legal para mensagens de aniversário (legítimo interesse com opção de sair, ou consentimento) e acrescente isso ao Termo (`/termos`).
+
 ### Acessos para teste
 | Perfil | E-mail | Senha |
 |---|---|---|
@@ -389,6 +407,19 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Celular:** nada corta nem rola para o lado; gráficos legíveis; "Ver em tabela" abre os números.
 - [ ] **Privacidade (importante):** entrar como paciente → nenhuma tela mostra valores, responsável ou desempenho da equipe. Abrir `/admin` como paciente → bloqueado.
 
+### E8. Aniversários
+- [ ] **Cadastro:** Novo paciente → preencha **Data de nascimento** (ex.: o seu aniversário) → criar. Abra a ficha: a data está lá. A caixinha de autorização vem **desmarcada**.
+- [ ] **Datas inválidas:** tente uma data no futuro ou antes de 1900 → o sistema recusa e explica.
+- [ ] **Autorização:** marque a caixinha e salve → aparece "Marcado em <data>". Desmarque e salve → o registro some.
+- [ ] **Tela Aniversários:** menu **Aniversários**. Teste os 5 botões (Hoje, 7 dias, 30 dias, Este mês, Mês que vem). Quem faz aniversário em cada período aparece com a idade.
+- [ ] **Quem não aparece:** paciente com plano **vencido**, conta **desativada** ou **sem data de nascimento** não aparece (embaixo da lista há o aviso de quantos estão sem data).
+- [ ] **WhatsApp:** **Dar parabéns** abre o WhatsApp com a mensagem pronta e o primeiro nome (sem enviar nada sozinho). Paciente sem telefone mostra "sem WhatsApp".
+- [ ] **Mensagem:** Configurações → **Mensagem de aniversário** → mude o texto (com `{nome}`) → salve → o botão passa a usar o novo texto.
+- [ ] **Painel:** aba **Operação** mostra os aniversariantes dos próximos 7 dias; a **Visão executiva** mostra "aniversariantes hoje" nos Alertas.
+- [ ] **Celular:** cada aniversariante vira um cartão, sem rolagem para o lado, e o botão **Dar parabéns** aparece inteiro.
+- [ ] **Importação:** baixe o modelo de novo: tem a coluna **Data de nascimento**. Teste com 2 pacientes fictícios.
+- [ ] **Privacidade (importante):** entrar como paciente → nenhuma tela mostra data de nascimento, autorização ou aniversariantes. Abrir `/admin/aniversarios` como paciente → bloqueado.
+
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
 - [ ] O painel admin no celular abre o menu pelo botão ☰ (gaveta lateral).
@@ -401,12 +432,12 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **847 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **908 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
-> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
+> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), aniversários (janelas, 29/02, autorização, mensagem editável, privacidade), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
 > ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, os
-> arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql`, `atualizacao_04_financeiro_v2.sql`, `atualizacao_05_pacientes.sql`, `atualizacao_06_importacao.sql` e `atualizacao_07_painel.sql`) é o primeiro teste a fazer.
+> arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql`, `atualizacao_04_financeiro_v2.sql`, `atualizacao_05_pacientes.sql`, `atualizacao_06_importacao.sql`, `atualizacao_07_painel.sql` e `atualizacao_08_aniversarios.sql`) é o primeiro teste a fazer.
 > Se o phpMyAdmin acusar algum erro, copie a mensagem e me envie que eu corrijo.
 
 ---
@@ -444,7 +475,9 @@ Ideal: faça no celular e depois no computador.
 | Pacientes v2: status Ativo/Inativo, vencimento, consultas presenciais com cota por plano, responsável (modo babá), ordenação por coluna, filtros e atribuição em lote | ✅ **Neste MVP** (atualização 05) |
 | Importação de pacientes por planilha: modelo oficial em Excel, prévia antes de salvar, duplicados, erros, paciente importado sem acesso até liberar | ✅ **Neste MVP** (atualização 06) |
 | **Painel gerencial**: visão executiva (financeiro, carteira, crescimento, equipe, alertas), períodos com comparação, "Paciente desde" | ✅ **Neste MVP** (atualização 07) |
-| **Leads** (Instagram, WhatsApp, indicação) com funil de conversão no painel gerencial; entrada manual primeiro | ⏭️ Próxima rodada (atualização 08) |
+| **Leads** (Instagram, WhatsApp, indicação) com funil de conversão no painel gerencial; entrada manual primeiro | ⏭️ Próxima rodada (atualização 09) |
+| **Aniversários**: data de nascimento, aniversariantes do dia/semana/mês, botão de WhatsApp com mensagem pronta e editável, caixinha de autorização | ✅ **Neste MVP** (atualização 08) |
+| **Aniversário automático** por e-mail e WhatsApp (precisa de hospedagem, serviço de e-mail, API oficial do WhatsApp, autorização do paciente e revisão jurídica) | ⏭️ Depois da hospedagem |
 | Estagiárias com **login próprio** (cada uma vê só os pacientes dela, sem valores), mensagem de ação por faixa de vencimento (15/30 dias), acompanhamento da renovação | ⏭️ Próxima rodada (pede revisão de segurança) |
 | Financeiro, próximos passos: **notificação push** da cobrança do dia, taxa de renovação, previsão por mês, acompanhamento da renovação (conversei / vai renovar / não vai), marcador "cobrado em", mensagem de cobrança editável, importação de **renovações/histórico** por planilha | ⏭️ Próxima rodada |
 | Contagem regressiva da prova no Início do paciente, temas do dia por modalidade, ranking por modalidade | ⏭️ Próxima rodada (dados já estão no banco) |

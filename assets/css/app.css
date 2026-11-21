@@ -709,3 +709,22 @@ a.xmini:hover { border-color: var(--ink); }
     .xteam .ini { display: none; }
     .xfin-list dd { font-size: 15px; }
 }
+
+/* ---- Aniversários (Atualização 08) ---- */
+.bd-tbl .bd-sub { display: block; margin: 4px 0 0 44px; line-height: 1.5; }
+@media (max-width: 520px) {
+    /* no celular, cada aniversariante vira um cartão: nome e idade em cima; data e botão embaixo */
+    .bd-tbl thead { display: none; }
+    .bd-tbl, .bd-tbl tbody { display: block; width: 100%; }
+    .bd-tbl tr { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--line); }
+    .bd-tbl tr:first-child { border-top: 0; }
+    .bd-tbl td { display: block; padding: 0; border: 0; }
+    .bd-tbl td:first-child { grid-column: 1 / -1; }
+    .bd-tbl td:nth-child(2) { grid-column: 1; }
+    .bd-tbl td:nth-child(2) br { display: none; }
+    .bd-tbl td:nth-child(2) .tag { margin-left: 6px; }
+    .bd-tbl td:nth-child(3) { grid-column: 2; text-align: right; }
+    .bd-tbl .avatar { display: none; }
+    .bd-tbl .bd-sub { margin-left: 0; }
+    .bd-tbl .btn { white-space: nowrap; }
+}

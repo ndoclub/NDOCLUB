@@ -26,7 +26,7 @@ final class PatientImport
     public const MAX_ROWS = 500;           // pacientes por arquivo
     public const MAX_BYTES = 2097152;      // 2 MB
     public const SHEET = 'Pacientes';      // nome da aba que o modelo usa
-    public const TEMPLATE_VERSION = '2';
+    public const TEMPLATE_VERSION = '3';
 
     // ---------------------------------------------------------------
     // Colunas do modelo (a fonte única: o modelo .xlsx, a tela de instruções e o leitor usam esta lista)
@@ -59,6 +59,11 @@ final class PatientImport
                 'Objetivo do paciente, em poucas palavras.',
                 'Até 120 letras.',
                 'Emagrecimento'],
+            'birth' => ['Data de nascimento', 'Dados do paciente', false,
+                ['data de nascimento', 'nascimento', 'aniversario', 'data de aniversario', 'dt nascimento', 'data nasc'],
+                'Dia em que o paciente nasceu. Usada só para o aviso de aniversariantes no painel (só o admin vê).',
+                'Data no formato dd/mm/aaaa, do passado e a partir de 1900. Vazio é aceito. A autorização para receber mensagens NÃO vem da planilha: marque na ficha de cada paciente.',
+                '15/08/1990'],
             'plan' => ['Plano', 'Plano e acompanhamento', false,
                 ['plano', 'nome do plano'],
                 'Nome do plano, igual ao de Admin > Planos (veja a aba Listas).',
@@ -398,7 +403,7 @@ final class PatientImport
     // ---------------------------------------------------------------
 
     /** "20/11/2026", "20-11-26", "2026-11-20" -> "2026-11-20". Vazio = null. Inválido = false. */
-    public static function parseDate(string $s): string|false|null
+    public static function parseDate(string $s, bool $birth = false): string|false|null
     {
         $s = trim($s);
         if ($s === '') {
@@ -409,12 +414,13 @@ final class PatientImport
         } elseif (preg_match('/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4}|\d{2})$/', $s, $m)) {
             [$d, $mo, $y] = [(int) $m[1], (int) $m[2], (int) $m[3]];
             if ($y < 100) {
-                $y += 2000;
+                // Data de nascimento com 2 números no ano (15/08/90): se passa do ano atual, é 19xx
+                $y += ($birth && $y > (int) date('y')) ? 1900 : 2000;
             }
         } else {
             return false;
         }
-        if ($y < 2000 || $y > 2100 || !checkdate($mo, $d, $y)) {
+        if ($y < ($birth ? 1900 : 2000) || $y > 2100 || !checkdate($mo, $d, $y)) {
             return false;
         }
         return sprintf('%04d-%02d-%02d', $y, $mo, $d);
@@ -694,6 +700,14 @@ final class PatientImport
         }
 
         // ---- Paciente desde (início do acompanhamento; usado pelo painel gerencial)
+        $birth = self::parseDate($g('birth'), true);
+        if ($birth === false) {
+            $errors[] = 'Data de nascimento: "' . $g('birth') . '" não é uma data válida. Use dd/mm/aaaa (ex.: 15/08/1990).';
+            $birth = null;
+        } elseif ($birth !== null && ($birth > $today || $birth < '1900-01-01')) {
+            $errors[] = 'Data de nascimento: ' . fmt_date($birth) . ' não é possível (use uma data do passado, a partir de 1900).';
+            $birth = null;
+        }
         $joined = self::parseDate($g('joined'));
         if ($joined === false) {
             $errors[] = 'Paciente desde: "' . $g('joined') . '" não é uma data válida. Use dd/mm/aaaa (ex.: 15/08/2026).';
@@ -992,7 +1006,7 @@ final class PatientImport
             ],
             'data' => $status === 'ok' || $status === 'warn' ? [
                 'name' => $name, 'email' => $email, 'phone' => $phone !== '' ? $phone : null, 'goal' => $goal !== '' ? $goal : null,
-                'plan_id' => $plan ? (int) $plan['id'] : null, 'renewal' => $renewal, 'joined' => $joined, 'responsible_id' => $respId,
+                'plan_id' => $plan ? (int) $plan['id'] : null, 'renewal' => $renewal, 'joined' => $joined, 'birth' => $birth, 'responsible_id' => $respId,
                 'sport_ids' => array_values($sportIds), 'has_coach' => $hasCoach, 'coach_name' => $coachName,
                 'competes' => $competes, 'event_name' => $eventName !== '' ? $eventName : null, 'event_date' => $eventDate,
                 'custom' => $custom, 'custom_cur' => $cur, 'store_custom' => $storeCustom,
@@ -1030,10 +1044,10 @@ final class PatientImport
                 $id = DB::tx(function () use ($d, $adminId) {
                     // Sem senha e sem acesso: a senha aqui é aleatória e ninguém conhece. O acesso é liberado depois, na ficha.
                     $id = DB::insert(
-                        "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, joined_on, plan_id, responsible_id, must_change_password, app_access, created_at)
-                         VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, 1, 0, ?)",
+                        "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, joined_on, birth_date, plan_id, responsible_id, must_change_password, app_access, created_at)
+                         VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, 1, 0, ?)",
                         [$d['name'], $d['email'], password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), $d['phone'], $d['goal'],
-                            $d['renewal'], $d['joined'] ?? today(), $d['plan_id'], $d['responsible_id'], now()]
+                            $d['renewal'], $d['joined'] ?? today(), $d['birth'] ?? null, $d['plan_id'], $d['responsible_id'], now()]
                     );
                     if ($d['store_custom'] && $d['custom'] !== null) {
                         Plans::setCustomPrice($id, $d['custom'], $d['custom_cur'], 'manual');

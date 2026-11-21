@@ -246,6 +246,7 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
             ['warn', $al['noresp'],  'pacientes ativos sem responsável (sem acompanhamento)', url('/admin/pacientes?st=active&r=none')],
             ['warn', $al['away'],    'pacientes sem abrir o app há 7 dias ou mais', url('/admin/pacientes?f=away')],
             ['info', $al['risk'],    'renovações em risco (vencem em até ' . (int) $x['yellow'] . ' dias e estão sumidos)', url('/admin?aba=operacao')],
+            ['info', $al['birthdays'], 'aniversariantes hoje', url('/admin/aniversarios?q=hoje')],
         ];
         ?>
         <div class="xalerts">

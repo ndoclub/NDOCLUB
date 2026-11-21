@@ -5,6 +5,7 @@ $finBadge = \App\Services\Payments::attentionStats()['count'];
 $nav = [
     ['/admin',            'Painel',        'grid',     $path === '/admin'],
     ['/admin/pacientes',  'Pacientes',     'users',    $is('/admin/pacientes') || $is('/admin/importar')],
+    ['/admin/aniversarios','Aniversários', 'gift',     $is('/admin/aniversarios')],
     ['/admin/planos',     'Planos',        'card',     $is('/admin/planos')],
     ['/admin/responsaveis','Responsáveis', 'users',    $is('/admin/responsaveis')],
     ['/admin/financeiro', 'Financeiro',    'cash',     $is('/admin/financeiro')],

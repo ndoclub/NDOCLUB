@@ -17,6 +17,10 @@
         <div class="field"><label for="renewal_date">Vence em</label><input class="input" type="date" id="renewal_date" name="renewal_date" value="<?= e(old('renewal_date', $defaultRenewal)) ?>"></div>
         <div class="field"><label for="joined_on">Paciente desde</label><input class="input" type="date" id="joined_on" name="joined_on" max="<?= e(today()) ?>" value="<?= e(old('joined_on', today())) ?>">
             <p class="hint">Dia em que começou o acompanhamento. O painel usa para contar novos pacientes. Se ele já é antigo, coloque a data real.</p></div>
+        <div class="field"><label for="birth_date">Data de nascimento</label><input class="input" type="date" id="birth_date" name="birth_date" min="1900-01-01" max="<?= e(today()) ?>" value="<?= e(old('birth_date')) ?>">
+            <p class="hint">Opcional. Serve para o aviso de aniversariantes no painel. Só você vê.</p></div>
+        <div class="field full"><label class="checkbox"><input type="checkbox" name="msg_optin" value="1"<?= !empty(old('msg_optin')) ? ' checked' : '' ?>><span>Autorizou receber mensagens (aniversário e novidades)</span></label>
+            <p class="hint">Marque só se o paciente disse que aceita. Fica registrado o dia em que você marcou.</p></div>
         <div class="field"><label for="responsible_id">Responsável</label>
             <select id="responsible_id" name="responsible_id">
                 <option value="">Sem responsável</option>

@@ -13,6 +13,12 @@
     </div>
 
     <div class="panel">
+        <h3>Mensagem de aniversário</h3>
+        <div class="field"><textarea class="input" id="birthday_message" name="birthday_message" maxlength="300" style="min-height:96px" aria-label="Mensagem de aniversário"><?= e($v('birthday_message')) ?></textarea>
+            <p class="hint">Use <strong>{nome}</strong> onde quiser o primeiro nome do paciente. Em branco = texto padrão. É o texto do botão "Dar parabéns" (Aniversários e Painel).</p></div>
+    </div>
+
+    <div class="panel">
         <h3>Avisos de renovação</h3>
         <div class="form-grid">
             <div class="field"><label for="warn_yellow_days">Selo amarelo a partir de (dias)</label><input class="input" type="number" id="warn_yellow_days" name="warn_yellow_days" min="2" max="90" value="<?= e($v('warn_yellow_days')) ?>"></div>

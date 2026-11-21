@@ -50,6 +50,12 @@
 </div>
 <?php endif; ?>
 
+<h3 class="sub" style="margin-top:32px">Aniversariantes <a class="tiny" style="font-weight:600;margin-left:8px" href="<?= e(url('/admin/aniversarios')) ?>">Ver todos →</a></h3>
+<p class="muted small">Hoje e nos próximos 7 dias. O botão abre o WhatsApp com a mensagem pronta (você confere e envia).</p>
+<?php if (!$birthdays): ?>
+    <div class="empty"><strong>Nenhum aniversário nos próximos 7 dias</strong>Preencha a data de nascimento na ficha dos pacientes para eles aparecerem aqui.</div>
+<?php else: partial('birthday-table', ['rows' => $birthdays]); endif; ?>
+
 <?php if ($events): ?>
 <h3 class="sub" style="margin-top:32px">Próximas provas</h3>
 <p class="muted small">Atletas que competem, da prova mais perto para a mais longe. É a hora de ajustar a dieta e mandar uma mensagem.</p>

@@ -82,6 +82,10 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
             <div class="field"><label for="renewal_date">Vence em</label><input class="input" type="date" id="renewal_date" name="renewal_date" value="<?= e(substr((string) $p['renewal_date'], 0, 10)) ?>"></div>
             <div class="field"><label for="joined_on">Paciente desde</label><input class="input" type="date" id="joined_on" name="joined_on" max="<?= e(today()) ?>" value="<?= e(substr((string) ($p['joined_on'] ?? ''), 0, 10)) ?>">
                 <p class="hint">Dia em que começou o acompanhamento (o painel conta novos pacientes por esta data). Vazio = data do cadastro.</p></div>
+            <div class="field"><label for="birth_date">Data de nascimento</label><input class="input" type="date" id="birth_date" name="birth_date" min="1900-01-01" max="<?= e(today()) ?>" value="<?= e(substr((string) ($p['birth_date'] ?? ''), 0, 10)) ?>">
+                <p class="hint">Opcional. Só o admin vê. Usada no aviso de aniversariantes.</p></div>
+            <div class="field full"><label class="checkbox"><input type="checkbox" name="msg_optin" value="1"<?= !empty($p['msg_optin']) ? ' checked' : '' ?>><span>Autorizou receber mensagens (aniversário e novidades)</span></label>
+                <p class="hint"><?= !empty($p['msg_optin']) && !empty($p['msg_optin_at']) ? 'Marcado em ' . e(fmt_date(substr((string) $p['msg_optin_at'], 0, 10))) . '.' : 'Marque só se o paciente disse que aceita. Fica registrado o dia da marcação.' ?></p></div>
             <div class="field"><label for="responsible_id">Responsável</label>
                 <select id="responsible_id" name="responsible_id">
                     <option value="">Sem responsável</option>

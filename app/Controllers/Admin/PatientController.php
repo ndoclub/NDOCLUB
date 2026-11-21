@@ -274,6 +274,12 @@ final class PatientController
         ], 'admin');
     }
 
+    /** Data de nascimento válida: existe no calendário, não é futura e não é anterior a 1900. */
+    private static function validBirth(string $d): bool
+    {
+        return Payments::validDate($d) && $d <= today() && $d >= '1900-01-01';
+    }
+
     public function store(): void
     {
         $name = input('name');
@@ -282,6 +288,8 @@ final class PatientController
         $goal = input('goal');
         $renewal = input('renewal_date');
         $joined = input('joined_on') ?: today();
+        $birth = input('birth_date');
+        $optin = !empty($_POST['msg_optin']);
         $password = input('password');
         $planId = (int) ($_POST['plan_id'] ?? 0);
         $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
@@ -316,6 +324,9 @@ final class PatientController
         }
         if (!Payments::validDate($joined) || $joined > today()) {
             $errors[] = '"Paciente desde" inválido (use uma data de hoje ou do passado).';
+        }
+        if ($birth !== '' && !self::validBirth($birth)) {
+            $errors[] = 'Data de nascimento inválida (use uma data do passado, a partir de 1900).';
         }
         if (mb_strlen($password) < 8) {
             $errors[] = 'A senha provisória precisa ter pelo menos 8 caracteres.';
@@ -361,11 +372,11 @@ final class PatientController
         if ($storeCustom && $plan && $plan['price'] !== null && $customCur === 'BRL' && abs($custom - (float) $plan['price']) < 0.005) {
             $storeCustom = false;
         }
-        $id = DB::tx(function () use ($name, $email, $password, $phone, $goal, $renewal, $joined, $plan, $custom, $customCur, $storeCustom, $pay, $amount, $payCur, $respId) {
+        $id = DB::tx(function () use ($name, $email, $password, $phone, $goal, $renewal, $joined, $birth, $optin, $plan, $custom, $customCur, $storeCustom, $pay, $amount, $payCur, $respId) {
             $id = DB::insert(
-                "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, joined_on, plan_id, responsible_id, must_change_password, created_at)
-                 VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, 1, ?)",
-                [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, $joined, $plan ? (int) $plan['id'] : null, $respId > 0 ? $respId : null, now()]
+                "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, joined_on, birth_date, msg_optin, msg_optin_at, plan_id, responsible_id, must_change_password, created_at)
+                 VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+                [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, $joined, $birth !== '' ? $birth : null, $optin ? 1 : 0, $optin ? now() : null, $plan ? (int) $plan['id'] : null, $respId > 0 ? $respId : null, now()]
             );
             if ($storeCustom) {
                 Plans::setCustomPrice($id, $custom, $customCur, 'manual');
@@ -484,6 +495,8 @@ final class PatientController
         $status = input('status') === 'inactive' ? 'inactive' : 'active';
         $renewal = input('renewal_date');
         $joined = input('joined_on');
+        $birth = input('birth_date');
+        $optin = !empty($_POST['msg_optin']);
         $planId = (int) ($_POST['plan_id'] ?? 0);
         $respId = (int) ($_POST['responsible_id'] ?? 0);
         $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
@@ -513,6 +526,9 @@ final class PatientController
         if ($joined !== '' && (!Payments::validDate($joined) || $joined > today())) {
             $errors[] = '"Paciente desde" inválido (use uma data de hoje ou do passado).';
         }
+        if ($birth !== '' && !self::validBirth($birth)) {
+            $errors[] = 'Data de nascimento inválida (use uma data do passado, a partir de 1900).';
+        }
         if ($errors) {
             foreach ($errors as $e) {
                 flash('err', $e);
@@ -527,9 +543,15 @@ final class PatientController
             }
         }
         DB::run(
-            'UPDATE users SET name = ?, email = ?, phone = ?, goal = ?, status = ?, renewal_date = ?, joined_on = ?, plan_id = ?, responsible_id = ? WHERE id = ?',
-            [$name, $email, $phone ?: null, $goal ?: null, $status, $renewal ?: null, $joined !== '' ? $joined : null, $planId ?: null, $respId > 0 ? $respId : null, $id]
+            'UPDATE users SET name = ?, email = ?, phone = ?, goal = ?, status = ?, renewal_date = ?, joined_on = ?, birth_date = ?, plan_id = ?, responsible_id = ? WHERE id = ?',
+            [$name, $email, $phone ?: null, $goal ?: null, $status, $renewal ?: null, $joined !== '' ? $joined : null, $birth !== '' ? $birth : null, $planId ?: null, $respId > 0 ? $respId : null, $id]
         );
+        // Autorização de mensagens: guarda quando foi marcada (e não muda a data se já estava marcada)
+        if ($optin && !(int) ($p['msg_optin'] ?? 0)) {
+            DB::run('UPDATE users SET msg_optin = 1, msg_optin_at = ? WHERE id = ?', [now(), $id]);
+        } elseif (!$optin && (int) ($p['msg_optin'] ?? 0)) {
+            DB::run('UPDATE users SET msg_optin = 0, msg_optin_at = NULL WHERE id = ?', [$id]);
+        }
         Plans::setCustomPrice($id, $custom, $customCur);
         Audit::log((int) Auth::id(), 'patient_update', 'user', $id, $p['name']);
         flash('ok', 'Dados salvos.');

@@ -435,6 +435,7 @@ final class Insights
 
         $team = self::team($pats, $activePats, $events, $w);
         $alerts['noresp'] = $team['noResponsible'];
+        $alerts['birthdays'] = Birthdays::todayCount($today);
 
         return [
             'window' => $w,

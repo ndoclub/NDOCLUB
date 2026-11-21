@@ -107,6 +107,7 @@ $router->post('/admin/modalidades', 'Admin\SportController@store', $A);
 $router->get('/admin/modalidades/{id}', 'Admin\SportController@form', $A);
 $router->post('/admin/modalidades/{id}', 'Admin\SportController@update', $A);
 
+$router->get('/admin/aniversarios', 'Admin\BirthdayController@index', $A);
 $router->get('/admin/responsaveis', 'Admin\ResponsibleController@index', $A);
 $router->get('/admin/responsaveis/novo', 'Admin\ResponsibleController@form', $A);
 $router->post('/admin/responsaveis', 'Admin\ResponsibleController@store', $A);
