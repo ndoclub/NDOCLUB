@@ -224,7 +224,7 @@ Mesmo processo, **depois** das atualizações 01 a 06 (se ainda não aplicou a 0
 
 **O que o painel mostra** (tudo calculado a partir do que já existe no sistema; nada inventado)
 - **Período:** Últimos 30 dias (padrão), Este mês, Mês passado, Este ano. Cada indicador compara com o período anterior (↑ ↓).
-- **Pacientes ativos:** status Ativo **e** plano não vencido (igual ao filtro "Ativo" da lista).
+- **Pacientes em carteira (antes "ativos"):** status Ativo **e** plano não vencido (igual ao filtro "Ativo" da lista).
 - **Vendido:** soma das vendas pela **data da venda**. **Recebido:** o que realmente caiu, pela data em que caiu. **A receber:** parcelas pendentes que ainda não venceram (cartão já líquido da taxa). **Inadimplência:** parcelas pendentes **vencidas, a partir de 1 dia de atraso**.
 - **Novos pacientes:** pela data **"Paciente desde"** (campo novo no cadastro e na ficha; se ficar em branco, vale a data do cadastro). Serve para a carga dos pacientes antigos não aparecer como "170 novos de uma vez".
 - **Taxa de renovação:** dos planos que **venceram no período**, quantos **renovaram**. Sem plano vencido no período, aparece "—" (e não 0%).
@@ -252,6 +252,27 @@ Mesmo processo, **depois** das atualizações 01 a 07 (se ainda não aplicou 05,
 - **Planilha de importação**: nova coluna **Data de nascimento** (opcional; baixe o modelo de novo). A autorização de mensagens **não** vem da planilha, de propósito: marque na ficha de cada paciente.
 - **Ainda não existe:** envio **automático** de e-mail e de WhatsApp. Pede hospedagem (tarefa agendada no servidor), serviço de e-mail e a API oficial do WhatsApp (que exige autorização do paciente e cobra por mensagem). Por isso a Atualização 08 é o botão com a mensagem pronta.
 - **LGPD:** confirme com a revisão jurídica a base legal para mensagens de aniversário (legítimo interesse com opção de sair, ou consentimento) e acrescente isso ao Termo (`/termos`).
+
+### Atualização 08.1 (Cadastro: sexo, CPF, Instagram e endereço; telas mais limpas)
+Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.1):
+1. Atualize os arquivos do projeto (`git pull`, ou copie a pasta nova por cima).
+2. phpMyAdmin → clique no banco **nodaysoffclub** → aba **Importar** → `database/atualizacao_08b_cadastro.sql` → **Executar**.
+   Acrescenta 11 campos na tabela de usuários (sexo, CPF, Instagram e endereço) e um índice do CPF. Não apaga nada. **Importe antes de abrir o sistema.**
+3. **Ctrl + F5**.
+
+**O que mudou**
+- **Cadastro e ficha do paciente** ficaram em blocos: *Dados do paciente*, *Plano e acompanhamento*, *Pagamento* e *Acesso ao app*. Campos novos (todos opcionais, **só o admin vê**):
+  - **Sexo** (Feminino ou Masculino): alimenta o gráfico **Por sexo** na carteira do painel (para saber qual público é maior e ajudar na compra dos brindes).
+  - **CPF** (para recibo e nota fiscal): o sistema confere os dígitos, guarda só os números, mostra formatado e **não deixa cadastrar o mesmo CPF duas vezes** (diz de quem já é).
+  - **Instagram**: digite `@usuario` ou cole o link do perfil; guarda só o usuário e, na ficha, vira link clicável.
+  - **Endereço completo** (bloco que abre ao clicar): CEP, rua, número, complemento, bairro, cidade, estado e **país**. Em branco = Brasil. No Brasil, o CEP tem 8 números e o estado é a sigla; para quem mora fora, CEP e estado ficam livres.
+- **Painel → Visão executiva → Distribuição da carteira**: novo gráfico **Por sexo**. A porcentagem é sobre quem **tem** o sexo informado; quem ficou sem informar aparece numa nota. Enquanto ninguém tiver sexo preenchido, o gráfico avisa para preencher.
+- **Lista de pacientes**: novo filtro **Cadastro incompleto** (sem CPF ou sem endereço), útil para cobrar o que falta dos pacientes antigos.
+- **Planos, Responsáveis e Modalidades**: saiu a coluna **Status** (e o "≈ por mês" dos Planos). Item desativado aparece em cinza com "(desativado)"; para desativar ou reativar, abra o **Editar** e use a caixinha "Ativo".
+- **Nomes**: "Pacientes ativos" virou **Pacientes em carteira** (Planos, Responsáveis e Painel) e "Atletas ativos" virou **Atletas**. Só o rótulo mudou; a regra continua a mesma (plano em dia).
+- **Planilha de importação**: modelo **versão 4**, com as colunas novas (Sexo, CPF, Instagram, CEP, Rua, Número, Complemento, Bairro, Cidade, Estado, País). **Baixe o modelo de novo.** CPF repetido (no sistema ou dentro da planilha) vira "Duplicado". Planilhas antigas (versão 3) continuam funcionando.
+- **Proteção extra**: se uma aba da ficha ficou aberta de antes da atualização e você salvar nela, os dados novos **não** são apagados.
+- **LGPD:** CPF e endereço são dados pessoais. Peça à revisão jurídica para incluir no Termo (`/termos`) a finalidade (emitir recibo e nota fiscal; envio de brindes) e confirme com o dev como o CPF deve ser protegido no banco em produção.
 
 ### Acessos para teste
 | Perfil | E-mail | Senha |
@@ -368,7 +389,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Cancelar / Reativar** uma parcela (chargeback): ela sai dos totais; **Reativar** devolve.
 - [ ] **Dólar/euro:** forma **Wise**, moeda **US$**; ao marcar "Recebi", informar o **R$ que caiu**. O "já caiu" usa esse R$.
 - [ ] **Registrar pagamento sem renovar:** na ficha, contrato antigo com algumas parcelas já recebidas.
-- [ ] **Planos:** coluna **≈ por mês**; clicar no número de pacientes abre a lista filtrada. Mudar o valor de um plano → aviso de quantos pacientes mantêm o valor antigo até renovar.
+- [ ] **Planos:** coluna clicar no número de **Pacientes em carteira** abre a lista filtrada. (A coluna "≈ por mês" foi removida na 08.1.) Mudar o valor de um plano → aviso de quantos pacientes mantêm o valor antigo até renovar.
 - [ ] **Privacidade (importante):** entrar como paciente e passar pelas telas → **nenhum R$, US$ ou € em lugar nenhum**. Abrir `/admin/financeiro` e o endereço de um comprovante como paciente → bloqueado.
 - [ ] **Excluir paciente de teste** (LGPD): os pagamentos dele somem do Financeiro.
 
@@ -420,6 +441,18 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Importação:** baixe o modelo de novo: tem a coluna **Data de nascimento**. Teste com 2 pacientes fictícios.
 - [ ] **Privacidade (importante):** entrar como paciente → nenhuma tela mostra data de nascimento, autorização ou aniversariantes. Abrir `/admin/aniversarios` como paciente → bloqueado.
 
+### E8.1. Cadastro: sexo, CPF, Instagram e endereço
+- [ ] **Novo paciente** está em blocos (Dados, Plano e acompanhamento, Pagamento, Acesso ao app) e tem **Sexo**, **CPF**, **Instagram** e o bloco **Endereço completo** (fechado).
+- [ ] **CPF:** use um CPF **de teste** (ex.: `529.982.247-25`, que é só para teste). Salve e abra a ficha: aparece formatado. Digite um CPF errado (ex.: `123.456.789-00`) → o sistema recusa. Tente o mesmo CPF em outro paciente → recusa e diz de quem é.
+- [ ] **Instagram:** cole `https://www.instagram.com/usuario/` → guarda `@usuario`; na ficha aparece uma etiqueta clicável.
+- [ ] **Endereço:** preencha CEP `01310-100` e estado `sp` → guarda certo (estado em maiúsculas). Estado `ZZ` ou CEP com poucos números → recusa. Para quem mora fora, escreva o país (ex.: Estados Unidos): CEP e estado ficam livres.
+- [ ] **Tudo opcional:** cadastre um paciente sem nenhum desses campos → funciona. Apagar o conteúdo e salvar limpa o campo.
+- [ ] **Painel → Visão executiva:** em *Distribuição da carteira* aparece **Por sexo** (Feminino/Masculino em %, com a quantidade) e a nota de quantos estão sem sexo informado.
+- [ ] **Lista de pacientes:** botão **Cadastro incompleto** lista quem não tem CPF ou endereço.
+- [ ] **Planos / Responsáveis / Modalidades:** sem coluna Status; desative um item pelo **Editar** (caixinha "Ativo") e veja-o em cinza com "(desativado)". Colunas agora dizem **Pacientes em carteira** e **Atletas**.
+- [ ] **Importação:** baixe o modelo de novo (diz "Versão 4" e tem as colunas novas). Teste com 2 pacientes fictícios, um deles com CPF repetido → aparece como Duplicado.
+- [ ] **Privacidade (importante):** entrar como paciente → nenhuma tela mostra CPF, endereço, Instagram ou sexo (nem o seu, nem o dos outros).
+
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
 - [ ] O painel admin no celular abre o menu pelo botão ☰ (gaveta lateral).
@@ -432,12 +465,12 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **908 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **987 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
-> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), aniversários (janelas, 29/02, autorização, mensagem editável, privacidade), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
+> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), aniversários (janelas, 29/02, autorização, mensagem editável, privacidade), cadastro com sexo, CPF (dígitos, duplicado), Instagram e endereço (Brasil e exterior), importação v4 e gráfico por sexo (conferido contra cálculo independente), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
 > ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, os
-> arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql`, `atualizacao_04_financeiro_v2.sql`, `atualizacao_05_pacientes.sql`, `atualizacao_06_importacao.sql`, `atualizacao_07_painel.sql` e `atualizacao_08_aniversarios.sql`) é o primeiro teste a fazer.
+> arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql`, `atualizacao_04_financeiro_v2.sql`, `atualizacao_05_pacientes.sql`, `atualizacao_06_importacao.sql`, `atualizacao_07_painel.sql`, `atualizacao_08_aniversarios.sql` e `atualizacao_08b_cadastro.sql`) é o primeiro teste a fazer.
 > Se o phpMyAdmin acusar algum erro, copie a mensagem e me envie que eu corrijo.
 
 ---
@@ -477,6 +510,7 @@ Ideal: faça no celular e depois no computador.
 | **Painel gerencial**: visão executiva (financeiro, carteira, crescimento, equipe, alertas), períodos com comparação, "Paciente desde" | ✅ **Neste MVP** (atualização 07) |
 | **Leads** (Instagram, WhatsApp, indicação) com funil de conversão no painel gerencial; entrada manual primeiro | ⏭️ Próxima rodada (atualização 09) |
 | **Aniversários**: data de nascimento, aniversariantes do dia/semana/mês, botão de WhatsApp com mensagem pronta e editável, caixinha de autorização | ✅ **Neste MVP** (atualização 08) |
+| **Cadastro completo**: sexo (gráfico por sexo na carteira), CPF para recibo/nota fiscal, Instagram, endereço completo, filtro "Cadastro incompleto"; telas de Planos/Responsáveis/Modalidades mais limpas | ✅ **Neste MVP** (atualização 08.1) |
 | **Aniversário automático** por e-mail e WhatsApp (precisa de hospedagem, serviço de e-mail, API oficial do WhatsApp, autorização do paciente e revisão jurídica) | ⏭️ Depois da hospedagem |
 | Estagiárias com **login próprio** (cada uma vê só os pacientes dela, sem valores), mensagem de ação por faixa de vencimento (15/30 dias), acompanhamento da renovação | ⏭️ Próxima rodada (pede revisão de segurança) |
 | Financeiro, próximos passos: **notificação push** da cobrança do dia, taxa de renovação, previsão por mês, acompanhamento da renovação (conversei / vai renovar / não vai), marcador "cobrado em", mensagem de cobrança editável, importação de **renovações/histórico** por planilha | ⏭️ Próxima rodada |

@@ -26,6 +26,7 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
                 <?php foreach ($athleteNames as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?>
                 <?php if ($planRow): ?><span class="tag"><?= $consSummary['quota'] !== null ? (int) $consSummary['done'] . ' de ' . (int) $consSummary['quota'] . ' consultas' : (int) $consSummary['done'] . ' consultas' ?></span><?php endif; ?>
                 <?php if ($respName): ?><span class="tag">Responsável: <?= e($respName) ?></span><?php endif; ?>
+                <?php if (!empty($p['instagram'])): ?><a class="tag" href="<?= e(\App\Services\PersonalData::instagramUrl((string) $p['instagram'])) ?>" target="_blank" rel="noopener noreferrer" title="Abrir o Instagram do paciente">@<?= e($p['instagram']) ?></a><?php endif; ?>
                 <?php if ($planRow): ?><span class="tag"><?= e($planRow['name']) ?><?= $priceInfo['amount'] !== null ? ' · ' . e(money($priceInfo['amount'], 2, $priceInfo['currency'])) . ($priceInfo['source'] === 'manual' ? ' (combinado)' : ($priceInfo['source'] === 'reajuste' ? ' (mantido até renovar)' : '')) : ' · sem valor' ?></span><?php endif; ?>
             </div>
         </div>
@@ -58,12 +59,24 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
 <div>
     <form class="panel" method="post" action="<?= e(url('/admin/pacientes/' . $id)) ?>">
         <?= csrf_field() ?>
-        <h3>Dados</h3>
+        <h3>Dados do paciente</h3>
         <div class="form-grid">
             <div class="field"><label for="name">Nome</label><input class="input" id="name" name="name" maxlength="120" value="<?= e($p['name']) ?>" required></div>
             <div class="field"><label for="email">E-mail</label><input class="input" type="email" id="email" name="email" value="<?= e($p['email']) ?>" required></div>
             <div class="field"><label for="phone">WhatsApp</label><input class="input" id="phone" name="phone" inputmode="tel" value="<?= e($p['phone'] ?? '') ?>"></div>
+            <div class="field"><label for="birth_date">Data de nascimento</label><input class="input" type="date" id="birth_date" name="birth_date" min="1900-01-01" max="<?= e(today()) ?>" value="<?= e(substr((string) ($p['birth_date'] ?? ''), 0, 10)) ?>">
+                <p class="hint">Opcional. Só o admin vê. Usada no aviso de aniversariantes.</p></div>
             <div class="field"><label for="goal">Objetivo</label><input class="input" id="goal" name="goal" maxlength="120" value="<?= e($p['goal'] ?? '') ?>"></div>
+            <?php
+            $pdNow = [];
+            foreach (\App\Services\PersonalData::COLUMNS as $pdk) {
+                $pdNow[$pdk] = (string) ($p[$pdk] ?? '');
+            }
+            partial('personal-fields', ['v' => $pdNow]);
+            ?>
+            <div class="field full"><label class="checkbox"><input type="checkbox" name="msg_optin" value="1"<?= !empty($p['msg_optin']) ? ' checked' : '' ?>><span>Autorizou receber mensagens (aniversário e novidades)</span></label>
+                <p class="hint"><?= !empty($p['msg_optin']) && !empty($p['msg_optin_at']) ? 'Marcado em ' . e(fmt_date(substr((string) $p['msg_optin_at'], 0, 10))) . '.' : 'Marque só se o paciente disse que aceita. Fica registrado o dia da marcação.' ?></p></div>
+            <h3 class="sub full" style="margin:12px 0 12px">Plano e acompanhamento</h3>
             <div class="field"><label for="plan_id">Plano</label>
                 <select id="plan_id" name="plan_id" data-plan-select data-price-target="#plan_price">
                     <option value="">Sem plano definido</option>
@@ -82,10 +95,6 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
             <div class="field"><label for="renewal_date">Vence em</label><input class="input" type="date" id="renewal_date" name="renewal_date" value="<?= e(substr((string) $p['renewal_date'], 0, 10)) ?>"></div>
             <div class="field"><label for="joined_on">Paciente desde</label><input class="input" type="date" id="joined_on" name="joined_on" max="<?= e(today()) ?>" value="<?= e(substr((string) ($p['joined_on'] ?? ''), 0, 10)) ?>">
                 <p class="hint">Dia em que começou o acompanhamento (o painel conta novos pacientes por esta data). Vazio = data do cadastro.</p></div>
-            <div class="field"><label for="birth_date">Data de nascimento</label><input class="input" type="date" id="birth_date" name="birth_date" min="1900-01-01" max="<?= e(today()) ?>" value="<?= e(substr((string) ($p['birth_date'] ?? ''), 0, 10)) ?>">
-                <p class="hint">Opcional. Só o admin vê. Usada no aviso de aniversariantes.</p></div>
-            <div class="field full"><label class="checkbox"><input type="checkbox" name="msg_optin" value="1"<?= !empty($p['msg_optin']) ? ' checked' : '' ?>><span>Autorizou receber mensagens (aniversário e novidades)</span></label>
-                <p class="hint"><?= !empty($p['msg_optin']) && !empty($p['msg_optin_at']) ? 'Marcado em ' . e(fmt_date(substr((string) $p['msg_optin_at'], 0, 10))) . '.' : 'Marque só se o paciente disse que aceita. Fica registrado o dia da marcação.' ?></p></div>
             <div class="field"><label for="responsible_id">Responsável</label>
                 <select id="responsible_id" name="responsible_id">
                     <option value="">Sem responsável</option>

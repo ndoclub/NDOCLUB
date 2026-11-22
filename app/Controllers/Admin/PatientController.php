@@ -10,6 +10,7 @@ use App\Services\Audit;
 use App\Services\Consultations;
 use App\Services\Levels;
 use App\Services\Payments;
+use App\Services\PersonalData;
 use App\Services\Plans;
 use App\Services\Points;
 use App\Services\Ranking;
@@ -97,6 +98,7 @@ final class PatientController
         $ord = $sortKey . '_' . $sortDir;
 
         $sql = "SELECT u.id, u.name, u.email, u.phone, u.avatar, u.status, u.renewal_date, u.last_seen_at, u.responsible_id, u.app_access,
+                       u.cpf, u.addr_street, u.addr_city,
                        pl.name AS plan_name, COALESCE(bl.price, pl.price) AS plan_value,
                        CASE WHEN bl.price IS NOT NULL THEN bl.currency ELSE 'BRL' END AS plan_currency,
                        pl.consultations_included AS quota,
@@ -154,6 +156,9 @@ final class PatientController
                 continue;
             }
             if ($filter === 'noapp' && !$r['noapp']) {
+                continue;
+            }
+            if ($filter === 'incomplete' && !PersonalData::incomplete($r)) {
                 continue;
             }
             $isAthlete = (int) ($r['is_athlete'] ?? 0) === 1;
@@ -280,6 +285,16 @@ final class PatientController
         return Payments::validDate($d) && $d <= today() && $d >= '1900-01-01';
     }
 
+    /** Lê do formulário os dados pessoais (sexo, CPF, Instagram, endereço). Devolve [valores limpos, erros]. */
+    private static function readPersonalData(): array
+    {
+        $in = [];
+        foreach (PersonalData::COLUMNS as $k) {
+            $in[$k] = input($k);
+        }
+        return PersonalData::clean($in);
+    }
+
     public function store(): void
     {
         $name = input('name');
@@ -290,6 +305,7 @@ final class PatientController
         $joined = input('joined_on') ?: today();
         $birth = input('birth_date');
         $optin = !empty($_POST['msg_optin']);
+        [$pd, $pdErrors] = self::readPersonalData();
         $password = input('password');
         $planId = (int) ($_POST['plan_id'] ?? 0);
         $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
@@ -327,6 +343,10 @@ final class PatientController
         }
         if ($birth !== '' && !self::validBirth($birth)) {
             $errors[] = 'Data de nascimento inválida (use uma data do passado, a partir de 1900).';
+        }
+        $errors = array_merge($errors, $pdErrors);
+        if ($pd['cpf'] !== '' && ($owner = PersonalData::cpfOwner($pd['cpf']))) {
+            $errors[] = 'Este CPF já está cadastrado para ' . $owner['name'] . '.';
         }
         if (mb_strlen($password) < 8) {
             $errors[] = 'A senha provisória precisa ter pelo menos 8 caracteres.';
@@ -372,12 +392,13 @@ final class PatientController
         if ($storeCustom && $plan && $plan['price'] !== null && $customCur === 'BRL' && abs($custom - (float) $plan['price']) < 0.005) {
             $storeCustom = false;
         }
-        $id = DB::tx(function () use ($name, $email, $password, $phone, $goal, $renewal, $joined, $birth, $optin, $plan, $custom, $customCur, $storeCustom, $pay, $amount, $payCur, $respId) {
+        $id = DB::tx(function () use ($pd, $name, $email, $password, $phone, $goal, $renewal, $joined, $birth, $optin, $plan, $custom, $customCur, $storeCustom, $pay, $amount, $payCur, $respId) {
             $id = DB::insert(
                 "INSERT INTO users (role, name, email, password_hash, phone, goal, status, renewal_date, joined_on, birth_date, msg_optin, msg_optin_at, plan_id, responsible_id, must_change_password, created_at)
                  VALUES ('patient', ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, 1, ?)",
                 [$name, $email, password_hash($password, PASSWORD_DEFAULT), $phone ?: null, $goal ?: null, $renewal ?: null, $joined, $birth !== '' ? $birth : null, $optin ? 1 : 0, $optin ? now() : null, $plan ? (int) $plan['id'] : null, $respId > 0 ? $respId : null, now()]
             );
+            DB::run('UPDATE users SET ' . implode(' = ?, ', PersonalData::COLUMNS) . ' = ? WHERE id = ?', array_merge(PersonalData::dbValues($pd), [$id]));
             if ($storeCustom) {
                 Plans::setCustomPrice($id, $custom, $customCur, 'manual');
             }
@@ -497,6 +518,7 @@ final class PatientController
         $joined = input('joined_on');
         $birth = input('birth_date');
         $optin = !empty($_POST['msg_optin']);
+        [$pd, $pdErrors] = self::readPersonalData();
         $planId = (int) ($_POST['plan_id'] ?? 0);
         $respId = (int) ($_POST['responsible_id'] ?? 0);
         $custom = parse_money((string) ($_POST['plan_price'] ?? ''));
@@ -529,6 +551,10 @@ final class PatientController
         if ($birth !== '' && !self::validBirth($birth)) {
             $errors[] = 'Data de nascimento inválida (use uma data do passado, a partir de 1900).';
         }
+        $errors = array_merge($errors, $pdErrors);
+        if ($pd['cpf'] !== '' && ($owner = PersonalData::cpfOwner($pd['cpf'], $id))) {
+            $errors[] = 'Este CPF já está cadastrado para ' . $owner['name'] . '.';
+        }
         if ($errors) {
             foreach ($errors as $e) {
                 flash('err', $e);
@@ -546,6 +572,14 @@ final class PatientController
             'UPDATE users SET name = ?, email = ?, phone = ?, goal = ?, status = ?, renewal_date = ?, joined_on = ?, birth_date = ?, plan_id = ?, responsible_id = ? WHERE id = ?',
             [$name, $email, $phone ?: null, $goal ?: null, $status, $renewal ?: null, $joined !== '' ? $joined : null, $birth !== '' ? $birth : null, $planId ?: null, $respId > 0 ? $respId : null, $id]
         );
+        // Só mexe nos dados pessoais se o formulário os enviou (uma aba antiga, aberta antes da atualização, não apaga nada)
+        $sentPd = false;
+        foreach (PersonalData::COLUMNS as $k) {
+            $sentPd = $sentPd || array_key_exists($k, $_POST);
+        }
+        if ($sentPd) {
+            DB::run('UPDATE users SET ' . implode(' = ?, ', PersonalData::COLUMNS) . ' = ? WHERE id = ?', array_merge(PersonalData::dbValues($pd), [$id]));
+        }
         // Autorização de mensagens: guarda quando foi marcada (e não muda a data se já estava marcada)
         if ($optin && !(int) ($p['msg_optin'] ?? 0)) {
             DB::run('UPDATE users SET msg_optin = 1, msg_optin_at = ? WHERE id = ?', [now(), $id]);

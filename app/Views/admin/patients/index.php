@@ -1,5 +1,5 @@
 <?php
-$filters = ['all' => 'Todos', 'green' => 'Em dia', 'yellow' => 'Vencem logo', 'red' => 'Críticos', 'away' => 'Sumidos', 'noapp' => 'Sem acesso ao app', 'inactive' => 'Desativados', 'athletes' => 'Atletas', 'compete' => 'Competem', 'nocoach' => 'Sem assessoria'];
+$filters = ['all' => 'Todos', 'green' => 'Em dia', 'yellow' => 'Vencem logo', 'red' => 'Críticos', 'away' => 'Sumidos', 'noapp' => 'Sem acesso ao app', 'inactive' => 'Desativados', 'athletes' => 'Atletas', 'compete' => 'Competem', 'nocoach' => 'Sem assessoria', 'incomplete' => 'Cadastro incompleto'];
 // Nos filtros de atletas (ou ao escolher uma modalidade) a lista ganha as colunas Prova e Assessoria
 $athleteCols = in_array($filter, ['athletes', 'compete', 'nocoach'], true) || $sportId > 0;
 

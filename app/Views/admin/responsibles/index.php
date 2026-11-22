@@ -7,13 +7,12 @@
     <div class="empty"><strong>Nenhum responsável ainda</strong>Cadastre as estagiárias com o botão "Novo responsável".</div>
 <?php else: ?>
 <div class="tbl-wrap"><table class="tbl" style="min-width:0">
-    <thead><tr><th>Responsável</th><th class="r">Pacientes ativos</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Responsável</th><th class="r">Pacientes em carteira</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($list as $r): ?>
-        <tr>
-            <td><strong><?= e($r['name']) ?></strong></td>
+        <tr<?= $r['active'] ? '' : ' class="tag-soft"' ?>>
+            <td><strong><?= e($r['name']) ?></strong><?= $r['active'] ? '' : ' <span class="muted small">(desativada)</span>' ?></td>
             <td class="r num"><?php if ((int) $r['patients'] > 0): ?><a href="<?= e(url('/admin/pacientes?r=' . (int) $r['id'])) ?>"><?= (int) $r['patients'] ?></a><?php else: ?>0<?php endif; ?></td>
-            <td><?= $r['active'] ? '<span class="tag ok">ativa</span>' : '<span class="tag">desativada</span>' ?></td>
             <td class="r"><a class="btn btn-ghost btn-sm" href="<?= e(url('/admin/responsaveis/' . $r['id'])) ?>">Editar</a></td>
         </tr>
     <?php endforeach; ?>

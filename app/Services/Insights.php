@@ -108,7 +108,7 @@ final class Insights
     private static function patients(): array
     {
         return DB::all(
-            "SELECT u.id, u.status, u.renewal_date, u.responsible_id, u.plan_id,
+            "SELECT u.id, u.status, u.renewal_date, u.responsible_id, u.plan_id, u.sex,
                     COALESCE(u.joined_on, SUBSTR(u.created_at, 1, 10)) AS since
                FROM users u WHERE u.role = 'patient'"
         );
@@ -295,6 +295,30 @@ final class Insights
         return $out;
     }
 
+    /**
+     * Pacientes em carteira por sexo. O % é sobre quem TEM o sexo informado (é o que mostra qual público é maior);
+     * quem ficou sem informar aparece à parte, em "unknown". Ordem fixa: Feminino, Masculino.
+     */
+    private static function bySex(array $activePats): array
+    {
+        $count = ['F' => 0, 'M' => 0];
+        $unknown = 0;
+        foreach ($activePats as $p) {
+            $k = (string) ($p['sex'] ?? '');
+            if (isset($count[$k])) {
+                $count[$k]++;
+            } else {
+                $unknown++;
+            }
+        }
+        $known = $count['F'] + $count['M'];
+        $list = [];
+        foreach (['F' => 'Feminino', 'M' => 'Masculino'] as $k => $label) {
+            $list[] = ['key' => $k, 'name' => $label, 'count' => $count[$k], 'pct' => $known ? (int) round($count[$k] / $known * 100) : 0];
+        }
+        return ['list' => $list, 'known' => $known, 'unknown' => $unknown];
+    }
+
     /** Modalidades dos atletas ativos: name, count, pct (sobre os atletas). */
     private static function bySport(): array
     {
@@ -453,6 +477,7 @@ final class Insights
             'plans' => self::byPlan($activePats),
             'activeTotal' => count($activePats),
             'sports' => self::bySport(),
+            'sex' => self::bySex($activePats),
             'growth' => ['months' => $last6, 'pct' => $growth, 'newPeriod' => $newNow],
             'team' => $team,
             'alerts' => $alerts,

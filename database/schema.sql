@@ -27,6 +27,17 @@ CREATE TABLE users (
   birth_date DATE NULL,
   msg_optin TINYINT(1) NOT NULL DEFAULT 0,
   msg_optin_at DATETIME NULL,
+  sex CHAR(1) NULL,
+  cpf CHAR(11) NULL,
+  instagram VARCHAR(30) NULL,
+  addr_zip VARCHAR(12) NULL,
+  addr_street VARCHAR(120) NULL,
+  addr_number VARCHAR(20) NULL,
+  addr_complement VARCHAR(80) NULL,
+  addr_district VARCHAR(80) NULL,
+  addr_city VARCHAR(80) NULL,
+  addr_state VARCHAR(40) NULL,
+  addr_country VARCHAR(60) NULL,
   plan_id INT UNSIGNED NULL,
   responsible_id INT UNSIGNED NULL,
   must_change_password TINYINT(1) NOT NULL DEFAULT 1,
@@ -38,6 +49,7 @@ CREATE TABLE users (
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_email (email),
   KEY idx_users_role_status (role, status),
+  KEY idx_users_cpf (cpf),
   KEY idx_users_renewal (renewal_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

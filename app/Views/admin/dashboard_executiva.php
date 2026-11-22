@@ -39,7 +39,7 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
 <!-- 1. Cartões -->
 <div class="xkpis">
     <a class="xcard" href="<?= e(url('/admin/pacientes?st=active')) ?>">
-        <span class="xlbl"><?= icon('users', 18) ?> Pacientes ativos</span>
+        <span class="xlbl"><?= icon('users', 18) ?> Pacientes em carteira</span>
         <span class="xrow"><span><span class="xbig num"><?= (int) $c['active']['value'] ?></span><?= $trend($c['active']['trend']) ?></span><?= Charts::bars($c['active']['spark']) ?></span>
     </a>
     <a class="xcard" href="<?= e(url('/admin/financeiro')) ?>">
@@ -150,7 +150,7 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
         }
         ?>
         <?php if (!$segs): ?>
-            <div class="empty"><strong>Nenhum paciente ativo</strong>Cadastre pacientes com plano para ver a distribuição.</div>
+            <div class="empty"><strong>Nenhum paciente em carteira</strong>Cadastre pacientes com plano para ver a distribuição.</div>
         <?php else: ?>
             <div class="xcart">
                 <?= Charts::donut($segs, (string) (int) $x['activeTotal'], $x['activeTotal'] === 1 ? 'paciente' : 'pacientes') ?>
@@ -161,9 +161,20 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
                 </ul>
             </div>
         <?php endif; ?>
-        <h4 class="xsubh">Por modalidade <span class="tiny muted">(% dos atletas ativos; um paciente pode ter mais de uma)</span></h4>
+        <h4 class="xsubh">Por sexo <span class="tiny muted">(% de quem tem o sexo informado)</span></h4>
+        <?php if (!$x['sex']['known']): ?>
+            <p class="muted small">Ainda não há sexo informado. Preencha na ficha de cada paciente (ou na planilha de importação) para este gráfico aparecer.</p>
+        <?php else: ?>
+            <ul class="mbars has-n">
+                <?php foreach ($x['sex']['list'] as $s): ?>
+                    <li><span class="nm"><?= e($s['name']) ?></span><span class="mb" aria-hidden="true"><i style="width:<?= (int) $s['pct'] ?>%"></i></span><b class="num"><?= (int) $s['pct'] ?>%</b><span class="muted num">(<?= (int) $s['count'] ?>)</span></li>
+                <?php endforeach; ?>
+            </ul>
+            <?php if ($x['sex']['unknown'] > 0): ?><p class="tiny muted" style="margin:6px 0 0"><?= (int) $x['sex']['unknown'] ?> <?= $x['sex']['unknown'] === 1 ? 'paciente' : 'pacientes' ?> em carteira sem sexo informado (fora da conta).</p><?php endif; ?>
+        <?php endif; ?>
+        <h4 class="xsubh">Por modalidade <span class="tiny muted">(% dos atletas; um paciente pode ter mais de uma)</span></h4>
         <?php if (!$x['sports']['list']): ?>
-            <p class="muted small">Ainda não há atletas ativos com modalidade cadastrada.</p>
+            <p class="muted small">Ainda não há atletas com modalidade cadastrada.</p>
         <?php else: ?>
             <ul class="mbars">
                 <?php foreach (array_slice($x['sports']['list'], 0, 6) as $s): ?>
@@ -176,7 +187,7 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
 
     <!-- 4. Crescimento -->
     <section class="panel xp xp-5" aria-labelledby="h-cres">
-        <div class="xp-head"><h3 id="h-cres"><?= icon('chart', 20) ?> Crescimento da carteira</h3><span class="tiny muted">pacientes ativos no fim de cada mês</span></div>
+        <div class="xp-head"><h3 id="h-cres"><?= icon('chart', 20) ?> Crescimento da carteira</h3><span class="tiny muted">pacientes em carteira no fim de cada mês</span></div>
         <div class="xgrow">
             <div class="xhero<?= $x['growth']['pct'] !== null && $x['growth']['pct'] < 0 ? ' is-down' : '' ?>">
                 <?php if ($x['growth']['pct'] === null): ?>
@@ -188,14 +199,14 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
             <?= Charts::columns(array_column($x['growth']['months'], 'label'), array_column($x['growth']['months'], 'active')) ?>
         </div>
         <div class="tbl-wrap xmonths"><table class="tbl">
-            <thead><tr><th>Mês</th><th class="r">Novos</th><th class="r">Ativos</th></tr></thead>
+            <thead><tr><th>Mês</th><th class="r">Novos</th><th class="r">Em carteira</th></tr></thead>
             <tbody>
             <?php foreach (array_reverse($x['growth']['months']) as $m): ?>
                 <tr><td><?= e($monthLabel($m)) ?><?= $m['partial'] ? ' <span class="tag">em andamento</span>' : '' ?></td><td class="r num"><?= (int) $m['new'] ?></td><td class="r num"><?= (int) $m['active'] ?></td></tr>
             <?php endforeach; ?>
             </tbody>
         </table></div>
-        <p class="tiny muted" style="margin:10px 0 0">Novos = pacientes que começaram no mês. Ativos = pacientes com plano em dia no último dia do mês. Estimativa pela data "Paciente desde" e pelo vencimento atual de cada paciente.</p>
+        <p class="tiny muted" style="margin:10px 0 0">Novos = pacientes que começaram no mês. Em carteira = pacientes com plano em dia no último dia do mês. Estimativa pela data "Paciente desde" e pelo vencimento atual de cada paciente.</p>
     </section>
 
     <!-- 5. Equipe -->
@@ -243,7 +254,7 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
             ['bad',  $al['d7'],      'pacientes perto do vencimento (até 7 dias)', url('/admin/pacientes?v=d7')],
             ['bad',  $al['expired'], 'pacientes com plano vencido', url('/admin/pacientes?v=expired')],
             ['bad',  $al['late'],    'parcelas em atraso (inadimplência)', url('/admin/financeiro?f=late')],
-            ['warn', $al['noresp'],  'pacientes ativos sem responsável (sem acompanhamento)', url('/admin/pacientes?st=active&r=none')],
+            ['warn', $al['noresp'],  'pacientes em carteira sem responsável (sem acompanhamento)', url('/admin/pacientes?st=active&r=none')],
             ['warn', $al['away'],    'pacientes sem abrir o app há 7 dias ou mais', url('/admin/pacientes?f=away')],
             ['info', $al['risk'],    'renovações em risco (vencem em até ' . (int) $x['yellow'] . ' dias e estão sumidos)', url('/admin?aba=operacao')],
             ['info', $al['birthdays'], 'aniversariantes hoje', url('/admin/aniversarios?q=hoje')],

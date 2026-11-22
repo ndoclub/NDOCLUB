@@ -9,12 +9,12 @@
         <span class="big num"><?= (int) $pix['count'] ?></span>
         <span class="lbl">parcelas para cobrar ou conferir<?= $pix['count'] > 0 ? '<br>' . ($pix['late'] > 0 ? (int) $pix['late'] . ($pix['late'] === 1 ? ' atrasado' : ' atrasados') . ' · ' : '') . e(money_multi($pix['by'])) : '' ?></span>
     </a>
-    <a class="kpi" href="<?= e(url('/admin/pacientes?st=active')) ?>"><span class="big num"><?= (int) $stats['patients'] ?></span><span class="lbl">pacientes ativos</span></a>
+    <a class="kpi" href="<?= e(url('/admin/pacientes?st=active')) ?>"><span class="big num"><?= (int) $stats['patients'] ?></span><span class="lbl">pacientes em carteira</span></a>
     <div class="kpi"><span class="big num"><?= (int) $stats['active7'] ?></span><span class="lbl">abriram o app em 7 dias</span></div>
     <div class="kpi"><span class="big num"><?= (int) $stats['checkins'] ?></span><span class="lbl">check-ins hoje</span></div>
     <a class="kpi" href="<?= e(url('/admin/pacientes?f=yellow')) ?>"><span class="big num"><?= (int) $stats['expiring'] ?></span><span class="lbl">vencem em até <?= (int) $yellow ?> dias</span></a>
     <a class="kpi<?= $stats['expired'] > 0 ? ' alert' : '' ?>" href="<?= e(url('/admin/pacientes?f=red')) ?>"><span class="big num"><?= (int) $stats['expired'] ?></span><span class="lbl">vencidos</span></a>
-    <a class="kpi" href="<?= e(url('/admin/pacientes?f=athletes')) ?>"><span class="big num"><?= (int) $stats['athletes'] ?></span><span class="lbl">atletas ativos</span></a>
+    <a class="kpi" href="<?= e(url('/admin/pacientes?f=athletes')) ?>"><span class="big num"><?= (int) $stats['athletes'] ?></span><span class="lbl">atletas</span></a>
     <a class="kpi" href="<?= e(url('/admin/resgates')) ?>"><span class="big num"><?= (int) $stats['redemptions'] ?></span><span class="lbl">resgates pendentes</span></a>
     <a class="kpi<?= $stats['reports'] > 0 ? ' alert' : '' ?>" href="<?= e(url('/admin/moderacao')) ?>"><span class="big num"><?= (int) $stats['reports'] ?></span><span class="lbl">denúncias abertas</span></a>
 </div>

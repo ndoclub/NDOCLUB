@@ -728,3 +728,13 @@ a.xmini:hover { border-color: var(--ink); }
     .bd-tbl .bd-sub { margin-left: 0; }
     .bd-tbl .btn { white-space: nowrap; }
 }
+
+/* Atualização 08.1: bloco "Endereço" recolhível no cadastro e na ficha */
+details.addr { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); margin: 0 0 18px; padding: 0 14px; }
+details.addr > summary { cursor: pointer; list-style: none; font-weight: 700; font-size: 14px; padding: 12px 0; }
+details.addr > summary::-webkit-details-marker { display: none; }
+details.addr > summary::before { content: '▸'; color: var(--mute); margin-right: 8px; }
+details.addr[open] > summary::before { content: '▾'; }
+details.addr[open] { padding-bottom: 2px; }
+.tag-soft { opacity: .55; }
+.mbars.has-n li { grid-template-columns: minmax(80px, 110px) minmax(0, 1fr) 44px 36px; }

@@ -125,7 +125,7 @@ final class Charts
         $max = max(1.0, (float) max(array_map('floatval', $values)));
         $slot = $w / $n;
         $bw = min(40.0, $slot * 0.56);
-        $out = '<svg class="colchart" viewBox="0 0 ' . $w . ' ' . $h . '" width="100%" role="img" aria-label="Pacientes ativos por mês">';
+        $out = '<svg class="colchart" viewBox="0 0 ' . $w . ' ' . $h . '" width="100%" role="img" aria-label="Pacientes em carteira por mês">';
         $out .= '<line class="ch-axis" x1="0" y1="' . ($h - $bottom) . '" x2="' . $w . '" y2="' . ($h - $bottom) . '"/>';
         foreach (array_values($values) as $i => $v) {
             $bh = max(2.0, ((float) $v / $max) * $plotH);

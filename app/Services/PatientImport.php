@@ -26,7 +26,7 @@ final class PatientImport
     public const MAX_ROWS = 500;           // pacientes por arquivo
     public const MAX_BYTES = 2097152;      // 2 MB
     public const SHEET = 'Pacientes';      // nome da aba que o modelo usa
-    public const TEMPLATE_VERSION = '3';
+    public const TEMPLATE_VERSION = '4';
 
     // ---------------------------------------------------------------
     // Colunas do modelo (a fonte única: o modelo .xlsx, a tela de instruções e o leitor usam esta lista)
@@ -64,6 +64,61 @@ final class PatientImport
                 'Dia em que o paciente nasceu. Usada só para o aviso de aniversariantes no painel (só o admin vê).',
                 'Data no formato dd/mm/aaaa, do passado e a partir de 1900. Vazio é aceito. A autorização para receber mensagens NÃO vem da planilha: marque na ficha de cada paciente.',
                 '15/08/1990'],
+            'sex' => ['Sexo', 'Dados do paciente', false,
+                ['sexo', 'genero', 'sexo do paciente'],
+                'Feminino ou Masculino. Alimenta o gráfico da carteira no painel (só o admin vê).',
+                'Feminino, Masculino (também aceita F, M, Mulher ou Homem). Vazio = não informado.',
+                'Feminino'],
+            'cpf' => ['CPF', 'Dados do paciente', false,
+                ['cpf', 'cpf do paciente'],
+                'CPF do paciente, usado para emitir recibo e nota fiscal (só o admin vê).',
+                'Com ou sem pontos e traço. Precisa ser um CPF válido (11 dígitos). Se já existir no sistema (ou repetir na planilha), a linha é pulada como duplicada.',
+                '529.982.247-25'],
+            'instagram' => ['Instagram', 'Dados do paciente', false,
+                ['instagram', 'insta', 'perfil do instagram', 'arroba'],
+                'Perfil do paciente no Instagram.',
+                '@usuario ou o link do perfil. Letras, números, ponto e sublinhado (até 30).',
+                '@ana.exemplo'],
+            'addr_zip' => ['CEP', 'Endereço', false,
+                ['cep', 'codigo postal', 'zip'],
+                'CEP do endereço.',
+                'No Brasil, 8 números (com ou sem traço). Fora do Brasil, texto livre.',
+                '01310-100'],
+            'addr_street' => ['Rua', 'Endereço', false,
+                ['rua', 'endereco', 'logradouro', 'avenida', 'rua avenida'],
+                'Rua ou avenida.',
+                'Até 120 letras.',
+                'Av. Exemplo'],
+            'addr_number' => ['Número', 'Endereço', false,
+                ['numero', 'numero da casa', 'num'],
+                'Número do endereço.',
+                'Até 20 caracteres.',
+                '100'],
+            'addr_complement' => ['Complemento', 'Endereço', false,
+                ['complemento', 'compl'],
+                'Apartamento, bloco etc.',
+                'Até 80 letras.',
+                'Apto 12'],
+            'addr_district' => ['Bairro', 'Endereço', false,
+                ['bairro'],
+                'Bairro.',
+                'Até 80 letras.',
+                'Centro'],
+            'addr_city' => ['Cidade', 'Endereço', false,
+                ['cidade', 'municipio'],
+                'Cidade.',
+                'Até 80 letras.',
+                'São Paulo'],
+            'addr_state' => ['Estado', 'Endereço', false,
+                ['estado', 'uf', 'estado uf'],
+                'Estado (sigla).',
+                'No Brasil, a sigla (SP, RJ, MG...). Fora do Brasil, texto livre.',
+                'SP'],
+            'addr_country' => ['País', 'Endereço', false,
+                ['pais', 'country'],
+                'País do endereço.',
+                'Vazio = Brasil. Para quem mora fora, escreva o país.',
+                ''],
             'plan' => ['Plano', 'Plano e acompanhamento', false,
                 ['plano', 'nome do plano'],
                 'Nome do plano, igual ao de Admin > Planos (veja a aba Listas).',
@@ -533,8 +588,12 @@ final class PatientImport
                 $phones[$k][] = $u;
             }
         }
+        $cpfs = [];
+        foreach (DB::all("SELECT name, cpf FROM users WHERE cpf IS NOT NULL AND cpf <> ''") as $u) {
+            $cpfs[(string) $u['cpf']] = (string) $u['name'];
+        }
         $fees = Payments::feeTable();
-        return compact('plans', 'sports', 'resp', 'emails', 'names', 'phones', 'fees');
+        return compact('plans', 'sports', 'resp', 'emails', 'names', 'phones', 'cpfs', 'fees');
     }
 
     /**
@@ -548,10 +607,11 @@ final class PatientImport
         $seenEmail = [];
         $seenName = [];
         $seenPhone = [];
+        $seenCpf = [];
         $summary = ['total' => 0, 'ok' => 0, 'warn' => 0, 'dup' => 0, 'err' => 0, 'importable' => 0];
 
         foreach ($rows as $row) {
-            $r = self::validateRow((int) $row['n'], $row['raw'], $L, $seenEmail, $seenName, $seenPhone);
+            $r = self::validateRow((int) $row['n'], $row['raw'], $L, $seenEmail, $seenName, $seenPhone, $seenCpf);
             $out[] = $r;
             $summary['total']++;
             $summary[$r['status']]++;
@@ -562,7 +622,7 @@ final class PatientImport
         return ['rows' => $out, 'summary' => $summary];
     }
 
-    private static function validateRow(int $line, array $raw, array $L, array &$seenEmail, array &$seenName, array &$seenPhone): array
+    private static function validateRow(int $line, array $raw, array $L, array &$seenEmail, array &$seenName, array &$seenPhone, array &$seenCpf): array
     {
         $errors = [];
         $warns = [];
@@ -622,6 +682,26 @@ final class PatientImport
         $goal = $g('goal');
         if (mb_strlen($goal) > 120) {
             $errors[] = 'Objetivo: use até 120 letras.';
+        }
+
+        // ---- Sexo, CPF, Instagram e endereço (as mesmas regras do cadastro manual)
+        $pdIn = [];
+        foreach (PersonalData::COLUMNS as $k) {
+            $pdIn[$k] = $g($k);
+        }
+        [$pd, $pdErrors] = PersonalData::clean($pdIn);
+        foreach ($pdErrors as $pe) {
+            $errors[] = $pe;
+        }
+        if ($pd['cpf'] !== '') {
+            if (isset($L['cpfs'][$pd['cpf']])) {
+                $dups[] = 'Já existe um cadastro com este CPF (' . $L['cpfs'][$pd['cpf']] . ').';
+            }
+            if (isset($seenCpf[$pd['cpf']])) {
+                $dups[] = 'Mesmo CPF da linha ' . $seenCpf[$pd['cpf']] . ' da planilha.';
+            } else {
+                $seenCpf[$pd['cpf']] = $line;
+            }
         }
 
         // ---- Possível mesma pessoa (nome e WhatsApp)
@@ -1006,7 +1086,7 @@ final class PatientImport
             ],
             'data' => $status === 'ok' || $status === 'warn' ? [
                 'name' => $name, 'email' => $email, 'phone' => $phone !== '' ? $phone : null, 'goal' => $goal !== '' ? $goal : null,
-                'plan_id' => $plan ? (int) $plan['id'] : null, 'renewal' => $renewal, 'joined' => $joined, 'birth' => $birth, 'responsible_id' => $respId,
+                'plan_id' => $plan ? (int) $plan['id'] : null, 'renewal' => $renewal, 'joined' => $joined, 'birth' => $birth, 'pd' => $pd, 'responsible_id' => $respId,
                 'sport_ids' => array_values($sportIds), 'has_coach' => $hasCoach, 'coach_name' => $coachName,
                 'competes' => $competes, 'event_name' => $eventName !== '' ? $eventName : null, 'event_date' => $eventDate,
                 'custom' => $custom, 'custom_cur' => $cur, 'store_custom' => $storeCustom,
@@ -1041,6 +1121,11 @@ final class PatientImport
                     $failed[] = ['line' => $r['line'], 'name' => $d['name'], 'reason' => 'O e-mail já foi cadastrado enquanto você conferia a prévia.'];
                     continue;
                 }
+                $cpf = (string) ($d['pd']['cpf'] ?? '');
+                if ($cpf !== '' && DB::val('SELECT COUNT(*) FROM users WHERE cpf = ?', [$cpf])) {
+                    $failed[] = ['line' => $r['line'], 'name' => $d['name'], 'reason' => 'O CPF já foi cadastrado enquanto você conferia a prévia.'];
+                    continue;
+                }
                 $id = DB::tx(function () use ($d, $adminId) {
                     // Sem senha e sem acesso: a senha aqui é aleatória e ninguém conhece. O acesso é liberado depois, na ficha.
                     $id = DB::insert(
@@ -1049,6 +1134,7 @@ final class PatientImport
                         [$d['name'], $d['email'], password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), $d['phone'], $d['goal'],
                             $d['renewal'], $d['joined'] ?? today(), $d['birth'] ?? null, $d['plan_id'], $d['responsible_id'], now()]
                     );
+                    DB::run('UPDATE users SET ' . implode(' = ?, ', PersonalData::COLUMNS) . ' = ? WHERE id = ?', array_merge(PersonalData::dbValues($d['pd']), [$id]));
                     if ($d['store_custom'] && $d['custom'] !== null) {
                         Plans::setCustomPrice($id, $d['custom'], $d['custom_cur'], 'manual');
                     }
