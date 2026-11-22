@@ -10,6 +10,16 @@ if ($athleteOn) {
 $daysToEvent = ($athleteOn && $athlete['competes'] && $athlete['event_date']) ? days_until($athlete['event_date']) : null;
 $waWelcome = $welcome ? wa_phone_url($p['phone'], $welcome) : null;
 $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'Sáb', 7 => 'Dom'];
+$tabsDef = \App\Controllers\Admin\PatientController::ABAS;
+$lateTotal = 0;
+foreach ($payments as $pay0) { $lateTotal += (int) $pay0['late_count']; }
+// Usados no formulário de renovar e no de "registrar pagamento sem renovar" (aba Plano e financeiro)
+$sugAmount = $suggest['amount'];
+$sugCur = $suggest['currency'];
+$defMethod = array_key_exists($lastMethod, \App\Services\Payments::methods()) ? $lastMethod : 'pix';
+$defDue = $defMethod === 'cartao' ? date('Y-m-d', strtotime('+30 day')) : today();
+$planDays = $planRow ? (int) $planRow['duration_days'] : 90;
+if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
 ?>
 <div class="page-head">
     <div class="row">
@@ -20,9 +30,8 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
                 <span class="tag<?= $planStatus['tag'] ? ' ' . e($planStatus['tag']) : '' ?>"><?= e($planStatus['label']) ?></span>
                 <?php if ($p['status'] !== 'inactive') { partial('seal', ['renew' => $renew]); } ?>
                 <?php $noApp = (int) ($p['app_access'] ?? 1) === 0; $awayNow = !$noApp && (empty($p['last_seen_at']) || $p['last_seen_at'] < date('Y-m-d H:i:s', strtotime('-7 day'))); ?>
-                <?php if ($noApp): ?><span class="tag" title="Veio de importação. Gere a senha provisória (mais abaixo) para liberar o acesso.">Sem acesso ao app</span>
+                <?php if ($noApp): ?><a class="tag" href="<?= e(url(\App\Controllers\Admin\PatientController::ficha($id, 'app'))) ?>" title="Veio de importação. Gere a senha provisória na aba App do paciente para liberar o acesso.">Sem acesso ao app</a>
                 <?php else: ?><span class="tag<?= $awayNow ? ' warn' : '' ?>" title="Última vez que o paciente abriu o app"><?= !empty($p['last_seen_at']) ? 'Visto ' . e(time_ago($p['last_seen_at'])) : 'Nunca entrou no app' ?></span><?php endif; ?>
-                <?php partial('level', ['level' => $level]); ?>
                 <?php foreach ($athleteNames as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?>
                 <?php if ($planRow): ?><span class="tag"><?= $consSummary['quota'] !== null ? (int) $consSummary['done'] . ' de ' . (int) $consSummary['quota'] . ' consultas' : (int) $consSummary['done'] . ' consultas' ?></span><?php endif; ?>
                 <?php if ($respName): ?><span class="tag">Responsável: <?= e($respName) ?></span><?php endif; ?>
@@ -46,15 +55,13 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
 </div>
 <?php endif; ?>
 
-<div class="kpis">
-    <div class="kpi"><span class="big num"><?= (int) $streak ?></span><span class="lbl">dias seguidos</span></div>
-    <div class="kpi"><span class="big num"><?= pts($balance) ?></span><span class="lbl">saldo de pontos</span></div>
-    <div class="kpi"><span class="big num"><?= pts($monthPts) ?></span><span class="lbl">pontos no mês</span></div>
-    <div class="kpi"><span class="big num"><?= $rank && $rank['pts'] > 0 ? '#' . (int) $rank['pos'] : '-' ?></span><span class="lbl">ranking do mês</span></div>
-    <div class="kpi"><span class="big num"><?= (int) $workoutsMonth ?></span><span class="lbl">treinos no mês</span></div>
-    <div class="kpi"><span class="big num" style="font-size:22px"><?= $lastCheckin ? e(fmt_date($lastCheckin)) : '-' ?></span><span class="lbl">último check-in</span></div>
-</div>
+<nav class="tabs scroll" aria-label="Abas da ficha do paciente">
+    <?php foreach ($tabsDef as $tk => $tl): ?>
+        <a href="<?= e(url(\App\Controllers\Admin\PatientController::ficha($id, $tk))) ?>"<?= $aba === $tk ? ' aria-current="page"' : '' ?>><?= e($tl) ?><?php if ($tk === 'plano' && $lateTotal > 0): ?> <b class="tab-n" title="Parcelas atrasadas"><?= (int) $lateTotal ?></b><?php endif; ?></a>
+    <?php endforeach; ?>
+</nav>
 
+<?php if ($aba === 'resumo'): ?>
 <div class="cols">
 <div>
     <form class="panel" method="post" action="<?= e(url('/admin/pacientes/' . $id)) ?>">
@@ -111,7 +118,8 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
         </div>
         <div class="form-actions"><button class="btn btn-sm" type="submit">Salvar dados</button></div>
     </form>
-
+</div>
+<div>
     <form class="panel" method="post" action="<?= e(url('/admin/pacientes/' . $id . '/esporte')) ?>">
         <?= csrf_field() ?>
         <h3>Perfil esportivo</h3>
@@ -126,94 +134,23 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
     </form>
 
     <div class="panel">
-        <h3>Renovar acompanhamento</h3>
-        <p class="muted small">Soma os dias a partir do vencimento atual (ou de hoje, se já venceu) e lança o bônus de pontos. Com valor preenchido, também registra o pagamento e as parcelas em Financeiro.</p>
-        <?php
-        $sugAmount = $suggest['amount'];
-        $sugCur = $suggest['currency'];
-        $defMethod = array_key_exists($lastMethod, \App\Services\Payments::methods()) ? $lastMethod : 'pix';
-        $defDue = $defMethod === 'cartao' ? date('Y-m-d', strtotime('+30 day')) : today();
-        $planDays = $planRow ? (int) $planRow['duration_days'] : 90;
-        if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
-        ?>
-        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/renovar')) ?>" data-confirm="Confirmar a renovação?" data-pay-form data-fees="<?= e(json_encode($fees ?: new stdClass())) ?>">
+        <h3>Privacidade e exclusão (LGPD)</h3>
+        <p class="hint" style="margin-top:0">Consentimento: <?= $p['consent_at'] ? 'aceito em ' . e(fmt_datetime($p['consent_at'])) . ' (versão ' . e($p['consent_version']) . ')' : 'ainda não aceito' ?>.</p>
+        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/excluir')) ?>" data-confirm="Excluir DEFINITIVAMENTE este paciente e todos os dados dele? Não dá para desfazer.">
             <?= csrf_field() ?>
-            <div class="form-grid">
-                <div class="field"><label for="days">Período</label>
-                    <select id="days" name="days">
-                        <?php foreach ($renewChoices as $d): ?>
-                            <option value="<?= (int) $d ?>"<?= $d === $planDays ? ' selected' : '' ?>>+<?= (int) $d ?> dias<?= ($planRow && $d === (int) $planRow['duration_days']) ? ' (' . e($planRow['name']) . ')' : '' ?></option>
-                        <?php endforeach; ?>
-                    </select></div>
-                <?php partial('payment-fields', [
-                    'idp' => 'r_', 'amountName' => 'amount', 'amountId' => 'amount', 'amountLabel' => 'Valor total vendido',
-                    'amountValue' => $sugAmount !== null ? number_format($sugAmount, 2, ',', '') : '', 'amountPlaceholder' => 'Ex.: 1200,00',
-                    'currencyName' => 'currency', 'currency' => $sugCur,
-                    'method' => $defMethod, 'allowNone' => false,
-                    'installments' => 1, 'due' => $defDue,
-                    'paidMode' => 'first', 'paidChecked' => $defMethod !== 'cartao',
-                ]); ?>
-            </div>
-            <div class="form-actions"><button class="btn btn-sm" type="submit">Renovar</button></div>
+            <p class="muted small">Exclusão definitiva (pedido de exclusão pela LGPD): apaga cadastro, pontos, publicações, medidas, dieta e fotos.</p>
+            <label class="checkbox small mb"><input type="checkbox" name="confirm" value="1" required><span>Entendo que não dá para desfazer.</span></label>
+            <button class="btn btn-ghost btn-danger btn-sm" type="submit">Excluir paciente e dados</button>
         </form>
-        <p class="hint">Deixe o valor em branco para só somar os dias, sem registrar pagamento. O paciente nunca vê valores.</p>
-        <?php if ($renewals): ?>
-            <div class="tbl-wrap"><table class="tbl" style="min-width:0">
-                <thead><tr><th>Quando</th><th>De</th><th>Até</th><th class="r">Valor</th></tr></thead>
-                <tbody>
-                <?php foreach ($renewals as $r): ?>
-                    <tr><td><?= e(fmt_date($r['created_at'])) ?></td><td><?= e(fmt_date($r['previous_date'])) ?></td><td><?= e(fmt_date($r['new_date'])) ?> <span class="tag">+<?= (int) $r['days_added'] ?> d</span><?= !empty($r['plan_name']) ? '<br><span class="small muted">' . e($r['plan_name']) . '</span>' : '' ?></td>
-                        <td class="r num"><?= $r['amount'] !== null ? e(money((float) $r['amount'], 2, (string) ($r['currency'] ?? 'BRL'))) : '-' ?></td></tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table></div>
-        <?php endif; ?>
     </div>
+</div>
+</div>
 
-    <div class="panel" id="consultas">
-        <h3>Consultas presenciais</h3>
-        <?php if (!$planRow): ?>
-            <p class="muted small">Escolha o plano do paciente para acompanhar a cota de consultas.</p>
-        <?php elseif ($consSummary['quota'] === null): ?>
-            <p class="muted small"><strong class="num"><?= (int) $consSummary['done'] ?></strong> no plano atual. O plano <?= e($planRow['name']) ?> ainda não tem a quantidade de consultas definida: <a href="<?= e(url('/admin/planos/' . (int) $planRow['id'])) ?>">defina em Planos</a> para ver "x de y".</p>
-        <?php else: ?>
-            <p style="margin:0 0 12px"><strong class="num" style="font-size:26px"><?= (int) $consSummary['done'] ?> de <?= (int) $consSummary['quota'] ?></strong>
-                <span class="muted small">consultas do plano atual (<?= e($planRow['name']) ?>)</span>
-                <?= $consSummary['full'] ? '<span class="tag ok">cota completa</span>' : '<span class="tag">restam ' . (int) $consSummary['left'] . '</span>' ?></p>
-        <?php endif; ?>
-        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/consultas')) ?>">
-            <?= csrf_field() ?>
-            <div class="form-grid">
-                <div class="field"><label for="held_on">Data da consulta</label><input class="input" type="date" id="held_on" name="held_on" value="<?= e(today()) ?>" max="<?= e(today()) ?>" required></div>
-                <div class="field"><label for="qty">Quantas</label><input class="input" type="number" id="qty" name="qty" min="1" max="20" value="1" inputmode="numeric">
-                    <p class="hint">Para lançar consultas antigas de uma vez, aumente o número (todas ficam com a mesma data).</p></div>
-                <div class="field full"><label for="cnote">Observação (opcional)</label><input class="input" id="cnote" name="note" maxlength="160" placeholder="Ex.: avaliação inicial, retorno, bioimpedância"></div>
-            </div>
-            <div class="form-actions"><button class="btn btn-sm" type="submit">Registrar consulta</button></div>
-        </form>
-        <p class="hint">Ao <strong>renovar</strong> o plano, o contador "x de y" recomeça do zero. As consultas antigas continuam no histórico. Só o admin vê.</p>
-        <?php if ($consultations): ?>
-            <div class="tbl-wrap"><table class="tbl" style="min-width:0">
-                <thead><tr><th>Data</th><th>Observação</th><th>Plano</th><th class="r"></th></tr></thead>
-                <tbody>
-                <?php foreach ($consultations as $c): ?>
-                    <tr>
-                        <td class="num"><?= e(fmt_date($c['held_on'])) ?></td>
-                        <td><?= $c['note'] !== null && $c['note'] !== '' ? e($c['note']) : '<span class="muted">-</span>' ?></td>
-                        <td><?= $c['current'] ? '<span class="tag ok">atual</span>' : '<span class="tag">anterior</span>' ?></td>
-                        <td class="r"><form method="post" action="<?= e(url('/admin/consultas/' . (int) $c['id'] . '/apagar')) ?>" data-confirm="Apagar esta consulta?"><?= csrf_field() ?><button class="btn btn-ghost btn-sm" type="submit">Apagar</button></form></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table></div>
-            <p class="muted small mt"><?= (int) $consTotal ?> <?= $consTotal === 1 ? 'consulta registrada' : 'consultas registradas' ?> no total.</p>
-        <?php endif; ?>
-    </div>
-
+<?php elseif ($aba === 'plano'): ?>
     <div class="panel">
         <h3>Pagamentos</h3>
         <p class="muted small">Cada pagamento tem as parcelas (recebíveis). Cartão em reais cai sozinho no vencimento; Pix e as outras formas você confere e clica em "Recebi" (dá para anexar o comprovante). Só o admin vê.</p>
-        <?php $backHere = '/admin/pacientes/' . $id; ?>
+        <?php $backHere = \App\Controllers\Admin\PatientController::ficha($id, 'plano'); ?>
         <?php if (!$payments): ?>
             <p class="muted small" style="margin:0 0 12px">Nenhum pagamento registrado ainda.</p>
         <?php endif; ?>
@@ -267,6 +204,87 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
         </details>
     </div>
 
+    <div class="panel">
+        <h3>Renovar acompanhamento</h3>
+        <p class="muted small">Soma os dias a partir do vencimento atual (ou de hoje, se já venceu) e lança o bônus de pontos. Com valor preenchido, também registra o pagamento e as parcelas em Financeiro.</p>
+        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/renovar')) ?>" data-confirm="Confirmar a renovação?" data-pay-form data-fees="<?= e(json_encode($fees ?: new stdClass())) ?>">
+            <?= csrf_field() ?>
+            <div class="form-grid">
+                <div class="field"><label for="days">Período</label>
+                    <select id="days" name="days">
+                        <?php foreach ($renewChoices as $d): ?>
+                            <option value="<?= (int) $d ?>"<?= $d === $planDays ? ' selected' : '' ?>>+<?= (int) $d ?> dias<?= ($planRow && $d === (int) $planRow['duration_days']) ? ' (' . e($planRow['name']) . ')' : '' ?></option>
+                        <?php endforeach; ?>
+                    </select></div>
+                <?php partial('payment-fields', [
+                    'idp' => 'r_', 'amountName' => 'amount', 'amountId' => 'amount', 'amountLabel' => 'Valor total vendido',
+                    'amountValue' => $sugAmount !== null ? number_format($sugAmount, 2, ',', '') : '', 'amountPlaceholder' => 'Ex.: 1200,00',
+                    'currencyName' => 'currency', 'currency' => $sugCur,
+                    'method' => $defMethod, 'allowNone' => false,
+                    'installments' => 1, 'due' => $defDue,
+                    'paidMode' => 'first', 'paidChecked' => $defMethod !== 'cartao',
+                ]); ?>
+            </div>
+            <div class="form-actions"><button class="btn btn-sm" type="submit">Renovar</button></div>
+        </form>
+        <p class="hint">Deixe o valor em branco para só somar os dias, sem registrar pagamento. O paciente nunca vê valores.</p>
+        <?php if ($renewals): ?>
+            <div class="tbl-wrap"><table class="tbl" style="min-width:0">
+                <thead><tr><th>Quando</th><th>De</th><th>Até</th><th class="r">Valor</th></tr></thead>
+                <tbody>
+                <?php foreach ($renewals as $r): ?>
+                    <tr><td><?= e(fmt_date($r['created_at'])) ?></td><td><?= e(fmt_date($r['previous_date'])) ?></td><td><?= e(fmt_date($r['new_date'])) ?> <span class="tag">+<?= (int) $r['days_added'] ?> d</span><?= !empty($r['plan_name']) ? '<br><span class="small muted">' . e($r['plan_name']) . '</span>' : '' ?></td>
+                        <td class="r num"><?= $r['amount'] !== null ? e(money((float) $r['amount'], 2, (string) ($r['currency'] ?? 'BRL'))) : '-' ?></td></tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table></div>
+        <?php endif; ?>
+    </div>
+
+<?php elseif ($aba === 'acompanhamento'): ?>
+<div class="cols">
+<div>
+    <div class="panel" id="consultas">
+        <h3>Consultas presenciais</h3>
+        <?php if (!$planRow): ?>
+            <p class="muted small">Escolha o plano do paciente para acompanhar a cota de consultas.</p>
+        <?php elseif ($consSummary['quota'] === null): ?>
+            <p class="muted small"><strong class="num"><?= (int) $consSummary['done'] ?></strong> no plano atual. O plano <?= e($planRow['name']) ?> ainda não tem a quantidade de consultas definida: <a href="<?= e(url('/admin/planos/' . (int) $planRow['id'])) ?>">defina em Planos</a> para ver "x de y".</p>
+        <?php else: ?>
+            <p style="margin:0 0 12px"><strong class="num" style="font-size:26px"><?= (int) $consSummary['done'] ?> de <?= (int) $consSummary['quota'] ?></strong>
+                <span class="muted small">consultas do plano atual (<?= e($planRow['name']) ?>)</span>
+                <?= $consSummary['full'] ? '<span class="tag ok">cota completa</span>' : '<span class="tag">restam ' . (int) $consSummary['left'] . '</span>' ?></p>
+        <?php endif; ?>
+        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/consultas')) ?>">
+            <?= csrf_field() ?>
+            <div class="form-grid">
+                <div class="field"><label for="held_on">Data da consulta</label><input class="input" type="date" id="held_on" name="held_on" value="<?= e(today()) ?>" max="<?= e(today()) ?>" required></div>
+                <div class="field"><label for="qty">Quantas</label><input class="input" type="number" id="qty" name="qty" min="1" max="20" value="1" inputmode="numeric">
+                    <p class="hint">Para lançar consultas antigas de uma vez, aumente o número (todas ficam com a mesma data).</p></div>
+                <div class="field full"><label for="cnote">Observação (opcional)</label><input class="input" id="cnote" name="note" maxlength="160" placeholder="Ex.: avaliação inicial, retorno, bioimpedância"></div>
+            </div>
+            <div class="form-actions"><button class="btn btn-sm" type="submit">Registrar consulta</button></div>
+        </form>
+        <p class="hint">Ao <strong>renovar</strong> o plano, o contador "x de y" recomeça do zero. As consultas antigas continuam no histórico. Só o admin vê.</p>
+        <?php if ($consultations): ?>
+            <div class="tbl-wrap"><table class="tbl" style="min-width:0">
+                <thead><tr><th>Data</th><th>Observação</th><th>Plano</th><th class="r"></th></tr></thead>
+                <tbody>
+                <?php foreach ($consultations as $c): ?>
+                    <tr>
+                        <td class="num"><?= e(fmt_date($c['held_on'])) ?></td>
+                        <td><?= $c['note'] !== null && $c['note'] !== '' ? e($c['note']) : '<span class="muted">-</span>' ?></td>
+                        <td><?= $c['current'] ? '<span class="tag ok">atual</span>' : '<span class="tag">anterior</span>' ?></td>
+                        <td class="r"><form method="post" action="<?= e(url('/admin/consultas/' . (int) $c['id'] . '/apagar')) ?>" data-confirm="Apagar esta consulta?"><?= csrf_field() ?><button class="btn btn-ghost btn-sm" type="submit">Apagar</button></form></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table></div>
+            <p class="muted small mt"><?= (int) $consTotal ?> <?= $consTotal === 1 ? 'consulta registrada' : 'consultas registradas' ?> no total.</p>
+        <?php endif; ?>
+    </div>
+</div>
+<div>
     <form class="panel" method="post" action="<?= e(url('/admin/pacientes/' . $id . '/dieta')) ?>" enctype="multipart/form-data">
         <?= csrf_field() ?>
         <h3>Dieta</h3>
@@ -287,8 +305,38 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
             <?= csrf_field() ?><button class="link-btn danger small" type="submit">Remover PDF</button>
         </form>
     <?php endif; ?>
+
+    <div class="panel">
+        <h3>Medidas registradas</h3>
+        <?php if ($measures): ?>
+        <div class="tbl-wrap"><table class="tbl" style="min-width:0">
+            <thead><tr><th>Data</th><th class="r">Peso</th><th class="r">Cintura</th></tr></thead>
+            <tbody>
+            <?php foreach ($measures as $m): ?>
+                <tr><td><?= e(fmt_date($m['measured_on'])) ?></td><td class="r num"><?= e(number_format((float) $m['weight_kg'], 1, ',', '.')) ?> kg</td>
+                    <td class="r num"><?= $m['waist_cm'] !== null ? e(number_format((float) $m['waist_cm'], 1, ',', '.')) . ' cm' : '-' ?></td></tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table></div>
+        <?php else: ?>
+        <p class="muted small" style="margin:0">O paciente ainda não registrou peso nem cintura no app.</p>
+        <?php endif; ?>
+    </div>
+</div>
 </div>
 
+<?php else: ?>
+<p class="muted small" style="margin:0 0 12px">Tudo o que o paciente faz e ganha dentro do app. Nível atual: <?php partial('level', ['level' => $level]); ?></p>
+<div class="kpis">
+    <div class="kpi"><span class="big num"><?= (int) $streak ?></span><span class="lbl">dias seguidos</span></div>
+    <div class="kpi"><span class="big num"><?= pts($balance) ?></span><span class="lbl">saldo de pontos</span></div>
+    <div class="kpi"><span class="big num"><?= pts($monthPts) ?></span><span class="lbl">pontos no mês</span></div>
+    <div class="kpi"><span class="big num"><?= $rank && $rank['pts'] > 0 ? '#' . (int) $rank['pos'] : '-' ?></span><span class="lbl">ranking do mês</span></div>
+    <div class="kpi"><span class="big num"><?= (int) $workoutsMonth ?></span><span class="lbl">treinos no mês</span></div>
+    <div class="kpi"><span class="big num" style="font-size:22px"><?= $lastCheckin ? e(fmt_date($lastCheckin)) : '-' ?></span><span class="lbl">último check-in</span></div>
+</div>
+
+<div class="cols">
 <div>
     <div class="panel">
         <h3>Pontos</h3>
@@ -320,7 +368,8 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
         </table></div>
         <?php endif; ?>
     </div>
-
+</div>
+<div>
     <div class="panel">
         <div class="row-between"><h3 style="margin:0">Treinos deste paciente</h3>
             <a class="btn btn-ghost btn-sm" href="<?= e(url('/admin/treinos/novo?user_id=' . $id)) ?>">Novo treino</a></div>
@@ -335,23 +384,8 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
         <?php else: ?><p class="muted small mt" style="margin-bottom:0">Nenhum treino individual. Treinos gerais (para todos) aparecem para ele também.</p><?php endif; ?>
     </div>
 
-    <?php if ($measures): ?>
     <div class="panel">
-        <h3>Medidas registradas</h3>
-        <div class="tbl-wrap"><table class="tbl" style="min-width:0">
-            <thead><tr><th>Data</th><th class="r">Peso</th><th class="r">Cintura</th></tr></thead>
-            <tbody>
-            <?php foreach ($measures as $m): ?>
-                <tr><td><?= e(fmt_date($m['measured_on'])) ?></td><td class="r num"><?= e(number_format((float) $m['weight_kg'], 1, ',', '.')) ?> kg</td>
-                    <td class="r num"><?= $m['waist_cm'] !== null ? e(number_format((float) $m['waist_cm'], 1, ',', '.')) . ' cm' : '-' ?></td></tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table></div>
-    </div>
-    <?php endif; ?>
-
-    <div class="panel">
-        <h3>Acesso e privacidade</h3>
+        <h3>Acesso ao app</h3>
         <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/senha')) ?>" data-confirm="<?= (int) ($p['app_access'] ?? 1) === 0 ? 'Liberar o acesso e gerar a senha provisória?' : 'Gerar uma nova senha provisória? A senha atual deixa de funcionar.' ?>">
             <?= csrf_field() ?>
             <?php if ((int) ($p['app_access'] ?? 1) === 0): ?>
@@ -362,14 +396,7 @@ $weekdays = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex', 6 => 'S
                 <button class="btn btn-ghost btn-sm" type="submit">Gerar nova senha provisória</button>
             <?php endif; ?>
         </form>
-        <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
-        <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/excluir')) ?>" data-confirm="Excluir DEFINITIVAMENTE este paciente e todos os dados dele? Não dá para desfazer.">
-            <?= csrf_field() ?>
-            <p class="muted small">Exclusão definitiva (pedido de exclusão pela LGPD): apaga cadastro, pontos, publicações, medidas, dieta e fotos.</p>
-            <label class="checkbox small mb"><input type="checkbox" name="confirm" value="1" required><span>Entendo que não dá para desfazer.</span></label>
-            <button class="btn btn-ghost btn-danger btn-sm" type="submit">Excluir paciente e dados</button>
-        </form>
-        <p class="hint">Consentimento: <?= $p['consent_at'] ? 'aceito em ' . e(fmt_datetime($p['consent_at'])) . ' (versão ' . e($p['consent_version']) . ')' : 'ainda não aceito' ?>.</p>
     </div>
 </div>
 </div>
+<?php endif; ?>

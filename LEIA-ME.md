@@ -182,7 +182,7 @@ Mesmo processo, **depois** das atualizações 01 a 04:
 - **Status:** *Ativo* = plano em dia (vence hoje ou depois). *Inativo* = o plano venceu e não renovou. *Desativado* = conta bloqueada pelo Gabriel (não consegue entrar). *Sem data* = ainda sem vencimento. É calculado sozinho pela data de vencimento.
 - **Ordenar:** clique no título da coluna (clicar de novo inverte; a setinha mostra o sentido). Também dá para escolher em **Ordenar** (fica útil no celular). Padrão: nome de A a Z.
 - **Filtros** (combinam entre si e com os botões Em dia, Vencem logo, Atletas...): **Status**, **Vencimento** (vencidos, 0 a 7, 8 a 15, 16 a 30, 31 a 60, mais de 60 dias, sem data: serve para o plano de ação "vence em 15 dias, 30 dias..."), **Responsável** (cada estagiária ou "sem responsável"), **Consultas** (ainda têm a fazer, cota completa, nenhuma feita, plano sem cota), além de Plano e Modalidade. "Limpar filtros" volta ao começo.
-- **Consultas presenciais:** cada plano tem uma **cota** (Admin → Planos). Na ficha do paciente, painel **Consultas presenciais**, você registra cada consulta com a data e uma observação opcional (dá para lançar várias de uma vez, útil para quem já fez consultas antes do sistema). Ao **renovar** o plano o contador recomeça do zero; as consultas antigas ficam no histórico como "anterior". Registrou errado? **Apagar**.
+- **Consultas presenciais:** cada plano tem uma **cota** (Admin → Planos). Na ficha do paciente, aba **Acompanhamento** → painel **Consultas presenciais**, você registra cada consulta com a data e uma observação opcional (dá para lançar várias de uma vez, útil para quem já fez consultas antes do sistema). Ao **renovar** o plano o contador recomeça do zero; as consultas antigas ficam no histórico como "anterior". Registrou errado? **Apagar**.
 - **Responsáveis (modo babá):** por enquanto as estagiárias **não entram no sistema**: é só uma etiqueta. Para atribuir em massa: na lista, marque os pacientes (a caixinha do topo marca todos os que aparecem), escolha a estagiária em **"Atribuir os marcados a…"** e clique **Aplicar**. Dica: filtre por "Sem responsável" e marque todos para distribuir de uma vez. Também dá para escolher o responsável no cadastro e na ficha de cada paciente. Responsável não é apagado, só desativado.
 - **Privacidade:** responsável e consultas são só do painel do admin. O paciente nunca vê. Ao excluir um paciente (LGPD), as consultas dele também são apagadas.
 - **Ainda não existe:** login próprio para as estagiárias (cada uma ver só os pacientes dela, sem valores). Fica para uma próxima etapa, junto com a revisão de segurança.
@@ -211,7 +211,7 @@ Mesmo processo, **depois** das atualizações 01 a 05:
 - **Consultas já feitas:** entram no plano atual com a data da importação e a observação "Importado da planilha (data real não informada)". O contador "x de y" já fica certo; você pode apagar e relançar com a data real, se quiser.
 - **Limites:** até **500 pacientes** por arquivo e **2 MB**. Aceita `.xlsx` (Excel) e `.csv` (Excel em português, vírgula ou ponto e vírgula). A ordem das colunas pode mudar; colunas que não fazem parte do modelo são ignoradas (a prévia avisa quais).
 
-**Paciente importado não ganha senha nem acesso ao app.** Ele entra "sem acesso ao app": não consegue entrar, não aparece no ranking nem para outros pacientes, e não conta como "sumido". Para liberar, abra a ficha dele → **Liberar acesso e gerar senha provisória** → envie pelo WhatsApp. Na lista, o botão **Sem acesso ao app** mostra todos que ainda faltam liberar.
+**Paciente importado não ganha senha nem acesso ao app.** Ele entra "sem acesso ao app": não consegue entrar, não aparece no ranking nem para outros pacientes, e não conta como "sumido". Para liberar, abra a ficha dele → aba **App do paciente** → **Liberar acesso e gerar senha provisória** → envie pelo WhatsApp. Na lista, o botão **Sem acesso ao app** mostra todos que ainda faltam liberar.
 
 **Privacidade (LGPD):** a planilha tem dados pessoais. Não envie por WhatsApp ou e-mail e apague o arquivo do computador depois de importar (o sistema não guarda o arquivo, só o resultado). Valores (plano, combinado, pagamentos) continuam **só do admin**. Antes de usar com pacientes **reais**, faça um teste com 2 ou 3 pacientes fictícios.
 
@@ -273,6 +273,23 @@ Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.
 - **Planilha de importação**: modelo **versão 4**, com as colunas novas (Sexo, CPF, Instagram, CEP, Rua, Número, Complemento, Bairro, Cidade, Estado, País). **Baixe o modelo de novo.** CPF repetido (no sistema ou dentro da planilha) vira "Duplicado". Planilhas antigas (versão 3) continuam funcionando.
 - **Proteção extra**: se uma aba da ficha ficou aberta de antes da atualização e você salvar nela, os dados novos **não** são apagados.
 - **LGPD:** CPF e endereço são dados pessoais. Peça à revisão jurídica para incluir no Termo (`/termos`) a finalidade (emitir recibo e nota fiscal; envio de brindes) e confirme com o dev como o CPF deve ser protegido no banco em produção.
+
+### Atualização 08.2 (Ficha do paciente em abas; menu em grupos)
+**Não tem SQL.** Só atualize os arquivos (`git pull`, ou copie a pasta nova por cima) e aperte **Ctrl + F5**. Ordem das atualizações de banco, para quem ainda não fez todas: ... → 07 → 08 → 08.1 (a 08.2 não mexe no banco).
+
+**O que mudou** (nada foi apagado; só mudou de lugar):
+- **Ficha do paciente em 4 abas**, para separar o trabalho do dia a dia da equipe do que é do app do paciente:
+  - **Resumo** (abre sempre por aqui): *Dados do paciente* (cadastro, plano, vencimento, responsável, acesso), *Perfil esportivo* e, no fim, *Privacidade e exclusão (LGPD)*.
+  - **Plano e financeiro**: *Pagamentos* (parcelas, Recebi, Cobrar, comprovante) e *Renovar acompanhamento*. Quando há **parcela atrasada**, a aba mostra uma bolinha vermelha com o número.
+  - **Acompanhamento**: *Consultas presenciais*, *Dieta* e *Medidas registradas* (peso e cintura que o paciente lança no app).
+  - **App do paciente**: dias seguidos, saldo de pontos, pontos no mês, ranking do mês, treinos no mês, último check-in, **nível**, **Pontos** (lançar no extrato e ver o extrato), **Treinos deste paciente** e **Acesso ao app** (senha provisória, liberar acesso).
+- **Topo da ficha** ficou só com o que a equipe usa: situação, dias para vencer, "Visto…", modalidades, consultas "x de y", responsável, Instagram e plano com valor. O **nível** (Bronze/Prata/Ouro/Black) foi para a aba App do paciente.
+- **Cada botão volta para a aba onde você estava** (por exemplo, ao registrar um pagamento você continua em Plano e financeiro; ao lançar pontos, em App do paciente). A mensagem de boas-vindas (senha provisória) continua aparecendo no alto da ficha, em qualquer aba, e só uma vez.
+- **Etiqueta "Sem acesso ao app"** (paciente importado) agora é um link que leva direto à aba App do paciente, onde fica o botão de liberar.
+- **Menu lateral em grupos:** **Dia a dia** (Painel, Pacientes, Aniversários, Financeiro) · **Cadastros** (Planos, Responsáveis, Modalidades) · **App do paciente** (Treinos, Ranking, Loja, Resgates, Regras de pontos, Moderação, Ver o feed) · **Sistema** (Configurações, Auditoria). O item da tela em que você está continua destacado, também no celular (☰).
+- **Celular:** as abas da ficha rolam para o lado quando não cabem; as abas Plano e Acompanhamento não ficam mais largas que a tela; o menu ficou mais compacto para caber sem rolar.
+- **Privacidade e regras:** nada mudou. Só o admin vê a ficha; o paciente continua sem ver valores, CPF, endereço, sexo, nascimento nem nada do financeiro.
+- **Próximo passo:** a Atualização 09 (**Leads**) entra no grupo **Dia a dia** do menu.
 
 ### Acessos para teste
 | Perfil | E-mail | Senha |
@@ -380,7 +397,7 @@ Ideal: faça no celular e depois no computador.
 
 ### E4. Financeiro (só o Gabriel vê)
 - [ ] **Taxas do cartão:** Admin → Financeiro → **Taxas do cartão** → preencher Visa (à vista, 2–6x, 7–12x) → Salvar. Voltar à tela e ver os números gravados.
-- [ ] **Novo paciente com cartão:** *Novo paciente* → seção **Pagamento** → valor, forma **Cartão**, **12x**, bandeira Visa → Cadastrar. Na ficha, painel **Pagamentos** mostra "Cartão · 12x", a bandeira, a taxa e 12 parcelas com valor líquido.
+- [ ] **Novo paciente com cartão:** *Novo paciente* → seção **Pagamento** → valor, forma **Cartão**, **12x**, bandeira Visa → Cadastrar. Na ficha, aba **Plano e financeiro** → painel **Pagamentos** mostra "Cartão · 12x", a bandeira, a taxa e 12 parcelas com valor líquido.
 - [ ] **Cartão cai sozinho:** a 1ª parcela fica na data certa (se cair em fim de semana ou feriado nacional, passa para o próximo dia útil). **Não existe** botão Recebi/Desfazer no cartão. Parcela vencida aparece como recebida.
 - [ ] **Novo paciente com Pix parcelado:** forma **Pix**, 6x, data da 1ª combinada → as parcelas aparecem com "Parcela 1/6 de R$ …".
 - [ ] **Pix para cobrar e conferir:** parcela com vencimento hoje aparece na seção com botão **Cobrar** (abre o WhatsApp com a mensagem pronta) e **Recebi**. O número no menu Financeiro e o cartão do Painel batem com a lista.
@@ -388,7 +405,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Vendido × Já caiu × Falta cair:** vender um anual hoje → **Vendido** sobe o valor cheio, **Já caiu** não muda (cartão só cai nas datas das parcelas). Pix à vista já recebido sobe nos dois.
 - [ ] **Cancelar / Reativar** uma parcela (chargeback): ela sai dos totais; **Reativar** devolve.
 - [ ] **Dólar/euro:** forma **Wise**, moeda **US$**; ao marcar "Recebi", informar o **R$ que caiu**. O "já caiu" usa esse R$.
-- [ ] **Registrar pagamento sem renovar:** na ficha, contrato antigo com algumas parcelas já recebidas.
+- [ ] **Registrar pagamento sem renovar:** na ficha, aba **Plano e financeiro**, contrato antigo com algumas parcelas já recebidas.
 - [ ] **Planos:** coluna clicar no número de **Pacientes em carteira** abre a lista filtrada. (A coluna "≈ por mês" foi removida na 08.1.) Mudar o valor de um plano → aviso de quantos pacientes mantêm o valor antigo até renovar.
 - [ ] **Privacidade (importante):** entrar como paciente e passar pelas telas → **nenhum R$, US$ ou € em lugar nenhum**. Abrir `/admin/financeiro` e o endereço de um comprovante como paciente → bloqueado.
 - [ ] **Excluir paciente de teste** (LGPD): os pagamentos dele somem do Financeiro.
@@ -401,7 +418,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Vencimento:** filtro **16 a 30 dias** mostra só quem vence nessa faixa. Conferir a data na coluna Vencimento.
 - [ ] **Ordenar:** clicar em **Vencimento** (mais próximo primeiro), clicar de novo (mais distante primeiro). Clicar em **Pontos**, **Consultas**, **Responsável**. O filtro escolhido não se perde ao ordenar.
 - [ ] **Sumido:** paciente que não abre o app há 7+ dias mostra **sumido** ao lado do status; o botão **Sumidos** lista só eles. Na ficha, a etiqueta "Visto ..." mostra a última vez que ele entrou.
-- [ ] **Registrar consulta:** ficha → **Consultas presenciais** → data de hoje → **Registrar consulta**. Mostra "1 de 4", "restam 3". Data futura é recusada. Quantidade 2 lança duas de uma vez. **Apagar** remove.
+- [ ] **Registrar consulta:** ficha → aba **Acompanhamento** → **Consultas presenciais** → data de hoje → **Registrar consulta**. Mostra "1 de 4", "restam 3". Data futura é recusada. Quantidade 2 lança duas de uma vez. **Apagar** remove.
 - [ ] **Cota completa:** ao chegar em "4 de 4" aparece **cota completa** na ficha e **completa** na lista; o filtro **Cota de consultas completa** lista o paciente.
 - [ ] **Renovar zera o contador:** renovar o paciente → volta para "0 de 4"; o histórico mostra as consultas antigas como **anterior**.
 - [ ] **Privacidade (importante):** entrar como paciente → nenhuma tela mostra responsável nem consultas. Abrir `/admin/responsaveis` como paciente → bloqueado.
@@ -413,7 +430,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Erro:** apague o e-mail de uma linha e envie de novo → **Erro** em vermelho, com o motivo. Baixe o **relatório dos problemas**.
 - [ ] **Duplicado:** envie a mesma planilha duas vezes (depois de importar a primeira) → todas **Duplicado**, nada novo é criado.
 - [ ] **Confirmar:** os pacientes aparecem em **Pacientes → Sem acesso ao app**. Pagamentos informados aparecem em **Financeiro**.
-- [ ] **Liberar acesso:** ficha do paciente → **Liberar acesso e gerar senha provisória** → entrar com ela numa janela anônima → pede o primeiro acesso.
+- [ ] **Liberar acesso:** ficha do paciente → aba **App do paciente** → **Liberar acesso e gerar senha provisória** → entrar com ela numa janela anônima → pede o primeiro acesso.
 - [ ] **Privacidade (importante):** entrar como paciente → importados sem acesso não aparecem no ranking nem em `/u/número`; nenhuma tela mostra valores. Como paciente, abrir `/admin/importar` → bloqueado.
 - [ ] **Excluir paciente importado de teste** (LGPD): consultas, pagamentos e perfil esportivo dele somem junto.
 
@@ -453,6 +470,19 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Importação:** baixe o modelo de novo (diz "Versão 4" e tem as colunas novas). Teste com 2 pacientes fictícios, um deles com CPF repetido → aparece como Duplicado.
 - [ ] **Privacidade (importante):** entrar como paciente → nenhuma tela mostra CPF, endereço, Instagram ou sexo (nem o seu, nem o dos outros).
 
+### E8.2. Ficha do paciente em abas e menu em grupos
+- [ ] **Abas:** abra a ficha de um paciente → aparecem **Resumo**, **Plano e financeiro**, **Acompanhamento** e **App do paciente**; a ficha abre no **Resumo** e a aba atual fica sublinhada.
+- [ ] **Resumo:** *Dados do paciente* (com CPF, endereço, plano, vencimento, responsável), *Perfil esportivo* e, no fim, *Privacidade e exclusão (LGPD)*. Não aparecem pontos, pagamentos nem dieta aqui.
+- [ ] **Plano e financeiro:** *Pagamentos* e *Renovar acompanhamento*. Registre um pagamento e clique em **Recebi** numa parcela → você **continua nesta aba**. Um paciente com parcela atrasada mostra a **bolinha vermelha** no nome da aba.
+- [ ] **Acompanhamento:** registre uma consulta, salve um link de dieta e veja as medidas → cada botão **volta para a aba Acompanhamento**.
+- [ ] **App do paciente:** os 6 números (dias seguidos, saldo, pontos no mês, ranking, treinos, último check-in), o nível, **Lançar no extrato** (continua nesta aba e o lançamento aparece no extrato), **Treinos deste paciente** e **Acesso ao app**. **Gerar nova senha provisória** → fica nesta aba e a mensagem pronta aparece no alto.
+- [ ] **Topo:** sem o nível; com situação, dias para vencer, "Visto…", modalidades, consultas, responsável, Instagram e plano. É igual em todas as abas.
+- [ ] **Cadastro novo:** *Novo paciente* → Cadastrar → abre a ficha no Resumo com a **mensagem de boas-vindas** (só aparece uma vez).
+- [ ] **Paciente importado:** a etiqueta **Sem acesso ao app** leva à aba App do paciente, onde está o botão **Liberar acesso**.
+- [ ] **Menu lateral:** 4 grupos (Dia a dia, Cadastros, App do paciente, Sistema) com todos os itens de antes, e o item da tela atual destacado. No celular (☰) cabe na tela.
+- [ ] **Celular:** as 4 abas rolam para o lado; nenhuma tela da ficha tem rolagem horizontal; as tabelas de parcelas rolam dentro do próprio quadro.
+- [ ] **Privacidade (importante):** entrar como paciente e tentar abrir `/admin/pacientes/1?aba=app` → bloqueado. O app do paciente não tem abas nem o menu do admin.
+
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
 - [ ] O painel admin no celular abre o menu pelo botão ☰ (gaveta lateral).
@@ -465,9 +495,9 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **987 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **1077 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
-> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), aniversários (janelas, 29/02, autorização, mensagem editável, privacidade), cadastro com sexo, CPF (dígitos, duplicado), Instagram e endereço (Brasil e exterior), importação v4 e gráfico por sexo (conferido contra cálculo independente), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
+> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), aniversários (janelas, 29/02, autorização, mensagem editável, privacidade), cadastro com sexo, CPF (dígitos, duplicado), Instagram e endereço (Brasil e exterior), importação v4 e gráfico por sexo (conferido contra cálculo independente), ficha em abas (cada coisa na aba certa, cada botão volta para a aba certa, privacidade) e menu em grupos, financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
 > ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, os
 > arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql`, `atualizacao_04_financeiro_v2.sql`, `atualizacao_05_pacientes.sql`, `atualizacao_06_importacao.sql`, `atualizacao_07_painel.sql`, `atualizacao_08_aniversarios.sql` e `atualizacao_08b_cadastro.sql`) é o primeiro teste a fazer.
@@ -511,6 +541,7 @@ Ideal: faça no celular e depois no computador.
 | **Leads** (Instagram, WhatsApp, indicação) com funil de conversão no painel gerencial; entrada manual primeiro | ⏭️ Próxima rodada (atualização 09) |
 | **Aniversários**: data de nascimento, aniversariantes do dia/semana/mês, botão de WhatsApp com mensagem pronta e editável, caixinha de autorização | ✅ **Neste MVP** (atualização 08) |
 | **Cadastro completo**: sexo (gráfico por sexo na carteira), CPF para recibo/nota fiscal, Instagram, endereço completo, filtro "Cadastro incompleto"; telas de Planos/Responsáveis/Modalidades mais limpas | ✅ **Neste MVP** (atualização 08.1) |
+| **Ficha do paciente em abas** (Resumo, Plano e financeiro, Acompanhamento, App do paciente) e **menu lateral em grupos** (Dia a dia, Cadastros, App do paciente, Sistema) | ✅ **Neste MVP** (atualização 08.2) |
 | **Aniversário automático** por e-mail e WhatsApp (precisa de hospedagem, serviço de e-mail, API oficial do WhatsApp, autorização do paciente e revisão jurídica) | ⏭️ Depois da hospedagem |
 | Estagiárias com **login próprio** (cada uma vê só os pacientes dela, sem valores), mensagem de ação por faixa de vencimento (15/30 dias), acompanhamento da renovação | ⏭️ Próxima rodada (pede revisão de segurança) |
 | Financeiro, próximos passos: **notificação push** da cobrança do dia, taxa de renovação, previsão por mês, acompanhamento da renovação (conversei / vai renovar / não vai), marcador "cobrado em", mensagem de cobrança editável, importação de **renovações/histórico** por planilha | ⏭️ Próxima rodada |

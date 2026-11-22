@@ -20,6 +20,19 @@ use App\Services\Streak;
 
 final class PatientController
 {
+    /** Abas da ficha do paciente (?aba=). A primeira é a padrão. */
+    public const ABAS = ['resumo' => 'Resumo', 'plano' => 'Plano e financeiro', 'acompanhamento' => 'Acompanhamento', 'app' => 'App do paciente'];
+
+    /** Endereço da ficha já na aba certa (depois de salvar algo, o admin volta para onde estava). */
+    public static function ficha(int $id, string $aba = 'resumo', string $ancora = ''): string
+    {
+        $url = '/admin/pacientes/' . $id;
+        if ($aba !== 'resumo' && isset(self::ABAS[$aba])) {
+            $url .= '?aba=' . $aba;
+        }
+        return $url . ($ancora !== '' ? '#' . $ancora : '');
+    }
+
     /**
      * Ordenações possíveis da lista: chave => [rótulo, texto crescente, texto decrescente, sentido inicial,
      * expressão SQL, "vazio por último"]. A chave vem da URL, então só estas valem (lista fechada).
@@ -246,12 +259,12 @@ final class PatientController
         );
         if ($err !== null) {
             flash('err', $err);
-            redirect('/admin/pacientes/' . $id . '#consultas');
+            redirect(self::ficha($id, 'acompanhamento', 'consultas'));
         }
         $qty = max(1, (int) ($_POST['qty'] ?? 1));
         Audit::log((int) Auth::id(), 'consultation_add', 'user', $id, $qty . ' consulta(s) em ' . (input('held_on') ?: today()));
         flash('ok', $qty === 1 ? 'Consulta registrada.' : $qty . ' consultas registradas.');
-        redirect('/admin/pacientes/' . $id . '#consultas');
+        redirect(self::ficha($id, 'acompanhamento', 'consultas'));
     }
 
     /** Apaga uma consulta registrada por engano. */
@@ -264,7 +277,7 @@ final class PatientController
         }
         Audit::log((int) Auth::id(), 'consultation_delete', 'user', (int) $row['user_id'], 'consulta de ' . $row['held_on']);
         flash('ok', 'Consulta apagada.');
-        redirect('/admin/pacientes/' . (int) $row['user_id'] . '#consultas');
+        redirect(self::ficha((int) $row['user_id'], 'acompanhamento', 'consultas'));
     }
 
     public function create(): void
@@ -460,7 +473,12 @@ final class PatientController
         $suggest = Plans::renewalSuggestion($id);
         $lastMethod = $payments ? (string) $payments[0]['method'] : 'pix';
         $consSummary = Consultations::summary(Consultations::done($id), $planRow['consultations_included'] ?? null);
+        $aba = (string) ($_GET['aba'] ?? 'resumo');
+        if (!isset(self::ABAS[$aba])) {
+            $aba = 'resumo';
+        }
         View::render('admin/patients/show', [
+            'aba' => $aba,
             'consSummary' => $consSummary,
             'consultations' => Consultations::forUser($id),
             'consTotal' => Consultations::total($id),
@@ -598,12 +616,12 @@ final class PatientController
         $days = (int) ($_POST['days'] ?? 0);
         if (!in_array($days, Plans::renewalChoices(), true)) {
             flash('err', 'Escolha um período de renovação.');
-            redirect('/admin/pacientes/' . $id);
+            redirect(self::ficha($id, 'plano'));
         }
         $amount = parse_money((string) ($_POST['amount'] ?? ''));
         if ($amount === false) {
             flash('err', 'Valor da renovação inválido. Use números, por exemplo 450,00.');
-            redirect('/admin/pacientes/' . $id);
+            redirect(self::ficha($id, 'plano'));
         }
         $cur = currency_or_brl($_POST['currency'] ?? 'BRL');
 
@@ -613,7 +631,7 @@ final class PatientController
             $parsed = $this->parsePayment($amount, $cur, 'first_paid');
             if (is_string($parsed)) {
                 flash('err', $parsed);
-                redirect('/admin/pacientes/' . $id);
+                redirect(self::ficha($id, 'plano'));
             }
             $pay = $parsed;
         }
@@ -628,7 +646,7 @@ final class PatientController
         }
         Audit::log((int) Auth::id(), 'renewal', 'user', $id, $detail);
         flash('ok', 'Renovado até ' . fmt_date($new) . '. O bônus de pontos foi lançado.' . ($pay ? ' Pagamento e parcelas registrados em Financeiro.' : ''));
-        redirect('/admin/pacientes/' . $id);
+        redirect(self::ficha($id, 'plano'));
     }
 
     /**
@@ -693,16 +711,16 @@ final class PatientController
         }
         if ($total === false || $total === null || $total <= 0) {
             flash('err', 'Informe o valor total do pagamento. Use números, por exemplo 1200,00.');
-            redirect('/admin/pacientes/' . $id);
+            redirect(self::ficha($id, 'plano'));
         }
         if (!Payments::validDate($soldOn) || $soldOn > today()) {
             flash('err', 'Data da venda inválida (não pode ser no futuro).');
-            redirect('/admin/pacientes/' . $id);
+            redirect(self::ficha($id, 'plano'));
         }
         $parsed = $this->parsePayment($total, $cur, 'paid_count');
         if (is_string($parsed)) {
             flash('err', $parsed);
-            redirect('/admin/pacientes/' . $id);
+            redirect(self::ficha($id, 'plano'));
         }
         DB::tx(function () use ($id, $p, $total, $cur, $soldOn, $parsed) {
             Payments::create(
@@ -724,7 +742,7 @@ final class PatientController
         });
         Audit::log((int) Auth::id(), 'payment_add', 'user', $id, money($total, 2, $cur) . ' em ' . $parsed['installments'] . 'x (' . Payments::methodLabel($parsed['method']) . ')');
         flash('ok', 'Pagamento registrado com ' . $parsed['installments'] . ($parsed['installments'] === 1 ? ' parcela.' : ' parcelas.'));
-        redirect('/admin/pacientes/' . $id);
+        redirect(self::ficha($id, 'plano'));
     }
 
     public function points(int $id): void
@@ -737,7 +755,7 @@ final class PatientController
             $rule = Points::rule('referral');
             if (!$rule || (int) $rule['active'] !== 1 || (int) $rule['points'] <= 0) {
                 flash('err', 'A regra de indicação está desativada.');
-                redirect('/admin/pacientes/' . $id);
+                redirect(self::ficha($id, 'app'));
             }
             Points::add($id, 'referral', (int) $rule['points'], true, null, null, $note ?: 'Indicação que virou paciente', (int) Auth::id());
             Audit::log((int) Auth::id(), 'points_referral', 'user', $id, '+' . $rule['points']);
@@ -746,14 +764,14 @@ final class PatientController
             $points = (int) ($_POST['points'] ?? 0);
             if ($points === 0 || abs($points) > 5000 || $note === '') {
                 flash('err', 'Informe os pontos (de -5000 a 5000, diferente de 0) e o motivo.');
-                redirect('/admin/pacientes/' . $id);
+                redirect(self::ficha($id, 'app'));
             }
             $counts = !empty($_POST['counts_ranking']) && $points > 0;
             Points::add($id, 'manual', $points, $counts, null, null, $note, (int) Auth::id());
             Audit::log((int) Auth::id(), 'points_manual', 'user', $id, $points . ' pts: ' . $note);
             flash('ok', 'Ajuste lançado no extrato.');
         }
-        redirect('/admin/pacientes/' . $id);
+        redirect(self::ficha($id, 'app'));
     }
 
     public function resetPassword(int $id): void
@@ -766,8 +784,8 @@ final class PatientController
         DB::run('DELETE FROM login_attempts WHERE email = ?', [$p['email']]);
         Audit::log((int) Auth::id(), $wasBlocked ? 'access_release' : 'password_reset', 'user', $id, $p['name']);
         $_SESSION['_creds'] = ['name' => $p['name'], 'email' => $p['email'], 'password' => $pass];
-        flash('ok', ($wasBlocked ? 'Acesso liberado! ' : '') . 'Senha provisória gerada. Envie pelo WhatsApp (mensagem pronta abaixo).');
-        redirect('/admin/pacientes/' . $id);
+        flash('ok', ($wasBlocked ? 'Acesso liberado! ' : '') . 'Senha provisória gerada. Envie pelo WhatsApp (mensagem pronta no alto da página).');
+        redirect(self::ficha($id, 'app'));
     }
 
     public function diet(int $id): void
@@ -779,13 +797,13 @@ final class PatientController
 
         if ($link !== '' && !preg_match('#^https?://#i', $link)) {
             flash('err', 'O link precisa começar com http:// ou https://');
-            redirect('/admin/pacientes/' . $id);
+            redirect(self::ficha($id, 'acompanhamento'));
         }
         $current = DB::one('SELECT * FROM diets WHERE user_id = ?', [$id]);
         $pdf = Upload::pdf($_FILES['pdf'] ?? null, $err);
         if ($err) {
             flash('err', $err);
-            redirect('/admin/pacientes/' . $id);
+            redirect(self::ficha($id, 'acompanhamento'));
         }
         $pdfFile = $current['pdf_file'] ?? null;
         if ($pdf) {
@@ -799,7 +817,7 @@ final class PatientController
         }
         Audit::log((int) Auth::id(), 'diet_update', 'user', $id);
         flash('ok', 'Dieta atualizada.');
-        redirect('/admin/pacientes/' . $id);
+        redirect(self::ficha($id, 'acompanhamento'));
     }
 
     public function removeDietPdf(int $id): void
@@ -811,7 +829,7 @@ final class PatientController
             DB::run('UPDATE diets SET pdf_file = NULL, updated_at = ? WHERE user_id = ?', [now(), $id]);
         }
         flash('ok', 'PDF removido.');
-        redirect('/admin/pacientes/' . $id);
+        redirect(self::ficha($id, 'acompanhamento'));
     }
 
     /** Perfil esportivo (atleta) preenchido pelo admin. A escolha de "mostrar no perfil" é do paciente e não muda aqui. */
