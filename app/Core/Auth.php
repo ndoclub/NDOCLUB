@@ -49,6 +49,12 @@ final class Auth
         return $u !== null && $u['role'] === 'admin';
     }
 
+    /** Pode usar o CRM? Hoje só o administrador. A Equipe e os perfis (Atualização 10) mudam apenas esta regra. */
+    public static function canCrm(): bool
+    {
+        return self::isAdmin();
+    }
+
     public static function login(array $user): void
     {
         session_regenerate_id(true);

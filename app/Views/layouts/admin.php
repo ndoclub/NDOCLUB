@@ -7,6 +7,7 @@ $navGroups = [
     'Dia a dia' => [
         ['/admin',             'Painel',         'grid',     $path === '/admin'],
         ['/admin/pacientes',   'Pacientes',      'users',    $is('/admin/pacientes') || $is('/admin/importar')],
+        ['/admin/crm',         'CRM',            'filter',   $is('/admin/crm')],
         ['/admin/aniversarios', 'Aniversários',  'gift',     $is('/admin/aniversarios')],
         ['/admin/financeiro',  'Financeiro',     'cash',     $is('/admin/financeiro')],
     ],

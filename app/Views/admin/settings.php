@@ -19,6 +19,12 @@
     </div>
 
     <div class="panel">
+        <h3>Mensagem de WhatsApp para leads</h3>
+        <div class="field"><textarea class="input" id="lead_message" name="lead_message" maxlength="300" style="min-height:96px" aria-label="Mensagem de WhatsApp para leads"><?= e($v('lead_message')) ?></textarea>
+            <p class="hint">Use <strong>{nome}</strong> onde quiser o primeiro nome do lead. Em branco = texto padrão. É o texto do botão de WhatsApp no CRM. Não é enviado sozinho: abre o WhatsApp com a mensagem pronta, e a pessoa da equipe envia.</p></div>
+    </div>
+
+    <div class="panel">
         <h3>Avisos de renovação</h3>
         <div class="form-grid">
             <div class="field"><label for="warn_yellow_days">Selo amarelo a partir de (dias)</label><input class="input" type="number" id="warn_yellow_days" name="warn_yellow_days" min="2" max="90" value="<?= e($v('warn_yellow_days')) ?>"></div>

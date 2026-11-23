@@ -10,6 +10,7 @@ use App\Services\Settings;
  *  auth     -> exige login + senha trocada + consentimento aceito
  *  patient  -> só pacientes (admin é levado ao painel)
  *  admin    -> só administradores
+ *  crm      -> quem pode usar o CRM (hoje: administradores)
  */
 final class Middleware
 {
@@ -41,6 +42,16 @@ final class Middleware
             case 'patient':
                 if (Auth::isAdmin()) {
                     redirect('/admin');
+                }
+                break;
+
+            case 'crm':
+                // Única porta de entrada do CRM. Hoje só o administrador passa; com a Equipe e os perfis (Atualização 10)
+                // basta mudar a regra aqui, sem mexer nas telas.
+                if (!Auth::canCrm()) {
+                    http_response_code(403);
+                    View::render('errors/403', ['title' => 'Acesso negado'], 'app');
+                    exit;
                 }
                 break;
 

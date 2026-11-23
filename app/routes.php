@@ -107,6 +107,27 @@ $router->post('/admin/modalidades', 'Admin\SportController@store', $A);
 $router->get('/admin/modalidades/{id}', 'Admin\SportController@form', $A);
 $router->post('/admin/modalidades/{id}', 'Admin\SportController@update', $A);
 
+
+// CRM / Leads (Atualização 09). Todas as telas do CRM passam pela regra 'crm' (hoje = só administrador; a Equipe e os perfis entram na Atualização 10).
+$CRM = ['auth', 'crm'];
+$router->get('/admin/crm', 'Admin\LeadController@index', $CRM);
+$router->get('/admin/crm/novo', 'Admin\LeadController@form', $CRM);
+$router->post('/admin/crm', 'Admin\LeadController@store', $CRM);
+$router->get('/admin/crm/configurar', 'Admin\LeadController@config', $CRM);
+$router->post('/admin/crm/origens', 'Admin\LeadController@addSource', $CRM);
+$router->post('/admin/crm/origens/{id}', 'Admin\LeadController@saveSource', $CRM);
+$router->post('/admin/crm/etapas', 'Admin\LeadController@addStage', $CRM);
+$router->post('/admin/crm/etapas/{id}', 'Admin\LeadController@saveStage', $CRM);
+$router->get('/admin/crm/{id}', 'Admin\LeadController@show', $CRM);
+$router->get('/admin/crm/{id}/editar', 'Admin\LeadController@form', $CRM);
+$router->post('/admin/crm/{id}', 'Admin\LeadController@update', $CRM);
+$router->post('/admin/crm/{id}/contato', 'Admin\LeadController@contact', $CRM);
+$router->post('/admin/crm/{id}/etapa', 'Admin\LeadController@stage', $CRM);
+$router->post('/admin/crm/{id}/temperatura', 'Admin\LeadController@temperature', $CRM);
+$router->post('/admin/crm/{id}/autorizacao', 'Admin\LeadController@consent', $CRM);
+$router->post('/admin/crm/{id}/nao-contatar', 'Admin\LeadController@doNotContact', $CRM);
+$router->post('/admin/crm/{id}/excluir', 'Admin\LeadController@destroy', $CRM);
+
 $router->get('/admin/aniversarios', 'Admin\BirthdayController@index', $A);
 $router->get('/admin/responsaveis', 'Admin\ResponsibleController@index', $A);
 $router->get('/admin/responsaveis/novo', 'Admin\ResponsibleController@form', $A);

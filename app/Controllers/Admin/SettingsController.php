@@ -11,7 +11,7 @@ final class SettingsController
 {
     public function index(): void
     {
-        $keys = ['whatsapp_number', 'whatsapp_message', 'birthday_message', 'level_prata', 'level_ouro', 'level_black', 'warn_yellow_days', 'warn_red_days', 'community_rules', 'consent_version'];
+        $keys = ['whatsapp_number', 'whatsapp_message', 'birthday_message', 'lead_message', 'level_prata', 'level_ouro', 'level_black', 'warn_yellow_days', 'warn_red_days', 'community_rules', 'consent_version'];
         for ($i = 1; $i <= 7; $i++) {
             $keys[] = 'theme_' . $i;
             $keys[] = 'theme_' . $i . '_q';
@@ -53,6 +53,7 @@ final class SettingsController
         Settings::set('whatsapp_number', $number);
         Settings::set('whatsapp_message', mb_substr(input('whatsapp_message'), 0, 200));
         Settings::set('birthday_message', mb_substr(input('birthday_message'), 0, 300));
+        Settings::set('lead_message', mb_substr(input('lead_message'), 0, 300));
         Settings::set('warn_yellow_days', (string) $yellow);
         Settings::set('warn_red_days', (string) $red);
         Settings::set('level_prata', (string) $prata);
