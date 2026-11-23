@@ -141,7 +141,7 @@ final class Charts
 
     /**
      * Linhas (evolução financeira). $series = [['name' => 'Vendido', 'cls' => 'ch-s1', 'values' => [...]], ...]
-     * Eixo único, começando em zero. Só o último valor de cada linha tem rótulo; os demais aparecem ao passar o mouse
+     * Eixo único, começando em zero. Só o último valor de cada linha tem rótulo (à direita, afastados se forem parecidos); os demais aparecem ao passar o mouse
      * e na tabela. Retorna '' se tudo for zero.
      */
     public static function lines(array $labels, array $series, int $w = 560, int $h = 260): string
@@ -159,7 +159,7 @@ final class Charts
         [$step, $steps] = self::niceStep($max);
         $top = $step * $steps;
         $L = 70;
-        $R = 18;
+        $R = 96; // espaço à direita para o valor do último mês
         $T = 18;
         $B = 30;
         $plotW = $w - $L - $R;
@@ -171,16 +171,11 @@ final class Charts
         for ($g = 0; $g <= $steps; $g++) {
             $val = $g * $step;
             $yy = self::f($y($val));
-            $out .= '<line class="' . ($g === 0 ? 'ch-axis' : 'ch-grid') . '" x1="' . $L . '" y1="' . $yy . '" x2="' . ($w - $R) . '" y2="' . $yy . '"/>';
+            $out .= '<line class="' . ($g === 0 ? 'ch-axis' : 'ch-grid') . '" x1="' . $L . '" y1="' . $yy . '" x2="' . ($w - $R + 4) . '" y2="' . $yy . '"/>';
             $out .= '<text class="ch-lbl" x="' . ($L - 8) . '" y="' . self::f($y($val) + 4) . '" text-anchor="end">' . ($g === 0 ? 'R$ 0' : self::esc(self::compact($val))) . '</text>';
         }
         foreach ($labels as $i => $lab) {
             $out .= '<text class="ch-lbl" x="' . self::f($x($i)) . '" y="' . ($h - 8) . '" text-anchor="middle">' . self::esc((string) $lab) . '</text>';
-        }
-        // Qual linha fica por cima no último ponto (para os dois rótulos finais não se sobreporem)
-        $lastVals = [];
-        foreach ($series as $k => $s) {
-            $lastVals[$k] = (float) ($s['values'][$n - 1] ?? 0);
         }
         foreach ($series as $k => $s) {
             $pts = [];
@@ -194,13 +189,22 @@ final class Charts
                 $out .= '<circle class="' . self::esc((string) $s['cls']) . ' dot" cx="' . self::f($x($i)) . '" cy="' . self::f($y((float) $v)) . '" r="4.5"><title>' . self::esc(($labels[$i] ?? '') . ' · ' . $s['name'] . ': ' . 'R$ ' . number_format((float) $v, 2, ',', '.')) . '</title></circle>';
             }
         }
-        // Rótulo do último ponto de cada linha: a mais alta fica acima do ponto, a outra abaixo
-        $order = array_keys($series);
-        usort($order, fn($a, $b) => $lastVals[$b] <=> $lastVals[$a]);
-        foreach ($order as $pos => $k) {
-            $v = $lastVals[$k];
-            $above = $pos === 0;
-            $out .= '<text class="ch-val" x="' . self::f($x($n - 1)) . '" y="' . self::f($y($v) + ($above ? -11 : 20)) . '" text-anchor="end">' . self::esc(self::compact($v)) . '</text>';
+        // Rótulo do último ponto de cada linha, à direita do gráfico. Se os dois valores forem parecidos,
+        // os rótulos são afastados na vertical para nunca ficarem um por cima do outro.
+        $labs = [];
+        foreach ($series as $k => $s) {
+            $v = (float) ($s['values'][$n - 1] ?? 0);
+            $labs[] = ['y' => $y($v) + 4, 'v' => $v];
+        }
+        usort($labs, fn($a, $b) => $a['y'] <=> $b['y']);
+        $minGap = 18.0;
+        for ($i = 1; $i < count($labs); $i++) {
+            if ($labs[$i]['y'] - $labs[$i - 1]['y'] < $minGap) {
+                $labs[$i]['y'] = $labs[$i - 1]['y'] + $minGap;
+            }
+        }
+        foreach ($labs as $l) {
+            $out .= '<text class="ch-val" x="' . self::f($x($n - 1) + 12) . '" y="' . self::f($l['y']) . '" text-anchor="start">' . self::esc(self::compact($l['v'])) . '</text>';
         }
         return $out . '</svg>';
     }

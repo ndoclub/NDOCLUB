@@ -17,8 +17,11 @@ final class DashboardController
     {
         Payments::syncCards(); // cartão em R$ que já venceu cai sozinho
 
-        // Duas abas: "Visão executiva" (indicadores do negócio, padrão) e "Operação" (o dia a dia: risco, provas)
-        if (($_GET['aba'] ?? '') !== 'operacao') {
+        // Duas abas: "Operação" (o dia a dia, abre primeiro) e "Visão executiva" (indicadores do negócio).
+        // Endereços antigos com período/gráfico (?p= ou ?g=) continuam abrindo a Visão executiva.
+        $aba = (string) ($_GET['aba'] ?? '');
+        $executiva = $aba === 'executiva' || ($aba === '' && (isset($_GET['p']) || isset($_GET['g'])));
+        if ($executiva) {
             $period = Insights::periodKey($_GET['p'] ?? null);
             $graph = Insights::graphKey($_GET['g'] ?? null);
             View::render('admin/dashboard', [
@@ -40,6 +43,8 @@ final class DashboardController
             'redemptions' => (int) DB::val("SELECT COUNT(*) FROM redemptions WHERE status = 'pending'"),
             'reports' => (int) DB::val("SELECT COUNT(*) FROM reports WHERE status = 'open'"),
             'active7' => (int) DB::val("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND last_seen_at >= ?", [$weekAgo]),
+            // mesma conta do alerta "sem abrir o app há 7 dias" da Visão executiva e do filtro Pacientes > Sumidos
+            'away' => (int) DB::val("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND app_access = 1 AND (last_seen_at IS NULL OR last_seen_at < ?)", [$weekAgo]),
         ];
 
         // Painel de risco: quem vence logo (ou já venceu) e quanto tempo está sem abrir o app

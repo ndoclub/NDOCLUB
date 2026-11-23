@@ -1,7 +1,7 @@
 /* No Days Off Club - service worker
    Guarda só arquivos visuais (CSS, fontes, logo) e a tela "sem conexão".
    Páginas com dados de saúde NUNCA são guardadas no aparelho. */
-const VERSION = 'ndo-v14';
+const VERSION = 'ndo-v15';
 const SCOPE = self.registration.scope;
 const PRECACHE = [
     'offline.html',

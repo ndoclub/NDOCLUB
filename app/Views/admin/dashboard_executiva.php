@@ -1,11 +1,15 @@
 <?php
 use App\Core\Charts;
 
-/** Visão executiva: 5 dimensões do negócio. Tudo aqui tem valores em R$: só o admin chega nesta tela. */
+/**
+ * Visão executiva: "como está o negócio?". Tem valores em R$: só o admin chega nesta tela.
+ * Ordem: pontos de atenção (faixa curta) > 4 números grandes > gráfico principal > carteira, crescimento e equipe.
+ * Os números vêm todos do Insights::build(), iguais aos de antes; só a apresentação mudou.
+ */
 $c = $x['cards'];
 $fin = $x['finance'];
 $al = $x['alerts'];
-$link = fn(string $p, string $g) => url('/admin?p=' . $p . '&g=' . $g);
+$link = fn(string $p, string $g) => url('/admin?aba=executiva&p=' . $p . '&g=' . $g);
 
 // R$ inteiro nos cartões; zero vira "—" (igual ao Financeiro)
 $brl = fn(float $v, int $dec = 0) => $v > 0 ? money($v, $dec) : '—';
@@ -14,9 +18,10 @@ $abroad = function (array $by) use ($foreign): string {
     $f = $foreign($by);
     return $f ? '<span class="xsub">+ ' . e(money_multi($f)) . ' (exterior)</span>' : '';
 };
+// Comparação com o período anterior; sem base para comparar vira só um traço discreto
 $trend = function (?array $t) {
     if ($t === null) {
-        return '<span class="trend flat">— <span class="muted">sem base para comparar</span></span>';
+        return '<span class="trend flat" title="Sem período anterior para comparar">—</span>';
     }
     $arrow = ['up' => '↑', 'down' => '↓', 'flat' => '→'][$t['dir']];
     $sign = ['up' => '+', 'down' => '−', 'flat' => ''][$t['dir']];
@@ -25,6 +30,7 @@ $trend = function (?array $t) {
 };
 $pct = fn(?int $v) => $v === null ? '—' : (int) $v . '%';
 $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
+$yellow = (int) $x['yellow'];
 ?>
 
 <div class="xbar">
@@ -36,81 +42,111 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
     <span class="tiny muted"><?= e(fmt_date($x['window']['from'])) ?> a <?= e(fmt_date($x['window']['to'])) ?></span>
 </div>
 
-<!-- 1. Cartões -->
+<!-- 1. Pontos de atenção: só aparece o que tem número; quem quer agir abre a Operação -->
+<?php
+$items = [
+    ['bad',  $al['d7'],        'vence em até 7 dias',            'vencem em até 7 dias',            url('/admin/pacientes?v=d7'), 'Pacientes perto do vencimento'],
+    ['bad',  $al['expired'],   'plano vencido',                  'planos vencidos',                 url('/admin/pacientes?v=expired'), 'Pacientes com plano vencido'],
+    ['bad',  $al['late'],      'parcela em atraso',              'parcelas em atraso',              url('/admin/financeiro?f=late'), 'Parcelas em atraso (inadimplência)'],
+    ['warn', $al['noresp'],    'sem responsável',                'sem responsável',                 url('/admin/pacientes?st=active&r=none'), 'Pacientes em carteira sem responsável (sem acompanhamento)'],
+    ['warn', $al['away'],      'sem abrir o app há 7+ dias',     'sem abrir o app há 7+ dias',      url('/admin/pacientes?f=away'), 'Pacientes sem abrir o app há 7 dias ou mais'],
+    ['info', $al['risk'],      'renovação em risco',             'renovações em risco',             url('/admin'), 'Vencem em até ' . $yellow . ' dias e estão sumidos do app'],
+    ['info', $al['birthdays'], 'aniversariante hoje',            'aniversariantes hoje',            url('/admin/aniversarios?q=hoje'), 'Aniversariantes de hoje'],
+];
+$shown = array_values(array_filter($items, fn($i) => (int) $i[1] > 0));
+?>
+<section class="xstrip" aria-label="Pontos de atenção">
+    <div class="xstrip-head">
+        <span class="xstrip-t">Pontos de atenção</span>
+        <?php if ($shown): ?><a class="xstrip-go" href="<?= e(url('/admin')) ?>">Ver operação →</a><?php endif; ?>
+    </div>
+    <?php if (!$shown): ?>
+        <span class="xstrip-ok"><?= icon('check', 16) ?> Nada pedindo atenção agora.</span>
+    <?php else: ?>
+        <ul class="xpills">
+            <?php foreach ($shown as [$sev, $n, $one, $many, $href, $tip]): ?>
+                <li><a class="apill" href="<?= e($href) ?>" title="<?= e($tip) ?>"><i class="dotsev <?= e($sev) ?>"></i><b class="num"><?= (int) $n ?></b><span><?= e((int) $n === 1 ? $one : $many) ?></span></a></li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+</section>
+
+<!-- 2. Quatro números -->
 <div class="xkpis">
     <a class="xcard" href="<?= e(url('/admin/pacientes?st=active')) ?>">
         <span class="xlbl"><?= icon('users', 18) ?> Pacientes em carteira</span>
-        <span class="xrow"><span><span class="xbig num"><?= (int) $c['active']['value'] ?></span><?= $trend($c['active']['trend']) ?></span><?= Charts::bars($c['active']['spark']) ?></span>
+        <span class="xbig num"><?= (int) $c['active']['value'] ?></span>
+        <?= $trend($c['active']['trend']) ?>
+        <span class="xsub"><?= (int) $c['new']['value'] ?> <?= (int) $c['new']['value'] === 1 ? 'novo paciente' : 'novos pacientes' ?> no período</span>
     </a>
     <a class="xcard" href="<?= e(url('/admin/financeiro')) ?>">
         <span class="xlbl"><?= icon('cash', 18) ?> Vendido no período</span>
-        <span class="xrow"><span><span class="xbig num"><?= e($brl($c['sold']['brl'])) ?></span><?= $trend($c['sold']['trend']) ?><?= $abroad($c['sold']['by']) ?></span><?= Charts::bars($c['sold']['spark']) ?></span>
+        <span class="xbig num"><?= e($brl($c['sold']['brl'])) ?></span>
+        <?= $trend($c['sold']['trend']) ?>
+        <?= $abroad($c['sold']['by']) ?>
     </a>
     <a class="xcard" href="<?= e(url('/admin/financeiro?f=received')) ?>">
         <span class="xlbl"><?= icon('check', 18) ?> Recebido no período</span>
-        <span class="xrow"><span><span class="xbig num"><?= e($brl($c['received']['value'])) ?></span><?= $trend($c['received']['trend']) ?></span><?= Charts::bars($c['received']['spark']) ?></span>
+        <span class="xbig num"><?= e($brl($c['received']['value'])) ?></span>
+        <?= $trend($c['received']['trend']) ?>
     </a>
-    <a class="xcard" href="<?= e(url('/admin/financeiro?f=pending')) ?>">
-        <span class="xlbl"><?= icon('card', 18) ?> A receber</span>
-        <span class="xrow"><span><span class="xbig num"><?= e($brl((float) ($c['open']['by']['BRL'] ?? 0))) ?></span>
-            <span class="trend flat"><?= (int) $c['open']['count'] ?> <?= $c['open']['count'] === 1 ? 'parcela a vencer' : 'parcelas a vencer' ?></span><?= $abroad($c['open']['by']) ?></span></span>
-    </a>
-    <div class="xcard">
-        <span class="xlbl"><?= icon('plus', 18) ?> Novos pacientes</span>
-        <span class="xrow"><span><span class="xbig num"><?= (int) $c['new']['value'] ?></span><?= $trend($c['new']['trend']) ?></span><?= Charts::bars($c['new']['spark']) ?></span>
-    </div>
     <div class="xcard">
         <span class="xlbl"><?= icon('chart', 18) ?> Taxa de renovação</span>
-        <span class="xrow"><span><span class="xbig num"><?= e($pct($c['renewal']['rate']['pct'])) ?></span>
-            <?php if ($c['renewal']['rate']['due'] > 0): ?>
-                <span class="trend flat"><?= (int) $c['renewal']['rate']['renewed'] ?> de <?= (int) $c['renewal']['rate']['due'] ?> planos que venceram</span>
-                <?php if ($c['renewal']['trend'] !== null): ?><?= str_replace('%', ' pp', $trend($c['renewal']['trend'])) ?><?php endif; ?>
-            <?php else: ?>
-                <span class="trend flat">nenhum plano venceu neste período</span>
-            <?php endif; ?></span><?= Charts::ring($c['renewal']['rate']['pct']) ?></span>
+        <?php $rr = $c['renewal']['rate']; ?>
+        <span class="xrow">
+            <span class="xbig num"><?= e($pct($rr['pct'])) ?></span>
+            <?php if ($rr['pct'] !== null && $rr['pct'] > 0): ?><?= Charts::ring($rr['pct'], 48) ?><?php endif; ?>
+        </span>
+        <?php if ($rr['due'] > 0): ?>
+            <span class="xsub"><?= (int) $rr['renewed'] ?> de <?= (int) $rr['due'] ?> planos que venceram</span>
+            <?php if ($c['renewal']['trend'] !== null): ?><?= str_replace('%', ' pp', $trend($c['renewal']['trend'])) ?><?php endif; ?>
+        <?php else: ?>
+            <span class="xsub">Nenhum plano venceu neste período.</span>
+        <?php endif; ?>
     </div>
 </div>
 
 <div class="xgrid">
 
-    <!-- 2. Saúde financeira -->
+    <!-- 3. Gráfico principal -->
     <section class="panel xp xp-7" aria-labelledby="h-fin">
         <div class="xp-head">
-            <h3 id="h-fin"><?= icon('chart', 20) ?> Evolução financeira</h3>
+            <h3 id="h-fin">Evolução financeira</h3>
             <div class="chips seg" role="group" aria-label="Meses no gráfico">
                 <?php foreach (\App\Services\Insights::graphs() as $k => $lab): ?>
                     <a class="chip" href="<?= e($link($period, $k)) ?>"<?= $graph === (string) $k ? ' aria-current="true"' : '' ?>><?= e($lab) ?></a>
                 <?php endforeach; ?>
             </div>
         </div>
-        <div class="xfin">
-            <div class="xfin-chart">
-                <div class="xlegend"><span><i class="lgd ch-s1"></i> Vendido</span><span><i class="lgd ch-s2"></i> Recebido</span></div>
-                <?php
-                $svg = Charts::lines(
-                    array_column($x['chart'], 'label'),
-                    [
-                        ['name' => 'Vendido', 'cls' => 'ch-s1', 'values' => array_column($x['chart'], 'sold')],
-                        ['name' => 'Recebido', 'cls' => 'ch-s2', 'values' => array_column($x['chart'], 'received')],
-                    ]
-                );
-                ?>
-                <?php if ($svg !== ''): ?>
-                    <?= $svg ?>
-                <?php else: ?>
-                    <div class="empty"><strong>Ainda sem vendas em reais nesses meses</strong>Quando houver vendas ou parcelas recebidas, o gráfico aparece aqui.</div>
-                <?php endif; ?>
-            </div>
-            <dl class="xfin-list">
-                <div><dt>Vendido no período</dt><dd class="num"><?= e($brl($c['sold']['brl'], 2)) ?><?= $abroad($fin['sold']) ?></dd></div>
-                <div><dt>Vendido no ano (acumulado)</dt><dd class="num"><?= e($brl((float) ($fin['yearSold']['BRL'] ?? 0), 2)) ?><?= $abroad($fin['yearSold']) ?></dd></div>
-                <div><dt>Recebido no período</dt><dd class="num"><?= e($brl($fin['received'], 2)) ?></dd></div>
-                <div><dt>A receber <span class="tiny muted">(parcelas a vencer)</span></dt><dd class="num"><?= e($brl((float) ($fin['open']['by']['BRL'] ?? 0), 2)) ?><?= $abroad($fin['open']['by']) ?></dd></div>
-                <div class="<?= $fin['late']['count'] > 0 ? 'is-bad' : '' ?>"><dt>Inadimplência <span class="tiny muted">(atraso de 1 dia ou mais)</span></dt>
-                    <dd class="num"><?= e($brl((float) ($fin['late']['by']['BRL'] ?? 0), 2)) ?><?= $abroad($fin['late']['by']) ?>
-                        <?php if ($fin['late']['count'] > 0): ?><a class="xsub" href="<?= e(url('/admin/financeiro?f=late')) ?>"><?= (int) $fin['late']['count'] ?> <?= $fin['late']['count'] === 1 ? 'parcela' : 'parcelas' ?> · <?= (int) $fin['late']['patients'] ?> <?= $fin['late']['patients'] === 1 ? 'paciente' : 'pacientes' ?></a><?php endif; ?></dd></div>
-            </dl>
-        </div>
+
+        <dl class="xnums">
+            <div><dt>Vendido no ano</dt><dd class="num"><?= e($brl((float) ($fin['yearSold']['BRL'] ?? 0), 2)) ?></dd><?= $abroad($fin['yearSold']) ?></div>
+            <div><dt>A receber <span class="tiny muted">(parcelas a vencer)</span></dt><dd class="num"><?= e($brl((float) ($fin['open']['by']['BRL'] ?? 0), 2)) ?></dd><?= $abroad($fin['open']['by']) ?></div>
+        </dl>
+        <?php if ($fin['late']['count'] > 0): ?>
+            <a class="xwarn" href="<?= e(url('/admin/financeiro?f=late')) ?>"><i class="dotsev bad"></i>Inadimplência: <b class="num"><?= e($brl((float) ($fin['late']['by']['BRL'] ?? 0), 2)) ?></b><?php
+                $lf = $foreign($fin['late']['by']); if ($lf): ?> + <?= e(money_multi($lf)) ?> (exterior)<?php endif; ?> · <?= (int) $fin['late']['count'] ?> <?= $fin['late']['count'] === 1 ? 'parcela' : 'parcelas' ?> · <?= (int) $fin['late']['patients'] ?> <?= $fin['late']['patients'] === 1 ? 'paciente' : 'pacientes' ?> →</a>
+        <?php else: ?>
+            <p class="xnowarn">Inadimplência: nenhuma parcela em atraso.</p>
+        <?php endif; ?>
+
+        <div class="xlegend"><span><i class="lgd ch-s1"></i> Vendido</span><span><i class="lgd ch-s2"></i> Recebido</span></div>
+        <?php
+        $svg = Charts::lines(
+            array_column($x['chart'], 'label'),
+            [
+                ['name' => 'Vendido', 'cls' => 'ch-s1', 'values' => array_column($x['chart'], 'sold')],
+                ['name' => 'Recebido', 'cls' => 'ch-s2', 'values' => array_column($x['chart'], 'received')],
+            ],
+            560,
+            380
+        );
+        ?>
+        <?php if ($svg !== ''): ?>
+            <?= $svg ?>
+        <?php else: ?>
+            <div class="empty"><strong>Ainda sem vendas em reais nesses meses</strong>Quando houver vendas ou parcelas recebidas, o gráfico aparece aqui.</div>
+        <?php endif; ?>
         <details class="xtable">
             <summary>Ver em tabela</summary>
             <div class="tbl-wrap"><table class="tbl">
@@ -122,12 +158,13 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
                 </tbody>
             </table></div>
         </details>
-        <p class="tiny muted" style="margin:10px 0 0">Gráfico e tabela em reais (R$). Dólar e euro não entram na soma. "Recebido" é o líquido (depois da taxa do cartão). O mês atual ainda está em andamento.</p>
+        <p class="tiny muted xfoot">Valores em reais (R$). Dólar e euro não entram na soma. "Recebido" é o líquido (depois da taxa do cartão). O mês atual ainda está em andamento.</p>
     </section>
 
-    <!-- 3. Carteira -->
-    <section class="panel xp xp-5" aria-labelledby="h-cart">
-        <div class="xp-head"><h3 id="h-cart"><?= icon('users', 20) ?> Distribuição da carteira</h3><span class="tiny muted">hoje</span></div>
+    <div class="xcol">
+    <!-- 4. Carteira: um gráfico por vez -->
+    <section class="panel" aria-labelledby="h-cart">
+        <div class="xp-head"><h3 id="h-cart">Distribuição da carteira</h3><span class="tiny muted">hoje</span></div>
         <?php
         $plans = $x['plans'];
         $ranked = array_values(array_filter($plans, fn($p) => !$p['none']));
@@ -137,7 +174,7 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
             $extra = array_slice($ranked, 3);
             $ranked = array_slice($ranked, 0, 3);
         }
-        $ramp = [1 => [4], 2 => [1, 4], 3 => [1, 3, 4], 4 => [1, 2, 3, 4]][count($ranked)] ?? [];
+        $ramp = [1 => [1], 2 => [1, 3], 3 => [1, 2, 3], 4 => [1, 2, 3, 4]][count($ranked)] ?? [];
         $segs = [];
         foreach ($ranked as $i => $p) {
             $segs[] = ['label' => $p['name'], 'value' => $p['count'], 'cls' => 'dn-' . $ramp[$i], 'pct' => $p['pct']];
@@ -149,69 +186,90 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
             $segs[] = ['label' => 'Sem plano', 'value' => $noPlan[0]['count'], 'cls' => 'dn-0', 'pct' => $noPlan[0]['pct']];
         }
         ?>
-        <?php if (!$segs): ?>
-            <div class="empty"><strong>Nenhum paciente em carteira</strong>Cadastre pacientes com plano para ver a distribuição.</div>
-        <?php else: ?>
-            <div class="xcart">
-                <?= Charts::donut($segs, (string) (int) $x['activeTotal'], $x['activeTotal'] === 1 ? 'paciente' : 'pacientes') ?>
-                <ul class="xlist">
-                    <?php foreach ($segs as $s): ?>
-                        <li><i class="lgd <?= e($s['cls']) ?>"></i><span class="nm"><?= e($s['label']) ?></span><b class="num"><?= (int) $s['pct'] ?>%</b><span class="muted num">(<?= (int) $s['value'] ?>)</span></li>
-                    <?php endforeach; ?>
-                </ul>
+        <div class="segtabs" data-segtabs>
+            <div class="segtabs-bar" role="tablist" aria-label="Ver a carteira por" hidden>
+                <button type="button" role="tab" id="ct-plano" aria-controls="cp-plano" aria-selected="true" data-seg="plano">Plano</button>
+                <button type="button" role="tab" id="ct-sexo" aria-controls="cp-sexo" aria-selected="false" data-seg="sexo" tabindex="-1">Sexo</button>
+                <button type="button" role="tab" id="ct-modal" aria-controls="cp-modal" aria-selected="false" data-seg="modal" tabindex="-1">Modalidade</button>
             </div>
-        <?php endif; ?>
-        <h4 class="xsubh">Por sexo <span class="tiny muted">(% de quem tem o sexo informado)</span></h4>
-        <?php if (!$x['sex']['known']): ?>
-            <p class="muted small">Ainda não há sexo informado. Preencha na ficha de cada paciente (ou na planilha de importação) para este gráfico aparecer.</p>
-        <?php else: ?>
-            <ul class="mbars has-n">
-                <?php foreach ($x['sex']['list'] as $s): ?>
-                    <li><span class="nm"><?= e($s['name']) ?></span><span class="mb" aria-hidden="true"><i style="width:<?= (int) $s['pct'] ?>%"></i></span><b class="num"><?= (int) $s['pct'] ?>%</b><span class="muted num">(<?= (int) $s['count'] ?>)</span></li>
-                <?php endforeach; ?>
-            </ul>
-            <?php if ($x['sex']['unknown'] > 0): ?><p class="tiny muted" style="margin:6px 0 0"><?= (int) $x['sex']['unknown'] ?> <?= $x['sex']['unknown'] === 1 ? 'paciente' : 'pacientes' ?> em carteira sem sexo informado (fora da conta).</p><?php endif; ?>
-        <?php endif; ?>
-        <h4 class="xsubh">Por modalidade <span class="tiny muted">(% dos atletas; um paciente pode ter mais de uma)</span></h4>
-        <?php if (!$x['sports']['list']): ?>
-            <p class="muted small">Ainda não há atletas com modalidade cadastrada.</p>
-        <?php else: ?>
-            <ul class="mbars">
-                <?php foreach (array_slice($x['sports']['list'], 0, 6) as $s): ?>
-                    <li><span class="nm"><?= e($s['name']) ?></span><span class="mb" aria-hidden="true"><i style="width:<?= (int) $s['pct'] ?>%"></i></span><b class="num"><?= (int) $s['pct'] ?>%</b></li>
-                <?php endforeach; ?>
-            </ul>
-            <?php if (count($x['sports']['list']) > 6): ?><p class="tiny muted" style="margin:6px 0 0">+ <?= count($x['sports']['list']) - 6 ?> outras modalidades (veja em Pacientes, filtro por modalidade).</p><?php endif; ?>
-        <?php endif; ?>
-    </section>
 
-    <!-- 4. Crescimento -->
-    <section class="panel xp xp-5" aria-labelledby="h-cres">
-        <div class="xp-head"><h3 id="h-cres"><?= icon('chart', 20) ?> Crescimento da carteira</h3><span class="tiny muted">pacientes em carteira no fim de cada mês</span></div>
-        <div class="xgrow">
-            <div class="xhero<?= $x['growth']['pct'] !== null && $x['growth']['pct'] < 0 ? ' is-down' : '' ?>">
-                <?php if ($x['growth']['pct'] === null): ?>
-                    <b class="num">—</b><span>sem base para comparar nos últimos 6 meses</span>
+            <div class="segtabs-panel" role="tabpanel" id="cp-plano" aria-labelledby="ct-plano" data-seg-panel="plano">
+                <?php if (!$segs): ?>
+                    <div class="empty"><strong>Nenhum paciente em carteira</strong>Cadastre pacientes com plano para ver a distribuição.</div>
                 <?php else: ?>
-                    <b class="num"><?= $x['growth']['pct'] > 0 ? '+' : ($x['growth']['pct'] < 0 ? '−' : '') ?><?= abs((int) $x['growth']['pct']) ?>%</b><span>de crescimento nos últimos 6 meses</span>
+                    <div class="xcart">
+                        <?= Charts::donut($segs, (string) (int) $x['activeTotal'], $x['activeTotal'] === 1 ? 'paciente' : 'pacientes') ?>
+                        <ul class="xlist">
+                            <?php foreach ($segs as $s): ?>
+                                <li><i class="lgd <?= e($s['cls']) ?>"></i><span class="nm"><?= e($s['label']) ?></span><b class="num"><?= (int) $s['pct'] ?>%</b><span class="muted num">(<?= (int) $s['value'] ?>)</span></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
                 <?php endif; ?>
             </div>
-            <?= Charts::columns(array_column($x['growth']['months'], 'label'), array_column($x['growth']['months'], 'active')) ?>
+
+            <div class="segtabs-panel" role="tabpanel" id="cp-sexo" aria-labelledby="ct-sexo" data-seg-panel="sexo">
+                <h4 class="xsubh">Por sexo <span class="tiny muted">(% de quem tem o sexo informado)</span></h4>
+                <?php if (!$x['sex']['known']): ?>
+                    <p class="muted small">Ainda não há sexo informado. Preencha na ficha de cada paciente (ou na planilha de importação) para este gráfico aparecer.</p>
+                <?php else: ?>
+                    <ul class="mbars has-n">
+                        <?php foreach ($x['sex']['list'] as $s): ?>
+                            <li><span class="nm"><?= e($s['name']) ?></span><span class="mb" aria-hidden="true"><i style="width:<?= (int) $s['pct'] ?>%"></i></span><b class="num"><?= (int) $s['pct'] ?>%</b><span class="muted num">(<?= (int) $s['count'] ?>)</span></li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php if ($x['sex']['unknown'] > 0): ?><p class="tiny muted" style="margin:6px 0 0"><?= (int) $x['sex']['unknown'] ?> <?= $x['sex']['unknown'] === 1 ? 'paciente' : 'pacientes' ?> em carteira sem sexo informado (fora da conta).</p><?php endif; ?>
+                <?php endif; ?>
+            </div>
+
+            <div class="segtabs-panel" role="tabpanel" id="cp-modal" aria-labelledby="ct-modal" data-seg-panel="modal">
+                <h4 class="xsubh">Por modalidade <span class="tiny muted">(% dos atletas; um paciente pode ter mais de uma)</span></h4>
+                <?php if (!$x['sports']['list']): ?>
+                    <p class="muted small">Ainda não há atletas com modalidade cadastrada.</p>
+                <?php else: ?>
+                    <ul class="mbars">
+                        <?php foreach (array_slice($x['sports']['list'], 0, 6) as $s): ?>
+                            <li><span class="nm"><?= e($s['name']) ?></span><span class="mb" aria-hidden="true"><i style="width:<?= (int) $s['pct'] ?>%"></i></span><b class="num"><?= (int) $s['pct'] ?>%</b></li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php if (count($x['sports']['list']) > 6): ?><p class="tiny muted" style="margin:6px 0 0">+ <?= count($x['sports']['list']) - 6 ?> outras modalidades (veja em Pacientes, filtro por modalidade).</p><?php endif; ?>
+                <?php endif; ?>
+            </div>
         </div>
-        <div class="tbl-wrap xmonths"><table class="tbl">
-            <thead><tr><th>Mês</th><th class="r">Novos</th><th class="r">Em carteira</th></tr></thead>
-            <tbody>
-            <?php foreach (array_reverse($x['growth']['months']) as $m): ?>
-                <tr><td><?= e($monthLabel($m)) ?><?= $m['partial'] ? ' <span class="tag">em andamento</span>' : '' ?></td><td class="r num"><?= (int) $m['new'] ?></td><td class="r num"><?= (int) $m['active'] ?></td></tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table></div>
-        <p class="tiny muted" style="margin:10px 0 0">Novos = pacientes que começaram no mês. Em carteira = pacientes com plano em dia no último dia do mês. Estimativa pela data "Paciente desde" e pelo vencimento atual de cada paciente.</p>
     </section>
 
-    <!-- 5. Equipe -->
-    <section class="panel xp xp-7" aria-labelledby="h-eq">
-        <div class="xp-head"><h3 id="h-eq"><?= icon('users', 20) ?> Desempenho dos responsáveis</h3><span class="tiny muted">renovação no período escolhido</span></div>
+    <!-- 5. Crescimento -->
+    <section class="panel" aria-labelledby="h-cres">
+        <div class="xp-head">
+            <h3 id="h-cres">Crescimento da carteira</h3>
+            <?php $gp = $x['growth']['pct']; ?>
+            <?php if ($gp === null): ?>
+                <span class="xdelta flat" title="Ainda não há 6 meses de histórico para comparar">—</span>
+            <?php else: ?>
+                <span class="xdelta <?= $gp < 0 ? 'down' : ($gp > 0 ? 'up' : 'flat') ?>"><b class="num"><?= $gp > 0 ? '+' : ($gp < 0 ? '−' : '') ?><?= abs((int) $gp) ?>%</b> em 6 meses</span>
+            <?php endif; ?>
+        </div>
+        <p class="tiny muted" style="margin:-6px 0 8px">pacientes em carteira no fim de cada mês</p>
+        <?= Charts::columns(array_column($x['growth']['months'], 'label'), array_column($x['growth']['months'], 'active')) ?>
+        <details class="xtable">
+            <summary>Ver em tabela</summary>
+            <div class="tbl-wrap xmonths"><table class="tbl">
+                <thead><tr><th>Mês</th><th class="r">Novos</th><th class="r">Em carteira</th></tr></thead>
+                <tbody>
+                <?php foreach (array_reverse($x['growth']['months']) as $m): ?>
+                    <tr><td><?= e($monthLabel($m)) ?><?= $m['partial'] ? ' <span class="tag">em andamento</span>' : '' ?></td><td class="r num"><?= (int) $m['new'] ?></td><td class="r num"><?= (int) $m['active'] ?></td></tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table></div>
+        </details>
+        <p class="tiny muted xfoot">Novos = pacientes que começaram no mês. Em carteira = pacientes com plano em dia no último dia do mês. Estimativa pela data "Paciente desde" e pelo vencimento atual de cada paciente.</p>
+    </section>
+
+    </div>
+
+    <!-- 6. Equipe -->
+    <section class="panel xp" aria-labelledby="h-eq">
+        <div class="xp-head"><h3 id="h-eq">Desempenho dos responsáveis</h3><span class="tiny muted">renovação no período escolhido</span></div>
         <?php $team = $x['team']; ?>
         <?php if (!$team['rows'] && $team['noResponsible'] === 0): ?>
             <div class="empty"><strong>Nenhum responsável cadastrado</strong>Cadastre em Admin &gt; Responsáveis e atribua os pacientes (Gabriel e as estagiárias).</div>
@@ -234,55 +292,6 @@ $monthLabel = fn(array $m) => $m['label'] . '/' . substr($m['ym'], 0, 4);
                 </tbody>
             </table></div>
         <?php endif; ?>
-        <p class="tiny muted" style="margin:10px 0 0">Consultas = consultas feitas sobre a cota dos planos (só planos com cota definida). Renovação = planos que venceram no período e renovaram, entre os pacientes de cada um (entre parênteses, quantos venceram). Só o admin vê.</p>
-    </section>
-
-    <!-- 6. Comercial (em breve) -->
-    <section class="panel xp xp-5 xsoon" aria-labelledby="h-lead">
-        <div class="xp-head"><h3 id="h-lead"><?= icon('flag', 20) ?> Comercial · Leads</h3><span class="tag">Em breve</span></div>
-        <p class="muted small">A aba <strong>Leads</strong> (Instagram, WhatsApp e indicação) é a próxima atualização. Quando existir, o funil e a taxa de conversão aparecem aqui, com dados reais:</p>
-        <ol class="ghost-funnel" aria-hidden="true">
-            <li style="width:100%">Recebidos</li><li style="width:82%">Em atendimento</li><li style="width:64%">Em negociação</li><li style="width:46%">Convertidos</li><li style="width:30%">Perdidos</li>
-        </ol>
-    </section>
-
-    <!-- 7. Alertas -->
-    <section class="panel xp xp-7" aria-labelledby="h-al">
-        <div class="xp-head"><h3 id="h-al"><?= icon('shield', 20) ?> Alertas e acompanhamento</h3><a class="tiny" href="<?= e(url('/admin?aba=operacao')) ?>">Ver operação →</a></div>
-        <?php
-        $items = [
-            ['bad',  $al['d7'],      'pacientes perto do vencimento (até 7 dias)', url('/admin/pacientes?v=d7')],
-            ['bad',  $al['expired'], 'pacientes com plano vencido', url('/admin/pacientes?v=expired')],
-            ['bad',  $al['late'],    'parcelas em atraso (inadimplência)', url('/admin/financeiro?f=late')],
-            ['warn', $al['noresp'],  'pacientes em carteira sem responsável (sem acompanhamento)', url('/admin/pacientes?st=active&r=none')],
-            ['warn', $al['away'],    'pacientes sem abrir o app há 7 dias ou mais', url('/admin/pacientes?f=away')],
-            ['info', $al['risk'],    'renovações em risco (vencem em até ' . (int) $x['yellow'] . ' dias e estão sumidos)', url('/admin?aba=operacao')],
-            ['info', $al['birthdays'], 'aniversariantes hoje', url('/admin/aniversarios?q=hoje')],
-        ];
-        ?>
-        <div class="xalerts">
-            <ul class="xal">
-                <?php foreach ($items as [$sev, $n, $txt, $href]): ?>
-                    <li><a href="<?= e($href) ?>"><i class="dotsev <?= $n > 0 ? e($sev) : 'zero' ?>"></i><b class="num"><?= (int) $n ?></b><span><?= e($txt) ?></span></a></li>
-                <?php endforeach; ?>
-            </ul>
-            <div class="xside">
-                <?php $ev = $x['nextEvent']; ?>
-                <div class="xmini">
-                    <span class="xlbl">Próxima prova</span>
-                    <?php if ($ev): $dd = days_until($ev['event_date']); ?>
-                        <a href="<?= e(url('/admin/pacientes/' . (int) $ev['id'])) ?>"><b><?= e(fmt_date($ev['event_date'])) ?> · <?= e($ev['event_name'] ?: 'Prova') ?></b></a>
-                        <span class="small muted"><?= e($ev['name']) ?> · <?= $dd === 0 ? 'hoje' : ($dd === 1 ? 'amanhã' : 'em ' . (int) $dd . ' dias') ?></span>
-                    <?php else: ?>
-                        <span class="small muted">Nenhuma prova marcada.</span>
-                    <?php endif; ?>
-                </div>
-                <a class="xmini" href="<?= e(url('/admin/moderacao')) ?>">
-                    <span class="xlbl">Pendências de moderação</span>
-                    <b class="<?= $al['reports'] > 0 ? 'bad' : '' ?>"><?= (int) $al['reports'] ?> <?= $al['reports'] === 1 ? 'denúncia aberta' : 'denúncias abertas' ?></b>
-                    <span class="small muted"><?= (int) $al['redemptions'] ?> <?= $al['redemptions'] === 1 ? 'resgate pendente' : 'resgates pendentes' ?></span>
-                </a>
-            </div>
-        </div>
+        <p class="tiny muted xfoot">Consultas = consultas feitas sobre a cota dos planos (só planos com cota definida). Renovação = planos que venceram no período e renovaram, entre os pacientes de cada um (entre parênteses, quantos venceram). Só o admin vê.</p>
     </section>
 </div>

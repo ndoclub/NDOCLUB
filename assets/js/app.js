@@ -242,4 +242,40 @@
             });
         }
     });
+
+    // Abas pequenas (Visão executiva > Distribuição da carteira: Plano | Sexo | Modalidade).
+    // Sem JavaScript os painéis aparecem todos, um embaixo do outro.
+    function initSegTabs() {
+        var boxes = document.querySelectorAll('[data-segtabs]');
+        Array.prototype.forEach.call(boxes, function (box) {
+            var bar = box.querySelector('[role="tablist"]');
+            var tabs = box.querySelectorAll('[data-seg]');
+            var panels = box.querySelectorAll('[data-seg-panel]');
+            if (!bar || !tabs.length) { return; }
+            function show(name, focus) {
+                Array.prototype.forEach.call(tabs, function (t) {
+                    var on = t.getAttribute('data-seg') === name;
+                    t.setAttribute('aria-selected', on ? 'true' : 'false');
+                    t.tabIndex = on ? 0 : -1;
+                    if (on && focus) { t.focus(); }
+                });
+                Array.prototype.forEach.call(panels, function (p) {
+                    p.hidden = p.getAttribute('data-seg-panel') !== name;
+                });
+            }
+            box.classList.add('is-js');
+            bar.hidden = false;
+            show(tabs[0].getAttribute('data-seg'), false);
+            Array.prototype.forEach.call(tabs, function (t, i) {
+                t.addEventListener('click', function () { show(t.getAttribute('data-seg'), false); });
+                t.addEventListener('keydown', function (ev) {
+                    var j = ev.key === 'ArrowRight' ? i + 1 : (ev.key === 'ArrowLeft' ? i - 1 : -1);
+                    if (j < 0 || j >= tabs.length) { return; }
+                    ev.preventDefault();
+                    show(tabs[j].getAttribute('data-seg'), true);
+                });
+            });
+        });
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initSegTabs); } else { initSegTabs(); }
 })();

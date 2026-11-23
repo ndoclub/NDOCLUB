@@ -31,7 +31,7 @@ Gabriel. A ideia central é um ciclo simples:
 | **Perfil esportivo** | Para quem treina: modalidades (Corrida, Musculação, Hyrox, Natação...), se tem assessoria, se compete e a próxima prova. O paciente edita o dele e escolhe se mostra as **modalidades** no perfil da comunidade (assessoria e provas nunca aparecem para outros). |
 
 ### Para o Gabriel (painel `/admin`, funciona no celular e no computador)
-**Painel gerencial** (tela inicial, aba **Visão executiva**: pacientes ativos, vendido, recebido, a receber, novos e taxa de renovação, evolução financeira, carteira por plano/modalidade, crescimento, equipe e alertas; a aba **Operação** mantém o painel do dia a dia) · **Aniversários** (data de nascimento opcional na ficha, aniversariantes de hoje e dos próximos dias com botão de WhatsApp e mensagem pronta e editável, caixinha de autorização para receber mensagens) · Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)** · **risco de renovação** (quem vence logo e quem sumiu há 7+ dias, com botão de
+**Painel** (tela inicial, duas abas: **Operação**, que abre primeiro, com o que fazer hoje: parcelas para cobrar, renovações, sumidos do app e pendências; e **Visão executiva**: pontos de atenção, pacientes em carteira, vendido, recebido, taxa de renovação, evolução financeira, carteira por plano/sexo/modalidade, crescimento e equipe) · **Aniversários** (data de nascimento opcional na ficha, aniversariantes de hoje e dos próximos dias com botão de WhatsApp e mensagem pronta e editável, caixinha de autorização para receber mensagens) · Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)** · **risco de renovação** (quem vence logo e quem sumiu há 7+ dias, com botão de
 WhatsApp) · **planos e valores** (só o admin vê R$) · pacientes (cadastro com plano e "valor combinado",
 renovar com a duração do plano e bônus, pontos manuais, dieta, senha provisória, exclusão LGPD) · **lista de pacientes completa** (status Ativo/Inativo, vencimento, consultas "x de y" por plano, responsável da equipe, ordenar clicando na coluna, filtros por vencimento 15/30 dias, status, responsável e consultas, atribuição em lote) · **responsáveis** ("modo babá": quem cuida de quais pacientes) · **importação de pacientes por planilha** (modelo oficial em Excel, prévia antes de salvar, duplicados e erros) ·
 **atletas** (etiquetas de modalidade nos pacientes, filtros Atletas / Competem / Sem assessoria / por modalidade,
@@ -222,7 +222,7 @@ Mesmo processo, **depois** das atualizações 01 a 06 (se ainda não aplicou a 0
 1. Atualize os arquivos do projeto (`git pull`, ou copie a pasta nova por cima).
 2. phpMyAdmin → clique no banco **nodaysoffclub** (menu da esquerda) → aba **Importar** → `database/atualizacao_07_painel.sql` → **Executar**.
    Acrescenta um único campo (`joined_on`, "Paciente desde") e preenche com a data de cadastro dos pacientes que já existem. Não apaga nada. **Importe antes de abrir o sistema.**
-3. **Ctrl + F5** e abra **Admin** (a tela inicial agora é a **Visão executiva**).
+3. **Ctrl + F5** e abra **Admin** (a tela inicial é a **Operação**; a **Visão executiva** é a segunda aba).
 
 **O que o painel mostra** (tudo calculado a partir do que já existe no sistema; nada inventado)
 - **Período:** Últimos 30 dias (padrão), Este mês, Mês passado, Este ano. Cada indicador compara com o período anterior (↑ ↓).
@@ -249,7 +249,7 @@ Mesmo processo, **depois** das atualizações 01 a 07 (se ainda não aplicou 05,
 - **Caixinha "Autorizou receber mensagens (aniversário e novidades)"**: começa **desmarcada**. Marque só se o paciente disse que aceita; o sistema guarda o **dia** em que foi marcada. Ela ainda não bloqueia nada (o botão de WhatsApp funciona para todos); vai servir de trava quando o envio passar a ser automático.
 - **Admin → Aniversários**: escolha **Hoje**, **Próximos 7 dias**, **Próximos 30 dias**, **Este mês** ou **Mês que vem**. Aparece quem tem plano em dia (ou sem data de vencimento); plano vencido e conta desativada não entram. Mostra a idade que a pessoa faz, se autorizou, e o botão **Dar parabéns**, que abre o WhatsApp com a mensagem pronta e o primeiro nome. Você confere e envia.
 - Quem nasceu em **29/02** é lembrado em **28/02** nos anos que não são bissextos.
-- **Painel → aba Operação** mostra os aniversariantes de hoje e dos próximos 7 dias. A **Visão executiva** tem o alerta "aniversariantes hoje".
+- **Painel → aba Operação** mostra os aniversariantes de hoje e dos próximos 7 dias. A **Visão executiva** tem o ponto de atenção "aniversariantes hoje" (só aparece quando há aniversariante).
 - **Texto da mensagem**: Admin → Configurações → **Mensagem de aniversário**. Use `{nome}` para o primeiro nome. Em branco = texto padrão.
 - **Planilha de importação**: nova coluna **Data de nascimento** (opcional; baixe o modelo de novo). A autorização de mensagens **não** vem da planilha, de propósito: marque na ficha de cada paciente.
 - **Ainda não existe:** envio **automático** de e-mail e de WhatsApp. Pede hospedagem (tarefa agendada no servidor), serviço de e-mail e a API oficial do WhatsApp (que exige autorização do paciente e cobra por mensagem). Por isso a Atualização 08 é o botão com a mensagem pronta.
@@ -311,6 +311,26 @@ Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.
 - **Ajuste 08.3.1:** a tabela agora tem colunas em porcentagem e nunca passa da largura do quadro (antes, em algumas telas, a coluna **Ações** ficava cortada na direita). Nomes, e-mails e planos muito longos ganham "..." ou quebram de linha; o e-mail inteiro aparece ao passar o mouse. Em telas abaixo de 1360 px de largura, a tela usa os cartões.
 - **Não foi incluído, de propósito:** sino de notificações (o sistema ainda não tem notificações) e botão **Exportar** (dado de saúde e CPF; vale decidir com a LGPD em mente).
 - **Próximo passo:** a Atualização 09 (**Leads**) entra no grupo **Dia a dia** do menu.
+
+### Atualização 08.4 (Painel mais limpo: Operação primeiro e Visão executiva enxuta)
+**Não tem SQL.** Só atualize os arquivos (`git pull`, ou copie a pasta nova por cima) e aperte **Ctrl + F5** (o navegador troca para a versão `ndo-v15` do app). Ordem das atualizações de banco, para quem ainda não fez todas: ... → 07 → 08 → 08.1 (da 08.2 em diante não mexem no banco).
+
+**Princípio:** cada aba responde **uma pergunta**. **Nenhum número ou conta mudou** (são os mesmos de antes, conferidos pelos testes); só a apresentação.
+
+**Aba Operação — "o que eu faço hoje?" (agora é a que abre primeiro)**
+- **4 cartões de tarefa no alto**, cada um leva para a lista certa: **parcelas para cobrar ou conferir** (com quantas estão atrasadas e o valor), **vencem em até N dias** (com quantos já venceram), **sem abrir o app há 7 dias ou mais** e **pendências no app** (resgates + denúncias, cada um com seu link). O cartão inteiro é clicável; número zerado fica apagado.
+- Uma linha de resumo: pacientes em carteira, abriram o app em 7 dias, check-ins hoje e atletas.
+- **Risco de renovação** (lista enxuta de 3 colunas: Paciente com plano, valor e "visto por último"; Renovação; Ação com WhatsApp e ícone de abrir a ficha) com a **previsão "a renovar em 30 dias"** logo acima. **Aniversariantes** e **Próximas provas** ficam numa coluna ao lado (no celular, uma embaixo da outra).
+
+**Aba Visão executiva — "como está o negócio?"**
+- **Pontos de atenção no topo**, numa faixa curta: só aparece o que tem número (vence em até 7 dias, planos vencidos, parcelas em atraso, sem responsável, sem abrir o app, renovações em risco, aniversariantes hoje). Sem nada, diz "Nada pedindo atenção agora".
+- **4 números grandes:** pacientes em carteira (com "N novos pacientes no período"), vendido, recebido e taxa de renovação. Saíram os mini gráficos dos cartões e as caixinhas que repetiam os mesmos valores.
+- **Evolução financeira** é o gráfico principal: os números do topo são **vendido no ano** e **a receber**; a **inadimplência** virou uma linha só, em vermelho, que leva ao Financeiro (ou "nenhuma parcela em atraso"). Os valores do último mês ficam à direita do gráfico **sem se sobrepor** (antes, valores parecidos como R$ 9,3 mil e R$ 9,1 mil colavam).
+- **Distribuição da carteira** mostra **um gráfico por vez**, com as abas **Plano | Sexo | Modalidade**. **Crescimento da carteira** mostra o gráfico e o "+X% em 6 meses" no título; a tabela fica em **Ver em tabela**. A tabela dos **responsáveis** ocupa a largura toda embaixo.
+- **Uma paleta só:** **vinho** para destaque e **tons de vinho/greige** para categorias (a rosca deixou de ser verde); **verde só para o que é bom** (setas para cima, crescimento) e **vermelho só para alerta**. A linha "Recebido" do gráfico agora é greige.
+- **Saiu o bloco "Comercial · Leads — Em breve"** (volta na Atualização 09, já com dados reais). "Sem base para comparar" virou um traço discreto "—" e o anel de 0% não aparece vazio.
+- **Endereços antigos continuam funcionando:** `/admin?aba=operacao` abre a Operação e `/admin?p=mes&g=12` abre a Visão executiva.
+- **Próximo passo:** a Atualização 09 (**Leads**).
 
 ### Acessos para teste
 | Perfil | E-mail | Senha |
@@ -456,7 +476,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Excluir paciente importado de teste** (LGPD): consultas, pagamentos e perfil esportivo dele somem junto.
 
 ### E7. Painel gerencial
-- [ ] **Abrir Admin:** a tela inicial mostra **Visão executiva** (6 cartões, evolução financeira, carteira, crescimento, responsáveis, alertas). A aba **Operação** mostra o painel antigo.
+- [ ] **Abrir Admin:** a tela inicial mostra a **Operação** (o que fazer hoje). A segunda aba, **Visão executiva**, mostra os pontos de atenção, os 4 números grandes, a evolução financeira, a carteira, o crescimento e os responsáveis (veja o roteiro E8.4).
 - [ ] **Períodos:** troque entre Últimos 30 dias, Este mês, Mês passado e Este ano: os números mudam e as setas comparam com o período anterior. Gráfico: 6 meses, 12 meses ou ano.
 - [ ] **Conferir um número:** o **Vendido** do mês bate com **Financeiro** (vendido do mês). O **A receber** bate com a agenda de recebíveis.
 - [ ] **Paciente desde:** cadastre um paciente novo (vem preenchido com hoje) → **Novos pacientes** sobe 1. Edite na ficha para uma data antiga → ele sai de "Novos".
@@ -474,7 +494,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Quem não aparece:** paciente com plano **vencido**, conta **desativada** ou **sem data de nascimento** não aparece (embaixo da lista há o aviso de quantos estão sem data).
 - [ ] **WhatsApp:** **Dar parabéns** abre o WhatsApp com a mensagem pronta e o primeiro nome (sem enviar nada sozinho). Paciente sem telefone mostra "sem WhatsApp".
 - [ ] **Mensagem:** Configurações → **Mensagem de aniversário** → mude o texto (com `{nome}`) → salve → o botão passa a usar o novo texto.
-- [ ] **Painel:** aba **Operação** mostra os aniversariantes dos próximos 7 dias; a **Visão executiva** mostra "aniversariantes hoje" nos Alertas.
+- [ ] **Painel:** aba **Operação** mostra os aniversariantes dos próximos 7 dias; a **Visão executiva** mostra "aniversariantes hoje" nos Pontos de atenção (quando houver).
 - [ ] **Celular:** cada aniversariante vira um cartão, sem rolagem para o lado, e o botão **Dar parabéns** aparece inteiro.
 - [ ] **Importação:** baixe o modelo de novo: tem a coluna **Data de nascimento**. Teste com 2 pacientes fictícios.
 - [ ] **Privacidade (importante):** entrar como paciente → nenhuma tela mostra data de nascimento, autorização ou aniversariantes. Abrir `/admin/aniversarios` como paciente → bloqueado.
@@ -518,6 +538,20 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Celular:** cada paciente vira um cartão, sem rolagem horizontal; os indicadores ficam em 2 colunas; os atalhos rolam para o lado; o menu ☰ abre o menu vinho completo.
 - [ ] **Privacidade (importante):** entrar como paciente e abrir `/admin/pacientes` → bloqueado.
 
+### E8.4. Painel mais limpo
+- [ ] **Abrir o Painel:** abre na **Operação**. As abas aparecem na ordem **Operação, Visão executiva**. O texto de cima diz "O que precisa de você hoje." (e "Como está o negócio." na Visão executiva).
+- [ ] **4 cartões de tarefa:** *parcelas para cobrar ou conferir* (igual ao Financeiro), *vencem em até 15 dias* (com "N vencidos sem renovar"), *sem abrir o app há 7 dias ou mais* (igual a Pacientes > Sumidos) e *pendências no app* (resgates + denúncias). Clique em cada um: vai para a lista certa. Clique também em "N atrasadas", "N vencidos", "N resgates" e "N denúncias".
+- [ ] **Resumo e previsão:** a linha com pacientes em carteira / abriram o app em 7 dias / check-ins hoje / atletas; e "R$ … a renovar em 30 dias" acima da lista de risco (com o exterior à parte, quando houver US$ ou €).
+- [ ] **Risco de renovação:** cada paciente com plano e valor, "visto …" e "check-in em …", selo de renovação, botão **WhatsApp** (só com telefone) e o ícone 👁 que abre a ficha. Quem está sumido aparece primeiro, com a etiqueta *sumido*.
+- [ ] **Aniversariantes e Próximas provas** aparecem ao lado (computador) ou embaixo (celular), sem rolagem horizontal.
+- [ ] **Visão executiva:** faixa **Pontos de atenção** no topo (só com números maiores que zero; compare com Pacientes e Financeiro), depois 4 números grandes. Confira que "Pacientes em carteira", "Vendido", "Recebido" e "Taxa de renovação" estão iguais aos de antes.
+- [ ] **Evolução financeira:** troque 6 meses / 12 meses / Ano atual; veja "Vendido no ano" e "A receber" no alto, a linha de **inadimplência** em vermelho e os valores do último mês à direita do gráfico, sem um por cima do outro. "Ver em tabela" mostra os mesmos valores.
+- [ ] **Carteira:** clique em **Plano**, **Sexo** e **Modalidade** (um gráfico por vez; as setas ← → do teclado também trocam). **Crescimento:** "+X% em 6 meses" no título e tabela em *Ver em tabela*.
+- [ ] **Cores:** a rosca é de tons de vinho/greige; verde só nas setas para cima e no crescimento; vermelho só em atraso e alertas.
+- [ ] **Endereços antigos:** `/admin?aba=operacao` abre a Operação e `/admin?p=mes` abre a Visão executiva.
+- [ ] **Celular:** os dois painéis em uma coluna, cartões em 2 colunas, sem rolagem horizontal, botão ☰ abre o menu.
+- [ ] **Privacidade (importante):** entrar como paciente e abrir `/admin` → bloqueado.
+
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
 - [ ] O painel admin no celular abre o menu pelo botão ☰ (gaveta lateral).
@@ -530,9 +564,9 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **1218 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **1284 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
-> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), aniversários (janelas, 29/02, autorização, mensagem editável, privacidade), cadastro com sexo, CPF (dígitos, duplicado), Instagram e endereço (Brasil e exterior), importação v4 e gráfico por sexo (conferido contra cálculo independente), ficha em abas (cada coisa na aba certa, cada botão volta para a aba certa, privacidade) e menu em grupos, tela Pacientes nova (indicadores conferidos contra o Painel e o banco, atalhos e contagens, "Em atraso", busca por CPF e WhatsApp, paginação, lote, tabela sem valores, parâmetros estranhos na URL, cores e frase do painel), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
+> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), aniversários (janelas, 29/02, autorização, mensagem editável, privacidade), cadastro com sexo, CPF (dígitos, duplicado), Instagram e endereço (Brasil e exterior), importação v4 e gráfico por sexo (conferido contra cálculo independente), ficha em abas (cada coisa na aba certa, cada botão volta para a aba certa, privacidade) e menu em grupos, tela Pacientes nova (indicadores conferidos contra o Painel e o banco, atalhos e contagens, "Em atraso", busca por CPF e WhatsApp, paginação, lote, tabela sem valores, parâmetros estranhos na URL, cores e frase do painel), Painel mais limpo (Operação primeiro, cartões de tarefa conferidos contra o banco, pontos de atenção iguais aos alertas, quatro números iguais ao Insights, rótulos do gráfico sem sobreposição, abas da carteira, endereços antigos), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
 > ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, os
 > arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql`, `atualizacao_04_financeiro_v2.sql`, `atualizacao_05_pacientes.sql`, `atualizacao_06_importacao.sql`, `atualizacao_07_painel.sql`, `atualizacao_08_aniversarios.sql` e `atualizacao_08b_cadastro.sql`) é o primeiro teste a fazer.
@@ -578,6 +612,7 @@ Ideal: faça no celular e depois no computador.
 | **Cadastro completo**: sexo (gráfico por sexo na carteira), CPF para recibo/nota fiscal, Instagram, endereço completo, filtro "Cadastro incompleto"; telas de Planos/Responsáveis/Modalidades mais limpas | ✅ **Neste MVP** (atualização 08.1) |
 | **Ficha do paciente em abas** (Resumo, Plano e financeiro, Acompanhamento, App do paciente) e **menu lateral em grupos** (Dia a dia, Cadastros, App do paciente, Sistema) | ✅ **Neste MVP** (atualização 08.2) |
 | **Pacientes: tela nova** (indicadores, busca e filtros compactos, atalhos com contagem, tabela enxuta, ações com ícone, paginação) e **cores da logo** no painel admin | ✅ **Neste MVP** (atualização 08.3) |
+| **Painel mais limpo**: Operação abre primeiro (4 cartões de tarefa) e Visão executiva enxuta (pontos de atenção no topo, 4 números, um gráfico principal, carteira por abas, paleta única) | ✅ **Neste MVP** (atualização 08.4) |
 | **Aniversário automático** por e-mail e WhatsApp (precisa de hospedagem, serviço de e-mail, API oficial do WhatsApp, autorização do paciente e revisão jurídica) | ⏭️ Depois da hospedagem |
 | Estagiárias com **login próprio** (cada uma vê só os pacientes dela, sem valores), mensagem de ação por faixa de vencimento (15/30 dias), acompanhamento da renovação | ⏭️ Próxima rodada (pede revisão de segurança) |
 | Financeiro, próximos passos: **notificação push** da cobrança do dia, taxa de renovação, previsão por mês, acompanhamento da renovação (conversei / vai renovar / não vai), marcador "cobrado em", mensagem de cobrança editável, importação de **renovações/histórico** por planilha | ⏭️ Próxima rodada |
