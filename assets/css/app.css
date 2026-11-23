@@ -377,7 +377,7 @@ body.admin { background: var(--bg); }
 .admin-nav nav a:hover { color: var(--ink); background: var(--soft); }
 .admin-nav nav a[aria-current="page"] { color: var(--on-ink); background: var(--ink); clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px); }
 .admin-user { padding: 14px 12px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
-.admin-main { padding: 20px 14px 48px; max-width: 1120px; }
+.admin-main { padding: 20px 14px 48px; max-width: 1240px; }
 
 @media (max-height: 1000px) {
     .admin-nav nav a { padding: 8px 12px; }
@@ -971,3 +971,20 @@ a.pg:hover { border-color: var(--brand); color: var(--brand); }
     .admin-motto { margin-top: 8px; padding-top: 10px; line-height: 1.55; }
     body.admin .admin-user { padding-top: 6px; }
 }
+
+/* Atualização 08.3.1 - a tabela de Pacientes nunca passa da largura do quadro (colunas em porcentagem; o texto quebra ou ganha "...") */
+.ptable .tbl { table-layout: fixed; width: 100%; }
+.ptable col.k-chk { width: 40px; }
+.ptable col.k-who { width: 22.5%; }
+.ptable col.k-plan { width: 12%; }
+.ptable col.k-mod { width: 11.5%; }
+.ptable col.k-due { width: 12%; }
+.ptable col.k-st { width: 15%; }
+.ptable col.k-resp { width: 9.5%; }
+.ptable col.k-act { width: 134px; }
+.ptable .tbl th { white-space: normal; }
+.ptable .tbl .who-mail { max-width: 100%; }
+.ptable .plan-pill { max-width: 100%; }
+.ptable .st { white-space: normal; border-radius: 12px; padding: 3px 9px; }
+.ptable .tbl td { overflow-wrap: anywhere; }
+.ptable .tbl td.c-who, .ptable .tbl td.c-act { overflow-wrap: normal; }

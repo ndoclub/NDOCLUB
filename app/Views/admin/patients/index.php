@@ -207,6 +207,7 @@ $statusTag = function (array $r) use ($cards) {
     </form>
     <div class="tbl-wrap">
         <table class="tbl tbl-patients">
+            <colgroup><col class="k-chk"><col class="k-who"><col class="k-plan"><col class="k-mod"><col class="k-due"><col class="k-st"><col class="k-resp"><col class="k-act"></colgroup>
             <thead><tr>
                 <th class="chk"><span class="sr-only">Marcar</span></th>
                 <?= $th('name', 'Paciente') ?>

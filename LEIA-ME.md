@@ -294,7 +294,7 @@ Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.
 - **Próximo passo:** a Atualização 09 (**Leads**) entra no grupo **Dia a dia** do menu.
 
 ### Atualização 08.3 (Pacientes: tela nova e cores da logo no painel)
-**Não tem SQL.** Só atualize os arquivos (`git pull`, ou copie a pasta nova por cima) e aperte **Ctrl + F5** (o navegador troca para a versão `ndo-v13` do app). Ordem das atualizações de banco, para quem ainda não fez todas: ... → 07 → 08 → 08.1 (as 08.2 e 08.3 não mexem no banco).
+**Não tem SQL.** Só atualize os arquivos (`git pull`, ou copie a pasta nova por cima) e aperte **Ctrl + F5** (o navegador troca para a versão `ndo-v14` do app). Ordem das atualizações de banco, para quem ainda não fez todas: ... → 07 → 08 → 08.1 (as 08.2 e 08.3 não mexem no banco).
 
 **O que mudou**
 - **Identidade da logo em todo o painel admin:** menu lateral **vinho** com a logo circular clara, fundo **creme** e botões/destaques em vinho (`#670001`), com o greige (`#9D897B`) só em detalhes. O **app do paciente continua com as cores de antes** (as cores novas só valem dentro do `/admin`).
@@ -308,6 +308,7 @@ Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.
   - **Seleção múltipla e ações em lote** continuam. **"Selecionar todos" marca só os pacientes da página que está na tela.**
   - **Paginação:** 25 por página (escolha 10, 25, 50 ou 100 em *Mostrar*), com "Mostrando 1–25 de N pacientes". Filtros, busca e ordem se mantêm ao trocar de página.
   - **Celular e telas menores:** cada paciente vira um **cartão** (nome, plano, modalidade, vencimento, status e responsável), com os mesmos ícones de ação.
+- **Ajuste 08.3.1:** a tabela agora tem colunas em porcentagem e nunca passa da largura do quadro (antes, em algumas telas, a coluna **Ações** ficava cortada na direita). Nomes, e-mails e planos muito longos ganham "..." ou quebram de linha; o e-mail inteiro aparece ao passar o mouse. Em telas abaixo de 1360 px de largura, a tela usa os cartões.
 - **Não foi incluído, de propósito:** sino de notificações (o sistema ainda não tem notificações) e botão **Exportar** (dado de saúde e CPF; vale decidir com a LGPD em mente).
 - **Próximo passo:** a Atualização 09 (**Leads**) entra no grupo **Dia a dia** do menu.
 
