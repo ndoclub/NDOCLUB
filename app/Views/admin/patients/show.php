@@ -96,8 +96,8 @@ if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
                 'currency' => $priceInfo['source'] === 'plan' ? 'BRL' : $priceInfo['currency'],
                 'placeholder' => $planRow && $planRow['price'] !== null ? number_format((float) $planRow['price'], 2, ',', '') : 'Igual ao do plano',
                 'hint' => $priceInfo['source'] === 'reajuste'
-                    ? 'Mantendo o valor antigo até renovar; depois passa para ' . ($priceInfo['planPrice'] !== null ? money($priceInfo['planPrice']) : 'o valor do plano') . '. Só o admin vê.'
-                    : 'Em branco = valor do plano' . ($planRow && $planRow['price'] !== null ? ' (' . money((float) $planRow['price']) . ')' : '') . '. Só se for diferente (ou em dólar/euro). Só o admin vê.',
+                    ? 'Mantendo o valor antigo até renovar; depois passa para ' . ($priceInfo['planPrice'] !== null ? money($priceInfo['planPrice']) : 'o valor do plano') . '. Só o admin vê. Não muda vendas já registradas.'
+                    : 'Em branco = valor do plano' . ($planRow && $planRow['price'] !== null ? ' (' . money((float) $planRow['price']) . ')' : '') . '. Só se for diferente (ou em dólar/euro). Só o admin vê. Vale para a previsão e para a próxima renovação; não muda vendas já registradas (veja em Plano e financeiro > Pagamentos).',
             ]); ?>
             <div class="field"><label for="renewal_date">Vence em</label><input class="input" type="date" id="renewal_date" name="renewal_date" value="<?= e(substr((string) $p['renewal_date'], 0, 10)) ?>"></div>
             <div class="field"><label for="joined_on">Paciente desde</label><input class="input" type="date" id="joined_on" name="joined_on" max="<?= e(today()) ?>" value="<?= e(substr((string) ($p['joined_on'] ?? ''), 0, 10)) ?>">

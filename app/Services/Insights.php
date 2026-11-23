@@ -199,8 +199,12 @@ final class Insights
     private static function sold(string $from, string $to): array
     {
         $out = [];
-        foreach (DB::all('SELECT currency, SUM(total) AS t FROM payments WHERE sold_on >= ? AND sold_on <= ? GROUP BY currency', [$from, $to]) as $r) {
-            $out[$r['currency']] = (float) $r['t'];
+        // Vendido = total das vendas menos as parcelas canceladas (venda toda cancelada não conta)
+        foreach (DB::all('SELECT p.currency, SUM(' . Payments::soldExpr() . ') AS t FROM payments p WHERE p.sold_on >= ? AND p.sold_on <= ? GROUP BY p.currency', [$from, $to]) as $r) {
+            $v = round((float) $r['t'], 2);
+            if ($v > 0) {
+                $out[$r['currency']] = $v;
+            }
         }
         return $out;
     }
@@ -243,7 +247,7 @@ final class Insights
         $today = today();
         $first = date('Y-m-d', strtotime(date('Y-m-01', strtotime($today)) . ' -11 month'));
         $soldBy = [];
-        foreach (DB::all("SELECT SUBSTR(sold_on, 1, 7) AS ym, SUM(total) AS t FROM payments WHERE currency = 'BRL' AND sold_on >= ? AND sold_on <= ? GROUP BY SUBSTR(sold_on, 1, 7)", [$first, $today]) as $r) {
+        foreach (DB::all("SELECT SUBSTR(p.sold_on, 1, 7) AS ym, SUM(" . Payments::soldExpr() . ") AS t FROM payments p WHERE p.currency = 'BRL' AND p.sold_on >= ? AND p.sold_on <= ? GROUP BY SUBSTR(p.sold_on, 1, 7)", [$first, $today]) as $r) {
             $soldBy[$r['ym']] = (float) $r['t'];
         }
         $recvBy = [];

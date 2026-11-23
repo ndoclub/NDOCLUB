@@ -540,6 +540,16 @@ final class Payments
         return $out;
     }
 
+    /**
+     * Valor "Vendido" de uma venda (use com a tabela payments apelidada de $p): o total da venda MENOS as parcelas
+     * canceladas (estorno, paciente que parou de pagar, venda lançada por engano). Cancelar tudo zera a venda;
+     * reativar a parcela devolve o valor.
+     */
+    public static function soldExpr(string $p = 'p'): string
+    {
+        return "({$p}.total - COALESCE((SELECT SUM(ci.amount) FROM payment_installments ci WHERE ci.payment_id = {$p}.id AND ci.status = 'canceled'), 0))";
+    }
+
     /** Valor que ainda vai cair: em reais é o líquido (depois da taxa); em dólar/euro, o valor da parcela. */
     private static function netExpr(string $a = ''): string
     {
@@ -557,10 +567,13 @@ final class Payments
     public static function monthSummary(string $ym): array
     {
         [$from, $to] = self::range($ym);
+        $soldExpr = self::soldExpr();
         $sold = DB::all(
-            'SELECT currency, SUM(total) AS t, COUNT(*) AS n FROM payments WHERE sold_on >= ? AND sold_on < ? GROUP BY currency',
+            "SELECT p.currency, SUM({$soldExpr}) AS t, SUM(CASE WHEN {$soldExpr} > 0.004 THEN 1 ELSE 0 END) AS n FROM payments p WHERE p.sold_on >= ? AND p.sold_on < ? GROUP BY p.currency",
             [$from, $to]
         );
+        // venda toda cancelada não conta nem aparece (nem como "US$ 0")
+        $sold = array_values(array_filter($sold, fn($r) => (float) $r['t'] > 0.004));
         $soldCount = 0;
         foreach ($sold as $r) {
             $soldCount += (int) $r['n'];
