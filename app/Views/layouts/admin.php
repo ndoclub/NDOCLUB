@@ -39,12 +39,12 @@ $navGroups = [
 <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true" tabindex="-1">
 <header class="admin-top">
     <label for="nav-toggle" class="burger" aria-label="Abrir menu"><?= icon('menu') ?></label>
-    <a class="brand" href="<?= e(url('/admin')) ?>"><img src="<?= e(asset('img/logo-nd.svg')) ?>" alt="" width="30" height="29"></a>
+    <a class="brand" href="<?= e(url('/admin')) ?>"><img src="<?= e(asset('img/logo-nd-vinho.svg')) ?>" alt="" width="30" height="29"></a>
     <h1><?= e($title) ?></h1>
 </header>
 <label for="nav-toggle" class="nav-scrim" aria-hidden="true"></label>
 <aside class="admin-nav" aria-label="Menu do painel">
-    <a class="admin-logo" href="<?= e(url('/admin')) ?>"><img src="<?= e(asset('img/logo-horizontal.svg')) ?>" alt="<?= e(app_name()) ?>" width="170" height="51"></a>
+    <a class="admin-logo" href="<?= e(url('/admin')) ?>"><img src="<?= e(asset('img/logo-circular-claro.png')) ?>" alt="<?= e(app_name()) ?>" width="150" height="156"></a>
     <nav>
         <?php $gi = 0; foreach ($navGroups as $gLabel => $gItems): $gi++; ?>
         <div class="nav-sec" role="group" aria-labelledby="nav-g<?= $gi ?>">
@@ -55,12 +55,22 @@ $navGroups = [
         </div>
         <?php endforeach; ?>
     </nav>
+    <p class="admin-motto">Constância vence a perfeição porque todo dia conta.</p>
     <div class="admin-user">
         <span><?= e($user['name'] ?? '') ?></span>
         <form method="post" action="<?= e(url('/logout')) ?>"><?= csrf_field() ?><button class="link-btn" type="submit">Sair</button></form>
     </div>
 </aside>
 <main class="admin-main" id="main">
+    <div class="admin-bar">
+        <p class="motto">Constância vence a perfeição<br>porque todo dia conta.</p>
+        <details class="user-menu">
+            <summary><span class="ini"><?= e(initials((string) ($user['name'] ?? '?'))) ?></span><span class="user-name"><?= e(first_name((string) ($user['name'] ?? ''))) ?></span><span class="caret" aria-hidden="true">▾</span></summary>
+            <div class="menu-pop">
+                <form method="post" action="<?= e(url('/logout')) ?>"><?= csrf_field() ?><button type="submit"><?= icon('logout', 18) ?> Sair</button></form>
+            </div>
+        </details>
+    </div>
     <?php partial('flash'); ?>
     <?= $content ?>
 </main>

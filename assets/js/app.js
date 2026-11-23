@@ -82,8 +82,23 @@
             for (var i = 0; i < items.length; i++) { items[i].checked = t.checked; }
             countChecked();
         } else if (t.hasAttribute('data-check-item')) {
+            var all = document.querySelector('input[data-check-all]');
+            if (all) { all.checked = document.querySelectorAll('input[data-check-item]:not(:checked)').length === 0; }
             countChecked();
         }
+    });
+
+    // Menus de "mais opções" (lista de pacientes, usuário no alto): fecham ao clicar fora ou apertar Esc
+    function closeMenus(except) {
+        var open = document.querySelectorAll('details.ra-menu[open], details.user-menu[open]');
+        for (var i = 0; i < open.length; i++) { if (open[i] !== except) { open[i].removeAttribute('open'); } }
+    }
+    document.addEventListener('click', function (ev) {
+        var inside = ev.target.closest ? ev.target.closest('details.ra-menu, details.user-menu') : null;
+        closeMenus(inside);
+    });
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') { closeMenus(null); }
     });
 
     // Confirmação em botões que escolhem a ação (ex.: Recusar resgate)

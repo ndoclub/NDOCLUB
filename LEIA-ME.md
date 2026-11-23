@@ -54,6 +54,8 @@ Todo o visual fica em um único arquivo: `assets/css/app.css`. As cores estão n
 status `--ok`, `--warn`, `--bad`. Para mudar o clima do app inteiro, troque esses valores. As logos têm
 versão escura (`logo-*.svg`, usadas hoje) e branca (`logo-*-branco.svg`, para fundos pretos).
 
+**Painel admin (desde a 08.3):** usa as cores da logo circular (vinho `#670001`, greige `#9D897B`, creme `#F6F3E3`). Elas estão no bloco *Atualização 08.3* no fim de `assets/css/app.css`, dentro de `body.admin { ... }` — por isso só valem no `/admin`; o app do paciente segue com as cores do bloco `:root` acima.
+
 ## 2. Como o código está organizado (pronto para crescer)
 
 ```
@@ -291,6 +293,24 @@ Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.
 - **Privacidade e regras:** nada mudou. Só o admin vê a ficha; o paciente continua sem ver valores, CPF, endereço, sexo, nascimento nem nada do financeiro.
 - **Próximo passo:** a Atualização 09 (**Leads**) entra no grupo **Dia a dia** do menu.
 
+### Atualização 08.3 (Pacientes: tela nova e cores da logo no painel)
+**Não tem SQL.** Só atualize os arquivos (`git pull`, ou copie a pasta nova por cima) e aperte **Ctrl + F5** (o navegador troca para a versão `ndo-v13` do app). Ordem das atualizações de banco, para quem ainda não fez todas: ... → 07 → 08 → 08.1 (as 08.2 e 08.3 não mexem no banco).
+
+**O que mudou**
+- **Identidade da logo em todo o painel admin:** menu lateral **vinho** com a logo circular clara, fundo **creme** e botões/destaques em vinho (`#670001`), com o greige (`#9D897B`) só em detalhes. O **app do paciente continua com as cores de antes** (as cores novas só valem dentro do `/admin`).
+- **Frase institucional** *"Constância vence a perfeição porque todo dia conta."* no alto das telas do painel (computador) e, discreta, no rodapé do menu lateral. O botão **Sair** foi para o menu do seu nome, no canto de cima.
+- **Tela Pacientes refeita:**
+  - **5 indicadores no topo**, com as mesmas contas do Painel: *Pacientes em carteira* (planos em dia hoje), *Novos no mês*, *Faturamento contratado* (vendido no mês em reais; dólar e euro aparecem à parte), *Renovações próximas* (planos que vencem nos próximos 15 dias, com "N vencem em até 7 dias") e *Taxa de renovação*. As setas comparam com o mês passado até o mesmo dia.
+  - **Busca e filtros numa área só:** busca por **nome, e-mail, CPF ou WhatsApp** + Plano, Modalidade, Status e Vencimento. O que sobrou (Responsável, Consultas, Ordenar por, Sumidos, Sem acesso ao app, Cadastro incompleto, Atletas, Competem, Sem assessoria…) está em **Mais filtros** (abre sozinho quando há filtro ali dentro).
+  - **Atalhos com contagem:** *Todos · Ativos · Inativos · Em atraso · Renovação próxima*. **Em atraso** = plano vencido **ou** parcela já vencida e não recebida. As contagens respeitam a busca e os outros filtros.
+  - **Tabela enxuta:** avatar, nome e e-mail, plano, modalidade, vencimento (data e dias), status (*Ativo, Renovação próxima, Inativo, Desativado, Sem data* e, quando for o caso, *Parcela atrasada*), responsável e ações. **Saíram da tabela:** pontos, "visto por último", valores em dinheiro, "x de y" de consultas e a etiqueta "sumido" (tudo continua na **ficha** e nos filtros).
+  - **Ações com ícone:** 👁 ver a ficha · ✏️ editar os dados · ⋯ mais opções (Plano e financeiro, Acompanhamento, App do paciente e WhatsApp, quando há telefone).
+  - **Seleção múltipla e ações em lote** continuam. **"Selecionar todos" marca só os pacientes da página que está na tela.**
+  - **Paginação:** 25 por página (escolha 10, 25, 50 ou 100 em *Mostrar*), com "Mostrando 1–25 de N pacientes". Filtros, busca e ordem se mantêm ao trocar de página.
+  - **Celular e telas menores:** cada paciente vira um **cartão** (nome, plano, modalidade, vencimento, status e responsável), com os mesmos ícones de ação.
+- **Não foi incluído, de propósito:** sino de notificações (o sistema ainda não tem notificações) e botão **Exportar** (dado de saúde e CPF; vale decidir com a LGPD em mente).
+- **Próximo passo:** a Atualização 09 (**Leads**) entra no grupo **Dia a dia** do menu.
+
 ### Acessos para teste
 | Perfil | E-mail | Senha |
 |---|---|---|
@@ -413,13 +433,13 @@ Ideal: faça no celular e depois no computador.
 ### E5. Lista de pacientes, consultas e responsáveis
 - [ ] **Planos:** Admin → Planos → Editar → preencher **Consultas presenciais incluídas** (ex.: 4). A tabela de Planos mostra a coluna **Consultas**. Número inválido (letras, 61 ou mais) é recusado; em branco = "definir".
 - [ ] **Responsáveis:** Admin → Responsáveis → Novo responsável. Nome repetido é recusado. Desativar não apaga.
-- [ ] **Atribuir em lote:** Pacientes → marcar 3 pacientes → escolher a estagiária → **Aplicar**. O aviso diz quantos mudaram e a coluna **Responsável** mostra o nome. O filtro **Responsável** mostra só os dela e **Sem responsável** mostra quem ficou sem.
+- [ ] **Atribuir em lote:** Pacientes → marcar 3 pacientes → escolher a estagiária em *Ações em lote* → **Aplicar**. O aviso diz quantos mudaram e a coluna **Responsável** mostra o nome. Em **Mais filtros**, o filtro **Responsável** mostra só os dela e **Sem responsável** mostra quem ficou sem.
 - [ ] **Status:** paciente com vencimento no futuro aparece **Ativo**; com data passada aparece **Inativo**; conta bloqueada (ficha → Acesso → Desativado) aparece **Desativado**.
 - [ ] **Vencimento:** filtro **16 a 30 dias** mostra só quem vence nessa faixa. Conferir a data na coluna Vencimento.
-- [ ] **Ordenar:** clicar em **Vencimento** (mais próximo primeiro), clicar de novo (mais distante primeiro). Clicar em **Pontos**, **Consultas**, **Responsável**. O filtro escolhido não se perde ao ordenar.
-- [ ] **Sumido:** paciente que não abre o app há 7+ dias mostra **sumido** ao lado do status; o botão **Sumidos** lista só eles. Na ficha, a etiqueta "Visto ..." mostra a última vez que ele entrou.
+- [ ] **Ordenar:** clicar em **Vencimento** (mais próximo primeiro), clicar de novo (mais distante primeiro). Clicar em **Plano**, **Status**, **Responsável**; em **Mais filtros → Ordenar por** também há *Consultas feitas*. O filtro escolhido não se perde ao ordenar.
+- [ ] **Sumido:** em **Mais filtros → Sumidos** aparecem só os pacientes que não abrem o app há 7+ dias. Na ficha, a etiqueta "Visto ..." mostra a última vez que ele entrou.
 - [ ] **Registrar consulta:** ficha → aba **Acompanhamento** → **Consultas presenciais** → data de hoje → **Registrar consulta**. Mostra "1 de 4", "restam 3". Data futura é recusada. Quantidade 2 lança duas de uma vez. **Apagar** remove.
-- [ ] **Cota completa:** ao chegar em "4 de 4" aparece **cota completa** na ficha e **completa** na lista; o filtro **Cota de consultas completa** lista o paciente.
+- [ ] **Cota completa:** ao chegar em "4 de 4" aparece **cota completa** na ficha; em **Mais filtros → Consultas → Cota de consultas completa** o paciente aparece na lista.
 - [ ] **Renovar zera o contador:** renovar o paciente → volta para "0 de 4"; o histórico mostra as consultas antigas como **anterior**.
 - [ ] **Privacidade (importante):** entrar como paciente → nenhuma tela mostra responsável nem consultas. Abrir `/admin/responsaveis` como paciente → bloqueado.
 
@@ -483,6 +503,20 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Celular:** as 4 abas rolam para o lado; nenhuma tela da ficha tem rolagem horizontal; as tabelas de parcelas rolam dentro do próprio quadro.
 - [ ] **Privacidade (importante):** entrar como paciente e tentar abrir `/admin/pacientes/1?aba=app` → bloqueado. O app do paciente não tem abas nem o menu do admin.
 
+### E8.3. Pacientes: tela nova e cores da logo
+- [ ] **Cores e frase:** o menu lateral do `/admin` é vinho com a logo clara; o fundo é creme; no alto (computador) aparece *"Constância vence a perfeição porque todo dia conta."* e a mesma frase, pequena, no rodapé do menu. O app do **paciente** continua com as cores de antes (entre como a Felipe e confira).
+- [ ] **Menu do usuário:** clique no seu nome (canto de cima) → **Sair**. Clicar fora ou apertar **Esc** fecha o menu.
+- [ ] **Indicadores:** 5 cartões (Pacientes em carteira, Novos no mês, Faturamento contratado, Renovações próximas, Taxa de renovação). Confira com o **Painel**: os números e as setas devem ser iguais. *Renovações próximas* leva para o atalho de mesmo nome.
+- [ ] **Atalhos:** clique em **Ativos**, **Inativos**, **Em atraso** e **Renovação próxima**. O número entre parênteses é a quantidade de pacientes que a lista mostra. **Em atraso** inclui quem tem **plano vencido** e quem tem **parcela vencida e não recebida** (aparece o selo vermelho *Parcela atrasada*).
+- [ ] **Busca:** procure por parte do nome, do e-mail, do **CPF** (com ou sem pontos) e do **WhatsApp** (com ou sem máscara). "Limpar filtros" volta ao começo.
+- [ ] **Mais filtros:** abre e fecha; mostra Responsável, Consultas, Ordenar por e os atalhos Sumidos, Sem acesso ao app, Cadastro incompleto, Atletas, Competem e Sem assessoria. Com um deles ligado, o quadro já abre aberto.
+- [ ] **Tabela:** só avatar, nome/e-mail, plano, modalidade, vencimento, status, responsável e ações. **Nada de pontos, "visto por último" ou valores em dinheiro.**
+- [ ] **Ações:** 👁 abre a ficha; ✏️ abre a ficha já no bloco *Dados do paciente*; ⋯ mostra Plano e financeiro, Acompanhamento, App do paciente e (com telefone) Abrir WhatsApp. Clicar fora fecha o menu.
+- [ ] **Lote:** marque 2 pacientes → escolha a estagiária → **Aplicar** → você volta **para a mesma página**. **Selecionar todos** marca só os da página.
+- [ ] **Paginação:** padrão 25 por página; trocar para 10/50/100 funciona; a página 2 mostra outros pacientes; "Mostrando 26–50 de N"; busca e filtros não se perdem ao trocar de página.
+- [ ] **Celular:** cada paciente vira um cartão, sem rolagem horizontal; os indicadores ficam em 2 colunas; os atalhos rolam para o lado; o menu ☰ abre o menu vinho completo.
+- [ ] **Privacidade (importante):** entrar como paciente e abrir `/admin/pacientes` → bloqueado.
+
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
 - [ ] O painel admin no celular abre o menu pelo botão ☰ (gaveta lateral).
@@ -495,9 +529,9 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **1077 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **1218 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
-> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), aniversários (janelas, 29/02, autorização, mensagem editável, privacidade), cadastro com sexo, CPF (dígitos, duplicado), Instagram e endereço (Brasil e exterior), importação v4 e gráfico por sexo (conferido contra cálculo independente), ficha em abas (cada coisa na aba certa, cada botão volta para a aba certa, privacidade) e menu em grupos, financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
+> perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), aniversários (janelas, 29/02, autorização, mensagem editável, privacidade), cadastro com sexo, CPF (dígitos, duplicado), Instagram e endereço (Brasil e exterior), importação v4 e gráfico por sexo (conferido contra cálculo independente), ficha em abas (cada coisa na aba certa, cada botão volta para a aba certa, privacidade) e menu em grupos, tela Pacientes nova (indicadores conferidos contra o Painel e o banco, atalhos e contagens, "Em atraso", busca por CPF e WhatsApp, paginação, lote, tabela sem valores, parâmetros estranhos na URL, cores e frase do painel), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
 > ser executado nesse ambiente** — por isso o passo 4/5 da instalação (e, para quem já tinha o banco, os
 > arquivos `atualizacao_01_planos.sql`, `atualizacao_02_atletas.sql`, `atualizacao_03_financeiro.sql`, `atualizacao_04_financeiro_v2.sql`, `atualizacao_05_pacientes.sql`, `atualizacao_06_importacao.sql`, `atualizacao_07_painel.sql`, `atualizacao_08_aniversarios.sql` e `atualizacao_08b_cadastro.sql`) é o primeiro teste a fazer.
@@ -542,6 +576,7 @@ Ideal: faça no celular e depois no computador.
 | **Aniversários**: data de nascimento, aniversariantes do dia/semana/mês, botão de WhatsApp com mensagem pronta e editável, caixinha de autorização | ✅ **Neste MVP** (atualização 08) |
 | **Cadastro completo**: sexo (gráfico por sexo na carteira), CPF para recibo/nota fiscal, Instagram, endereço completo, filtro "Cadastro incompleto"; telas de Planos/Responsáveis/Modalidades mais limpas | ✅ **Neste MVP** (atualização 08.1) |
 | **Ficha do paciente em abas** (Resumo, Plano e financeiro, Acompanhamento, App do paciente) e **menu lateral em grupos** (Dia a dia, Cadastros, App do paciente, Sistema) | ✅ **Neste MVP** (atualização 08.2) |
+| **Pacientes: tela nova** (indicadores, busca e filtros compactos, atalhos com contagem, tabela enxuta, ações com ícone, paginação) e **cores da logo** no painel admin | ✅ **Neste MVP** (atualização 08.3) |
 | **Aniversário automático** por e-mail e WhatsApp (precisa de hospedagem, serviço de e-mail, API oficial do WhatsApp, autorização do paciente e revisão jurídica) | ⏭️ Depois da hospedagem |
 | Estagiárias com **login próprio** (cada uma vê só os pacientes dela, sem valores), mensagem de ação por faixa de vencimento (15/30 dias), acompanhamento da renovação | ⏭️ Próxima rodada (pede revisão de segurança) |
 | Financeiro, próximos passos: **notificação push** da cobrança do dia, taxa de renovação, previsão por mês, acompanhamento da renovação (conversei / vai renovar / não vai), marcador "cobrado em", mensagem de cobrança editável, importação de **renovações/histórico** por planilha | ⏭️ Próxima rodada |

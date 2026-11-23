@@ -64,7 +64,7 @@ if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
 <?php if ($aba === 'resumo'): ?>
 <div class="cols">
 <div>
-    <form class="panel" method="post" action="<?= e(url('/admin/pacientes/' . $id)) ?>">
+    <form class="panel" id="dados" method="post" action="<?= e(url('/admin/pacientes/' . $id)) ?>">
         <?= csrf_field() ?>
         <h3>Dados do paciente</h3>
         <div class="form-grid">

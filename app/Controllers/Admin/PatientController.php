@@ -8,6 +8,7 @@ use App\Core\View;
 use App\Services\Athletes;
 use App\Services\Audit;
 use App\Services\Consultations;
+use App\Services\Insights;
 use App\Services\Levels;
 use App\Services\Payments;
 use App\Services\PersonalData;
@@ -16,6 +17,7 @@ use App\Services\Points;
 use App\Services\Ranking;
 use App\Services\Responsibles;
 use App\Services\Renewal;
+use App\Services\Settings;
 use App\Services\Streak;
 
 final class PatientController
@@ -77,16 +79,66 @@ final class PatientController
         };
     }
 
+    /** Atalhos rápidos do alto da lista (cada um mostra a quantidade). A chave vai na URL como ?f= */
+    public static function quickFilters(): array
+    {
+        return ['all' => 'Todos', 'active' => 'Ativos', 'expired' => 'Inativos', 'late' => 'Em atraso', 'soon' => 'Renovação próxima'];
+    }
+
+    /** Outros atalhos (dentro de "Mais filtros"). Os links antigos do Painel continuam funcionando. */
+    public static function moreFilters(): array
+    {
+        return ['green' => 'Em dia', 'yellow' => 'Vencem logo', 'red' => 'Críticos', 'away' => 'Sumidos', 'noapp' => 'Sem acesso ao app', 'inactive' => 'Desativados',
+                'athletes' => 'Atletas', 'compete' => 'Competem', 'nocoach' => 'Sem assessoria', 'incomplete' => 'Cadastro incompleto'];
+    }
+
+    /**
+     * Um paciente entra no atalho? Definições:
+     *  Ativos = plano em dia · Inativos = plano vencido e não renovado
+     *  Em atraso = plano vencido OU parcela pendente já vencida · Renovação próxima = vence de hoje até o limite do selo amarelo.
+     */
+    private static function matchesQuick(string $f, array $r, int $yellowDays): bool
+    {
+        $active = $r['status'] === 'active';
+        $isAthlete = (int) ($r['is_athlete'] ?? 0) === 1;
+        return match ($f) {
+            'active'     => $r['plan_status']['key'] === 'active',
+            'expired'    => $r['plan_status']['key'] === 'expired',
+            'late'       => $r['plan_status']['key'] === 'expired' || !empty($r['late']),
+            'soon'       => $active && $r['renew']['days'] !== null && $r['renew']['days'] >= 0 && $r['renew']['days'] <= $yellowDays,
+            'inactive'   => $r['status'] === 'inactive',
+            'green', 'yellow', 'red' => $active && $r['renew']['seal'] === $f,
+            'away'       => $active && $r['away'],
+            'noapp'      => $r['noapp'],
+            'incomplete' => PersonalData::incomplete($r),
+            'athletes'   => $isAthlete,
+            'compete'    => $isAthlete && (int) $r['competes'] === 1,
+            'nocoach'    => $isAthlete && (int) $r['has_coach'] === 0,
+            default      => true,
+        };
+    }
+
     public function index(): void
     {
-        $q = trim((string) ($_GET['q'] ?? ''));
-        $filter = (string) ($_GET['f'] ?? 'all');
-        $sportId = (int) ($_GET['s'] ?? 0);
-        $planFilter = (int) ($_GET['plan'] ?? 0);
-        $stFilter = (string) ($_GET['st'] ?? '');
-        $dueFilter = (string) ($_GET['v'] ?? '');
-        $respFilter = (string) ($_GET['r'] ?? '');
-        $consFilter = (string) ($_GET['c'] ?? '');
+        // Parâmetros da URL: só texto simples (?f[]=x e parecidos viram vazio, sem aviso nem filtro estranho)
+        $get = fn(string $k, string $d = ''): string => is_string($_GET[$k] ?? null) ? $_GET[$k] : $d;
+        $q = trim($get('q'));
+        $filter = $get('f', 'all');
+        if (!isset(self::quickFilters()[$filter]) && !isset(self::moreFilters()[$filter])) {
+            $filter = 'all';
+        }
+        $perOptions = [10, 25, 50, 100];
+        $perPage = (int) $get('pp', '25');
+        if (!in_array($perPage, $perOptions, true)) {
+            $perPage = 25;
+        }
+        $page = max(1, (int) $get('pg', '1'));
+        $sportId = (int) $get('s');
+        $planFilter = (int) $get('plan');
+        $stFilter = $get('st');
+        $dueFilter = $get('v');
+        $respFilter = $get('r');
+        $consFilter = $get('c');
         if (!in_array($stFilter, ['active', 'expired', 'disabled', 'nodate'], true)) {
             $stFilter = '';
         }
@@ -102,7 +154,7 @@ final class PatientController
 
         // Ordenação: "chave_sentido" (ex.: renewal_asc). Chave desconhecida volta para nome A a Z.
         $sorts = self::sortOptions();
-        $ord = (string) ($_GET['ord'] ?? 'name_asc');
+        $ord = $get('ord', 'name_asc');
         [$sortKey, $sortDir] = array_pad(explode('_', $ord, 2), 2, 'asc');
         if (!isset($sorts[$sortKey])) {
             $sortKey = 'name';
@@ -140,9 +192,20 @@ final class PatientController
             $params[] = (int) $respFilter;
         }
         if ($q !== '') {
-            $sql .= ' AND (u.name LIKE ? OR u.email LIKE ?)';
-            $params[] = '%' . $q . '%';
-            $params[] = '%' . $q . '%';
+            // Nome e e-mail; e, se tiver 3 números ou mais, também CPF e WhatsApp (só os dígitos)
+            $digits = preg_replace('/\D+/', '', $q) ?? '';
+            if (strlen($digits) >= 3) {
+                $sql .= " AND (u.name LIKE ? OR u.email LIKE ? OR u.cpf LIKE ?
+                          OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(u.phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') LIKE ?)";
+                $params[] = '%' . $q . '%';
+                $params[] = '%' . $q . '%';
+                $params[] = '%' . $digits . '%';
+                $params[] = '%' . $digits . '%';
+            } else {
+                $sql .= ' AND (u.name LIKE ? OR u.email LIKE ?)';
+                $params[] = '%' . $q . '%';
+                $params[] = '%' . $q . '%';
+            }
         }
         // ORDER BY só usa expressões da lista fechada acima (nada vem direto da URL)
         [, , , , $expr, $nullsLast] = $sorts[$sortKey];
@@ -152,38 +215,22 @@ final class PatientController
         }
 
         $weekAgo = date('Y-m-d H:i:s', strtotime('-7 day'));
-        $list = [];
+        Payments::syncCards();
+        $lateIds = array_fill_keys(array_map('intval', array_column(DB::all(
+            "SELECT DISTINCT p.user_id AS id FROM payment_installments i JOIN payments p ON p.id = i.payment_id WHERE i.status = 'pending' AND i.due_on < ?",
+            [today()]
+        ), 'id')), true);
+        $yellowDays = (int) Settings::get('warn_yellow_days', 15);
+
+        // 1) Filtros de fora dos atalhos (status, vencimento, consultas). Dá a base para contar os atalhos.
+        $base = [];
         foreach (DB::all($sql, $params) as $r) {
             $r['renew'] = Renewal::info($r['renewal_date']);
             $r['noapp'] = (int) $r['app_access'] === 0; // importado, acesso ainda não liberado
             $r['away'] = !$r['noapp'] && (empty($r['last_seen_at']) || $r['last_seen_at'] < $weekAgo);
             $r['plan_status'] = Renewal::planStatus((string) $r['status'], $r['renewal_date']);
             $r['cons'] = Consultations::summary((int) $r['done_count'], $r['quota']);
-            if ($filter === 'inactive' && $r['status'] !== 'inactive') {
-                continue;
-            }
-            if (in_array($filter, ['green', 'yellow', 'red'], true) && ($r['status'] !== 'active' || $r['renew']['seal'] !== $filter)) {
-                continue;
-            }
-            if ($filter === 'away' && ($r['status'] !== 'active' || !$r['away'])) {
-                continue;
-            }
-            if ($filter === 'noapp' && !$r['noapp']) {
-                continue;
-            }
-            if ($filter === 'incomplete' && !PersonalData::incomplete($r)) {
-                continue;
-            }
-            $isAthlete = (int) ($r['is_athlete'] ?? 0) === 1;
-            if ($filter === 'athletes' && !$isAthlete) {
-                continue;
-            }
-            if ($filter === 'compete' && !($isAthlete && (int) $r['competes'] === 1)) {
-                continue;
-            }
-            if ($filter === 'nocoach' && !($isAthlete && (int) $r['has_coach'] === 0)) {
-                continue;
-            }
+            $r['late'] = isset($lateIds[(int) $r['id']]);
             if ($stFilter !== '' && $r['plan_status']['key'] !== $stFilter) {
                 continue;
             }
@@ -203,17 +250,54 @@ final class PatientController
             if ($consFilter === 'noquota' && $r['cons']['quota'] !== null) {
                 continue;
             }
-            $list[] = $r;
+            $base[] = $r;
+        }
+
+        // 2) Quantos pacientes cada atalho mostraria (com a busca e os outros filtros já aplicados)
+        $counts = array_fill_keys(array_keys(self::quickFilters()), 0);
+        foreach ($base as $r) {
+            foreach ($counts as $k => $n) {
+                if (self::matchesQuick($k, $r, $yellowDays)) {
+                    $counts[$k]++;
+                }
+            }
+        }
+
+        // 3) O atalho escolhido
+        $list = array_values(array_filter($base, fn($r) => self::matchesQuick($filter, $r, $yellowDays)));
+
+        // 4) Paginação
+        $total = count($list);
+        $pages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $pages);
+        $offset = ($page - 1) * $perPage;
+        $shown = array_slice($list, $offset, $perPage);
+
+        // 5) Indicadores do alto (mês atual contra o mês passado até o mesmo dia; mesmas definições do Painel)
+        $ins = Insights::build('mes', '6');
+        $soon = 0;
+        $soon7 = 0;
+        foreach (DB::all("SELECT renewal_date FROM users WHERE role = 'patient' AND status = 'active' AND renewal_date IS NOT NULL") as $x) {
+            $dd = (int) days_until($x['renewal_date']);
+            if ($dd >= 0 && $dd <= $yellowDays) {
+                $soon++;
+            }
+            if ($dd >= 0 && $dd <= 7) {
+                $soon7++;
+            }
         }
         View::render('admin/patients/index', [
-            'title' => 'Pacientes', 'list' => $list, 'q' => $q, 'filter' => $filter,
+            'title' => 'Pacientes', 'list' => $shown, 'q' => $q, 'filter' => $filter,
+            'cards' => ['ins' => $ins, 'soon' => $soon, 'soon7' => $soon7, 'yellow' => $yellowDays],
+            'counts' => $counts, 'quick' => self::quickFilters(), 'more' => self::moreFilters(),
+            'total' => $total, 'page' => $page, 'pages' => $pages, 'perPage' => $perPage, 'perOptions' => $perOptions, 'offset' => $offset,
             'sportId' => $sportId, 'sports' => Athletes::sports(false),
             'planFilter' => $planFilter, 'planOptions' => Plans::withCounts(),
             'stFilter' => $stFilter, 'dueFilter' => $dueFilter, 'respFilter' => $respFilter, 'consFilter' => $consFilter,
             'dueBuckets' => self::dueBuckets(),
             'sorts' => $sorts, 'ord' => $ord, 'sortKey' => $sortKey, 'sortDir' => $sortDir,
             'responsibles' => Responsibles::all(), 'respChoices' => Responsibles::choices(),
-            'sportNames' => Athletes::namesFor(array_column($list, 'id')),
+            'sportNames' => Athletes::namesFor(array_column($shown, 'id')),
         ], 'admin');
     }
 
@@ -473,7 +557,7 @@ final class PatientController
         $suggest = Plans::renewalSuggestion($id);
         $lastMethod = $payments ? (string) $payments[0]['method'] : 'pix';
         $consSummary = Consultations::summary(Consultations::done($id), $planRow['consultations_included'] ?? null);
-        $aba = (string) ($_GET['aba'] ?? 'resumo');
+        $aba = is_string($_GET['aba'] ?? null) ? $_GET['aba'] : 'resumo';
         if (!isset(self::ABAS[$aba])) {
             $aba = 'resumo';
         }
