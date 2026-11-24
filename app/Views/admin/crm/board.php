@@ -57,11 +57,18 @@ $backHere = current_path();
     <?php endforeach; ?>
     <?php if ($hasFilters): ?><a class="chip chip-clear" href="<?= e(url('/admin/crm/quadro')) ?>">Limpar filtros</a><?php endif; ?>
 </div>
-<p class="kb-sum small muted">
-    <strong class="kb-sum-n"><?= (int) $total ?></strong> <?= $total === 1 ? 'lead no quadro' : 'leads no quadro' ?><?= $hasFilters ? ' (com os filtros)' : '' ?>
-    · <a href="<?= e(url('/admin/crm?f=pot')) ?>" title="Soma do valor do plano de interesse dos leads nas etapas marcadas em Configurar">Receita potencial em negociação: <strong data-pot-total data-total="<?= e((string) $ind['potential']) ?>"><?= e($mny($ind['potential'])) ?></strong></a>
-    <span data-pot-unpriced-wrap<?= $ind['unpriced'] > 0 ? '' : ' hidden' ?>> · <span data-pot-unpriced data-n="<?= (int) $ind['unpriced'] ?>"><?= (int) $ind['unpriced'] ?></span> sem plano de interesse (fora da soma)</span>
-</p>
+<div class="kb-bar">
+    <p class="kb-sum small muted">
+        <strong class="kb-sum-n"><?= (int) $total ?></strong> <?= $total === 1 ? 'lead no quadro' : 'leads no quadro' ?><?= $hasFilters ? ' (com os filtros)' : '' ?>
+        · <a href="<?= e(url('/admin/crm?f=pot')) ?>" title="Soma do valor do plano de interesse dos leads nas etapas marcadas em Configurar">Receita potencial em negociação: <strong data-pot-total data-total="<?= e((string) $ind['potential']) ?>"><?= e($mny($ind['potential'])) ?></strong></a>
+        <span data-pot-unpriced-wrap<?= $ind['unpriced'] > 0 ? '' : ' hidden' ?>> · <span data-pot-unpriced data-n="<?= (int) $ind['unpriced'] ?>"><?= (int) $ind['unpriced'] ?></span> sem plano de interesse (fora da soma)</span>
+    </p>
+    <?php /* só aparece (via JavaScript) quando as colunas não cabem na tela: evita arrastar a barra de rolagem */ ?>
+    <div class="kb-nav" data-board-nav hidden>
+        <button class="kb-arrow" type="button" data-board-go="-1" aria-label="Ver as colunas anteriores" title="Colunas anteriores">‹</button>
+        <button class="kb-arrow" type="button" data-board-go="1" aria-label="Ver as próximas colunas" title="Próximas colunas">›</button>
+    </div>
+</div>
 
 <?php if (!$columns): ?>
     <div class="empty"><strong>Nenhuma etapa ativa</strong>Ative ou crie as etapas do funil em Configurar.</div>
@@ -71,7 +78,7 @@ $backHere = current_path();
     <section class="kcol" role="listitem" data-stage="<?= $sid ?>" data-name="<?= e($st['name']) ?>" data-active="<?= (int) $st['active'] ?>" aria-labelledby="kh<?= $sid ?>">
         <header class="kcol-h">
             <h3 id="kh<?= $sid ?>"><?= e($st['name']) ?><?= (int) $st['active'] ? '' : ' <span class="small muted">(desativada)</span>' ?></h3>
-            <span class="kcol-n" data-count title="Leads nesta etapa"><?= (int) $col['total'] ?></span>
+            <span class="kcol-n" data-count-wrap title="<?= (int) $col['total'] ?> <?= (int) $col['total'] === 1 ? 'lead' : 'leads' ?> nesta etapa"><span data-count><?= (int) $col['total'] ?></span> <span data-unit><?= (int) $col['total'] === 1 ? 'lead' : 'leads' ?></span></span>
         </header>
         <?php if (!empty($st['potential'])): ?>
             <p class="kcol-sum small" data-sum="<?= e((string) $col['potential']) ?>" data-unpriced="<?= (int) $col['unpriced'] ?>" title="Soma do plano de interesse dos leads desta coluna (etapa marcada como receita potencial)"><?= e($mny($col['potential'])) ?><?= $col['unpriced'] > 0 ? ' · ' . (int) $col['unpriced'] . ' sem plano' : '' ?></p>

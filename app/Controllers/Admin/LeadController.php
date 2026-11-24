@@ -73,6 +73,7 @@ final class LeadController
         $b = Leads::board($f);
         View::render('admin/crm/board', [
             'title' => 'CRM · Quadro',
+            'wide' => true, // o Quadro usa a largura toda da tela (o conteúdo do painel normalmente tem limite)
             'columns' => $b['columns'], 'total' => $b['total'], 'f' => $f,
             'counts' => Leads::counts(),
             'ind' => Leads::indicators(),

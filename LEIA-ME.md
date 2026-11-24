@@ -357,7 +357,7 @@ Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.
 - **Preparado para depois, sem fazer nada sozinho:** o sistema **não envia mensagem nenhuma** (nem WhatsApp, nem e-mail, nem Instagram). Cada linha da linha do tempo já tem os campos `source` e `external_id`, reservados para integrações futuras.
 
 **Como as próximas etapas encaixam** (combinado):
-- **09.2** (já feita, veja abaixo) indicadores, responsáveis, follow-up, ficha completa, reativação e conversão em paciente · **09.3** (já feita, veja abaixo) Funil em quadro (Kanban, arrastar o lead entre as etapas) · **09.4** Central de follow-up e alertas no Painel (inclui "lead sem próxima ação") · **09.5** Bloco **Comercial** no Painel e filtros dos indicadores por período, origem, responsável e modalidade.
+- **09.2** (já feita, veja abaixo) indicadores, responsáveis, follow-up, ficha completa, reativação e conversão em paciente · **09.3** (já feita, veja abaixo; ajustes na **09.3.1**) Funil em quadro (Kanban, arrastar o lead entre as etapas) · **09.4** Central de follow-up e alertas no Painel (inclui "lead sem próxima ação") · **09.5** Bloco **Comercial** no Painel e filtros dos indicadores por período, origem, responsável e modalidade.
 - **Definições já combinadas:** *receita potencial* = valor do plano de interesse dos leads em aberto nas etapas **Proposta enviada + Negociação**; *receita contratada* = valor das conversões do período (**não** é o mesmo que *recebido*).
 - **Atualização 10 — Equipe e perfis:** login próprio para a secretária e para você e o Gabriel, perfis de acesso (Administrador e Secretaria, com CRM + Pacientes + Financeiro, sem Visão executiva, sem excluir paciente, sem planos e taxas, sem configurações e auditoria), "Conferência do mês" opcional e revisão de segurança. A regra de acesso do CRM já está em **um lugar só** no código, para esse ajuste ser pequeno.
 
@@ -403,6 +403,16 @@ Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.
 - **Abas do CRM organizadas:** **Quadro | Lista | Reativação | Configurar**. A antiga aba "Leads" agora se chama **Lista**. O que é de cada aba: *Quadro* = enxergar e mover o funil; *Lista* = tabela com indicadores, filtros e atribuição em lote; *Reativação* = leads perdidos; *Configurar* = origens, etapas, motivos e cadência.
 - **Tela inicial do CRM:** em *Configurar > Tela inicial do CRM* você escolhe se o item **CRM** do menu abre o **Quadro** (padrão) ou a **Lista**. É só a tela que abre primeiro: as duas continuam nas abas.
 - **Segurança:** só administrador acessa; o arrastar usa o mesmo token de segurança (CSRF) dos formulários; sem script na página (o código fica em `assets/js/app.js`).
+
+### Atualização 09.3.1 (Quadro: ajustes depois do primeiro uso)
+**Esta atualização NÃO tem SQL.** Só `git pull` (ou copiar a pasta nova) e **Ctrl + F5** (o app passa para a versão `ndo-v19`).
+
+**O que mudou no Quadro (o resto do CRM continua igual):**
+- **Soltar o cartão em qualquer ponto da coluna.** Antes, a coluna era uma caixinha só do tamanho dos cartões: uma coluna com 1 cartão ficava curta e, se você soltasse o cartão na faixa vazia embaixo dela, nada acontecia (já uma coluna com 5 cartões, mais comprida, aceitava). Agora **todas as colunas têm a mesma altura** e a coluna inteira recebe o cartão. Soltar na **folga entre duas colunas** também vale: o cartão vai para a coluna mais próxima.
+- **Quadro com a largura toda da tela.** O conteúdo do painel tem um limite de largura (bom para tabelas); o Quadro agora ignora esse limite e **usa todo o espaço ao lado do menu**. Em monitor grande, as 6 colunas cabem sem barra de rolagem.
+- **Sem barra de rolagem dentro de coluna.** A coluna cresce até mostrar todos os cartões (no máximo 30) e a página rola normalmente.
+- **Quando as colunas não cabem** (notebook, janela estreita): aparecem duas **setas ‹ ›** no canto direito, acima das colunas, que levam para as colunas anteriores/seguintes (não precisa arrastar a barra). E, ao **arrastar um cartão perto da borda** do quadro, ele rola sozinho para o lado. No celular, continua deslizando o dedo.
+- **O número do alto de cada coluna agora diz "leads"** (ex.: "3 leads", "1 lead"). É a **quantidade de leads em aberto naquela etapa**, não tem relação com a próxima etapa. Ao passar o mouse aparece "3 leads nesta etapa".
 
 ### Acessos para teste
 | Perfil | E-mail | Senha |
@@ -661,7 +671,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Privacidade:** entrar como paciente e abrir `/admin/crm/reativacao` → bloqueado.
 
 ### E9.3. CRM: Quadro Kanban
-> Antes: deu Ctrl + F5 (versão `ndo-v18`). Não tem SQL nesta atualização. Use a janela anônima, entrando como administrador, e tenha alguns leads (o `demo_crm.sql` serve).
+> Antes: deu Ctrl + F5 (versão `ndo-v19`). Não tem SQL nesta atualização. Use a janela anônima, entrando como administrador, e tenha alguns leads (o `demo_crm.sql` serve).
 - [ ] **Abas:** o CRM tem **Quadro | Lista | Reativação | Configurar**. Cada aba abre a sua tela e a aba atual fica sublinhada. Nenhum botão ou indicador que existia na Lista sumiu.
 - [ ] **Mesmos leads:** o número no alto de cada coluna bate com o filtro *Etapa* da Lista. Cadastre um lead novo: ele aparece na coluna **Novo lead** do Quadro e na Lista.
 - [ ] **Arrastar:** arraste um cartão para outra coluna: ele muda de coluna, os dois números do alto se ajustam e aparece "Fulano foi para (etapa)". Abra a ficha dele: a etapa mudou e a linha do tempo tem "Mudou de etapa". Confira em **Auditoria**.
@@ -672,6 +682,9 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Receita potencial:** as colunas Proposta enviada e Negociação mostram a soma do plano de interesse. Arraste um cartão de **Qualificação** para **Negociação**: a soma da coluna e o total "Receita potencial em negociação" sobem o valor do plano dele (lead sem plano de interesse aparece em "sem plano").
 - [ ] **Coluna cheia:** com mais de 30 leads numa etapa, aparece "+ N leads na Lista" e o número do alto continua sendo o total.
 - [ ] **Tela inicial:** em *Configurar > Tela inicial do CRM* escolha **Lista**, salve, e clique em **CRM** no menu: abre a Lista. Volte para **Quadro**.
+- [ ] **(09.3.1) Soltar em qualquer ponto da coluna:** pegue um cartão da coluna **Novo lead** e solte na **parte de baixo, vazia**, da coluna **Primeiro contato** (mesmo ela tendo poucos cartões): o cartão passa para lá. Solte também **na folga entre duas colunas**: vai para a mais próxima.
+- [ ] **(09.3.1) Largura:** em tela grande o Quadro ocupa **todo o espaço ao lado do menu** e as 6 colunas cabem sem barra lateral. Em janela estreita aparecem as setas **‹ ›**; clique em **›** e as colunas andam. Arraste um cartão até a borda direita: o quadro rola sozinho.
+- [ ] **(09.3.1) Números:** o alto de cada coluna mostra "N leads" (ou "1 lead"). Arraste um cartão: os dois números e a palavra (lead/leads) se ajustam.
 - [ ] **Privacidade:** entrar como paciente e abrir `/admin/crm/quadro` → bloqueado.
 
 ### F. Celular e aparência
@@ -686,7 +699,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **1817 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **1955 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
 > perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), aniversários (janelas, 29/02, autorização, mensagem editável, privacidade), cadastro com sexo, CPF (dígitos, duplicado), Instagram e endereço (Brasil e exterior), importação v4 e gráfico por sexo (conferido contra cálculo independente), ficha em abas (cada coisa na aba certa, cada botão volta para a aba certa, privacidade) e menu em grupos, tela Pacientes nova (indicadores conferidos contra o Painel e o banco, atalhos e contagens, "Em atraso", busca por CPF e WhatsApp, paginação, lote, tabela sem valores, parâmetros estranhos na URL, cores e frase do painel), Painel mais limpo (Operação primeiro, cartões de tarefa conferidos contra o banco, pontos de atenção iguais aos alertas, quatro números iguais ao Insights, rótulos do gráfico sem sobreposição, abas da carteira, endereços antigos, venda cancelada saindo do Vendido), CRM / Leads (cadastro e validações, duplicados por e-mail, telefone em qualquer formato, Instagram e paciente, linha do tempo que só ganha linhas, próximo retorno, "Não contatar" e autorização, filtros e indicadores conferidos contra o banco, origens e etapas editáveis, exclusão LGPD, auditoria, acesso só do administrador, escape de HTML), CRM evoluído 09.2 (indicadores comerciais conferidos contra cálculo independente, atribuição em lote, estados do follow-up, ficha, perdidos e cadência de reativação 20/30/45 com datas, reabrir, conversão em paciente com resumo antes de gravar, duplicidade, vínculo com paciente existente, venda e parcelas no Financeiro, transação única, reenvio sem duplicar, moedas, segurança e escape de HTML), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde

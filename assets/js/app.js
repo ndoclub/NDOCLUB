@@ -269,9 +269,66 @@
         function zoneOf(ev) {
             return ev.target && ev.target.closest ? ev.target.closest('.kcol, [data-final-to]') : null;
         }
+        // Onde o cartão vai cair. Se soltou na folga entre duas colunas (ou na borda do quadro), vale a coluna mais próxima:
+        // ninguém precisa acertar o pixel.
+        function zoneAt(ev) {
+            var z = zoneOf(ev);
+            if (z) { return z; }
+            var r = board.getBoundingClientRect();
+            if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) { return null; }
+            var best = null, bestD = 21;
+            columns().forEach(function (c) {
+                var cr = c.getBoundingClientRect();
+                var d = ev.clientX < cr.left ? cr.left - ev.clientX : (ev.clientX > cr.right ? ev.clientX - cr.right : 0);
+                if (d < bestD) { bestD = d; best = c; }
+            });
+            return best;
+        }
+        // Se as colunas não cabem na tela, arrastar perto da borda do quadro rola para o lado sozinho.
+        function autoScroll(ev) {
+            if (board.scrollWidth <= board.clientWidth + 2) { return; }
+            var r = board.getBoundingClientRect();
+            if (ev.clientY < r.top - 40 || ev.clientY > r.bottom + 40) { return; }
+            if (ev.clientX < r.left + 70) { board.scrollLeft -= 24; } else if (ev.clientX > r.right - 70) { board.scrollLeft += 24; }
+        }
+        // Setas ‹ › (só aparecem quando as colunas não cabem): rolam o quadro sem precisar arrastar a barra.
+        var nav = document.querySelector('[data-board-nav]');
+        function navState() {
+            if (!nav) { return; }
+            var over = board.scrollWidth > board.clientWidth + 4;
+            nav.hidden = !over;
+            if (!over) { return; }
+            var prev = nav.querySelector('[data-board-go="-1"]');
+            var next = nav.querySelector('[data-board-go="1"]');
+            if (prev) { prev.disabled = board.scrollLeft <= 2; }
+            if (next) { next.disabled = board.scrollLeft >= board.scrollWidth - board.clientWidth - 2; }
+        }
+        if (nav) {
+            nav.addEventListener('click', function (ev) {
+                var b = ev.target && ev.target.closest ? ev.target.closest('[data-board-go]') : null;
+                if (!b) { return; }
+                var first = board.querySelector('.kcol');
+                var w = first ? first.getBoundingClientRect().width + 12 : 260;
+                var dx = parseInt(b.getAttribute('data-board-go'), 10) * Math.max(w, board.clientWidth - w);
+                var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                if (board.scrollBy) { board.scrollBy({ left: dx, behavior: calm ? 'auto' : 'smooth' }); } else { board.scrollLeft += dx; }
+            });
+            board.addEventListener('scroll', navState, { passive: true });
+            window.addEventListener('resize', navState);
+            window.addEventListener('load', navState);
+            navState();
+        }
         function setCount(col, delta) {
             var out = col.querySelector('[data-count]');
-            if (out) { out.textContent = Math.max(0, (parseInt(out.textContent, 10) || 0) + delta); }
+            if (out) {
+                var n = Math.max(0, (parseInt(out.textContent, 10) || 0) + delta);
+                var word = n === 1 ? 'lead' : 'leads';
+                out.textContent = n;
+                var unit = col.querySelector('[data-unit]');
+                if (unit) { unit.textContent = word; }
+                var wrap = col.querySelector('[data-count-wrap]');
+                if (wrap) { wrap.setAttribute('title', n + ' ' + word + ' nesta etapa'); }
+            }
             var empty = col.querySelector('[data-empty]');
             if (empty) { empty.hidden = col.querySelectorAll('.kcard').length > 0; }
         }
@@ -362,27 +419,30 @@
             if (!card) { return; }
             dragged = card;
             card.classList.add('is-dragging');
+            board.classList.add('is-dragging-board');
             ev.dataTransfer.effectAllowed = 'move';
             try { ev.dataTransfer.setData('text/plain', card.getAttribute('data-lead') || ''); } catch (e) {}
             if (bar) { bar.hidden = false; }
         });
         document.addEventListener('dragend', function () {
             if (dragged) { dragged.classList.remove('is-dragging'); }
+            board.classList.remove('is-dragging-board');
             dragged = null;
             clearOver();
             if (bar) { bar.hidden = true; }
         });
         document.addEventListener('dragover', function (ev) {
             if (!dragged) { return; }
-            var z = zoneOf(ev);
-            if (!z) { return; }
+            autoScroll(ev);
+            var z = zoneAt(ev);
+            if (!z) { clearOver(); return; }
             ev.preventDefault();
             ev.dataTransfer.dropEffect = 'move';
             if (!z.classList.contains('is-over')) { clearOver(); z.classList.add('is-over'); }
         });
         document.addEventListener('drop', function (ev) {
             if (!dragged) { return; }
-            var z = zoneOf(ev);
+            var z = zoneAt(ev);
             if (!z) { return; }
             ev.preventDefault();
             var card = dragged;

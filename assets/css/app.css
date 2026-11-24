@@ -1235,15 +1235,26 @@ span.cfg-ord { display: inline-block; font-size: 20px; line-height: 42px; }
 .kb-sum a { color: inherit; text-decoration-color: var(--line-strong); }
 .kb-sum a:hover { color: var(--brand); }
 .kb-sum strong { color: var(--txt); }
-.kboard { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 12px; align-items: start; overflow-x: auto; padding: 2px 2px 14px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+.admin-main-wide { max-width: none; }
+.kb-bar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.kb-bar .kb-sum { margin: 0; min-width: 0; }
+.kb-nav { flex: none; display: flex; gap: 6px; }
+.kb-nav[hidden] { display: none; }
+.kb-arrow { width: 38px; height: 34px; padding: 0 0 3px; font-size: 24px; line-height: 1; font-weight: 700; color: var(--brand); background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer; }
+.kb-arrow:hover:not(:disabled) { background: var(--brand); color: var(--on-ink, #fff); border-color: var(--brand); }
+.kb-arrow:disabled { opacity: .35; cursor: default; }
+@media (max-width: 639px) { .kb-nav { display: none; } }
+/* Colunas da mesma altura: a coluna inteira (e não só a caixinha com os cartões) é a área onde se solta o cartão. */
+.kboard { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(224px, 1fr); gap: 12px; align-items: stretch; overflow-x: auto; padding: 2px 2px 14px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+.kboard.is-dragging-board { scroll-snap-type: none; }
 @media (max-width: 639px) { .kboard { grid-auto-columns: 84vw; margin-right: -4px; } }
 .kcol { display: flex; flex-direction: column; min-width: 0; background: var(--soft); border: 1px solid var(--line); border-radius: 16px; padding: 10px; scroll-snap-align: start; transition: border-color .12s, background-color .12s; }
 .kcol.is-over { border-color: var(--brand); border-style: dashed; background: rgba(103, 0, 1, .06); }
 .kcol-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 8px; }
-.kcol-h h3 { margin: 0; font-size: 15px; line-height: 1.25; min-width: 0; overflow-wrap: anywhere; }
-.kcol-n { flex: none; min-width: 28px; padding: 2px 8px; text-align: center; font-weight: 700; font-size: 13px; background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px; }
+.kcol-h h3 { margin: 0; font-size: 15px; line-height: 1.25; min-width: 0; overflow-wrap: break-word; }
+.kcol-n { flex: none; min-width: 28px; padding: 2px 9px; text-align: center; white-space: nowrap; font-weight: 700; font-size: 13px; background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px; }
 .kcol-sum { margin: -2px 4px 8px; font-weight: 700; color: var(--brand); }
-.kcol-body { display: flex; flex-direction: column; gap: 8px; min-height: 76px; max-height: min(68vh, 720px); overflow-y: auto; padding: 2px; }
+.kcol-body { display: flex; flex-direction: column; flex: 1 1 auto; gap: 8px; min-height: 76px; padding: 2px; }
 .kcol-empty { margin: 0; padding: 14px 8px; text-align: center; border: 1.5px dashed var(--line-strong); border-radius: 12px; }
 .kcol-empty[hidden] { display: none; }
 .kcol-more { display: block; padding: 8px; text-align: center; font-weight: 700; color: var(--brand); text-decoration: none; border-radius: 10px; }

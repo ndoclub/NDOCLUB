@@ -62,7 +62,7 @@ $navGroups = [
         <form method="post" action="<?= e(url('/logout')) ?>"><?= csrf_field() ?><button class="link-btn" type="submit">Sair</button></form>
     </div>
 </aside>
-<main class="admin-main" id="main">
+<main class="admin-main<?= !empty($wide) ? ' admin-main-wide' : '' ?>" id="main">
     <div class="admin-bar">
         <p class="motto">Constância vence a perfeição<br>porque todo dia conta.</p>
         <details class="user-menu">
