@@ -1,7 +1,7 @@
 <?php
 /**
  * Aba Operação: "o que eu faço hoje?". Quatro cartões de tarefa no alto (cada um leva para a lista),
- * uma linha de resumo, a previsão de renovação e as listas do dia (risco, aniversários, provas).
+ * (se houver retornos de leads para fazer, uma faixa do Follow-up do CRM), uma linha de resumo, a previsão de renovação e as listas do dia (risco, aniversários, provas).
  * Os números são os mesmos de antes; só a apresentação mudou.
  */
 $brlDue = money($due30['total'], floor($due30['total']) == $due30['total'] ? 0 : 2);
@@ -58,6 +58,16 @@ $pendHref = $nRep > 0 && $nRes === 0 ? '/admin/moderacao' : '/admin/resgates';
             <a class="<?= $nRep > 0 ? 'bad' : '' ?>" href="<?= e(url('/admin/moderacao')) ?>"><?= e($plural($nRep, 'denúncia', 'denúncias')) ?></a><?php endif; ?></span>
     </div>
 </div>
+
+<?php if ($crm['late'] + $crm['today'] + $crm['none'] > 0): ?>
+<div class="ocrm<?= $crm['late'] > 0 ? ' is-alert' : '' ?>" aria-label="Follow-up do CRM">
+    <span class="ocrm-t"><?= icon('filter', 18) ?> Follow-up de leads</span>
+    <?php if ($crm['late'] > 0): ?><a class="bad" href="<?= e(url('/admin/crm/follow-up')) ?>"><?= e($plural((int) $crm['late'], 'retorno atrasado', 'retornos atrasados')) ?></a><?php endif; ?>
+    <?php if ($crm['today'] > 0): ?><a href="<?= e(url('/admin/crm/follow-up')) ?>"><?= e($plural((int) $crm['today'], 'retorno para hoje', 'retornos para hoje')) ?></a><?php endif; ?>
+    <?php if ($crm['none'] > 0): ?><a href="<?= e(url('/admin/crm?f=none')) ?>"><?= e($plural((int) $crm['none'], 'lead sem retorno programado', 'leads sem retorno programado')) ?></a><?php endif; ?>
+    <a class="ocrm-go" href="<?= e(url('/admin/crm/follow-up')) ?>">Abrir o Follow-up →</a>
+</div>
+<?php endif; ?>
 
 <div class="ostats" aria-label="Resumo">
     <a href="<?= e(url('/admin/pacientes?st=active')) ?>"><b class="num"><?= (int) $stats['patients'] ?></b><span class="lbl">pacientes em carteira</span></a>

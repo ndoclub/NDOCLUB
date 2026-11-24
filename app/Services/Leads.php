@@ -57,9 +57,33 @@ final class Leads
     public const BOARD_LIMIT = 30;
 
     /** Telas iniciais possíveis do CRM (Configurar). */
-    public const HOME_VIEWS = ['board' => 'Quadro (colunas por etapa)', 'list' => 'Lista (tabela)'];
+    public const HOME_VIEWS = ['board' => 'Funil (colunas por etapa)', 'follow' => 'Follow-up (retornos por prazo)', 'list' => 'Lista (tabela)'];
+
+    /** Follow-up (09.4): faixas de prazo do próximo retorno, na ordem das colunas. "Próximos 7 dias" = de 2 a 7 dias (hoje e amanhã têm coluna própria). */
+    public const FOLLOW_BUCKETS = [
+        'late' => 'Atrasados', 'today' => 'Hoje', 'tomorrow' => 'Amanhã', 'week' => 'Próximos 7 dias', 'later' => 'Depois', 'none' => 'Sem retorno programado',
+    ];
+    /** Follow-up: quantos cartões de LEADS EM ABERTO aparecem por coluna (as tarefas de reativação aparecem todas; o resto fica na Lista). */
+    public const FOLLOW_LIMIT = 40;
+    /** Prazos do seletor "Reagendar para…" do cartão (dias a partir de hoje). "Outra data" abre a ficha. */
+    public const RESCHEDULE = [0 => 'Hoje', 1 => 'Amanhã', 3 => 'Em 3 dias', 7 => 'Em 7 dias', 15 => 'Em 15 dias', 30 => 'Em 30 dias'];
 
     public const DEFAULT_MESSAGE = 'Olá, {nome}! Tudo bem? Aqui é do No Days Off Club. Posso te ajudar com alguma dúvida sobre o acompanhamento nutricional?';
+
+    /**
+     * Texto padrão da mensagem de WhatsApp por TIPO DE AÇÃO do próximo retorno (09.4). Cada tipo pode ganhar um texto próprio em Configurações;
+     * sem texto próprio vale a mensagem geral que a equipe escreveu e, se não houver, estes textos. "Enviar WhatsApp" e "Outra ação" (e o lead sem ação marcada) usam a mensagem geral.
+     * Os textos não prometem preço, prazo nem desconto: só abrem a conversa.
+     */
+    public const ACTION_MESSAGES = [
+        'followup' => 'Olá, {nome}! Tudo bem? Aqui é do No Days Off Club. Passando para saber se você ainda tem interesse no acompanhamento nutricional e se posso te ajudar com alguma dúvida.',
+        'call' => 'Olá, {nome}! Aqui é do No Days Off Club. Tentei falar com você por telefone. Qual o melhor horário para conversarmos?',
+        'proposal' => 'Olá, {nome}! Tudo bem? Aqui é do No Days Off Club. Vou te enviar a proposta do acompanhamento nutricional por aqui. Qualquer dúvida, é só me chamar.',
+        'meeting' => 'Olá, {nome}! Tudo bem? Aqui é do No Days Off Club. Vamos marcar uma conversa para eu te explicar como funciona o acompanhamento? Qual dia e horário ficam melhores para você?',
+    ];
+
+    /** Quem entra no Follow-up: leads em aberto + tarefas de reativação (perdido que autorizou novos contatos, cadência em andamento e com data). "Não contatar" nunca entra. */
+    private const FU_BASE = "l.do_not_contact = 0 AND (l.status = 'open' OR (l.status = 'lost' AND l.contact_ok = 1 AND (l.recovery_status IS NULL OR l.recovery_status <> 'done') AND l.next_on IS NOT NULL))";
 
     // ------------------------------------------------------------------ listas
 
@@ -584,16 +608,7 @@ final class Leads
     {
         $w = ["l.status = 'lost'"];
         if (($f['q'] ?? '') !== '') {
-            $q = $f['q'];
-            $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $q) . '%';
-            $parts = ["l.name LIKE ? ESCAPE '!'", "l.email LIKE ? ESCAPE '!'", "l.instagram LIKE ? ESCAPE '!'", "l.phone LIKE ? ESCAPE '!'"];
-            array_push($p, $like, $like, $like, $like);
-            $key = self::phoneKey($q);
-            if ($key !== null && preg_match('/^[\d\s()+.-]+$/', $q)) {
-                $parts[] = 'l.phone_key = ?';
-                $p[] = $key;
-            }
-            $w[] = '(' . implode(' OR ', $parts) . ')';
+            $w[] = self::searchClause($f['q'], $p);
         }
         if (($f['reason'] ?? '') !== '') {
             $w[] = 'l.lost_reason_id = ?';
@@ -696,23 +711,28 @@ final class Leads
         ];
     }
 
+    /** Condição da busca por nome, e-mail, Instagram ou telefone (usada na Lista e no Follow-up). */
+    private static function searchClause(string $q, array &$p): string
+    {
+        // "!" é o caractere de escape do LIKE (funciona igual no MySQL e no SQLite)
+        $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $q) . '%';
+        $parts = ["l.name LIKE ? ESCAPE '!'", "l.email LIKE ? ESCAPE '!'", "l.instagram LIKE ? ESCAPE '!'", "l.phone LIKE ? ESCAPE '!'"];
+        array_push($p, $like, $like, $like, $like);
+        $key = self::phoneKey($q);
+        if ($key !== null && preg_match('/^[\d\s()+.-]+$/', $q)) {
+            $parts[] = 'l.phone_key = ?';
+            $p[] = $key;
+        }
+        return '(' . implode(' OR ', $parts) . ')';
+    }
+
     /** Monta o WHERE da lista a partir dos filtros. */
     private static function where(array $f, array &$p): string
     {
         // Convertidos têm a sua própria lista (atalho "Convertidos"); as demais telas só mostram oportunidades em aberto.
         $w = [($f['f'] ?? '') === 'won' ? "l.status = 'won'" : "l.status = 'open'"];
         if (($f['q'] ?? '') !== '') {
-            $q = $f['q'];
-            // "!" é o caractere de escape do LIKE (funciona igual no MySQL e no SQLite)
-            $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $q) . '%';
-            $parts = ["l.name LIKE ? ESCAPE '!'", "l.email LIKE ? ESCAPE '!'", "l.instagram LIKE ? ESCAPE '!'", "l.phone LIKE ? ESCAPE '!'"];
-            array_push($p, $like, $like, $like, $like);
-            $key = self::phoneKey($q);
-            if ($key !== null && preg_match('/^[\d\s()+.-]+$/', $q)) {
-                $parts[] = 'l.phone_key = ?';
-                $p[] = $key;
-            }
-            $w[] = '(' . implode(' OR ', $parts) . ')';
+            $w[] = self::searchClause($f['q'], $p);
         }
         foreach (['temp' => 'l.temperature', 'source' => 'l.source_id', 'stage' => 'l.stage_id', 'sport' => 'l.sport_id', 'plan' => 'l.plan_id'] as $k => $col) {
             if (($f[$k] ?? '') !== '') {
@@ -726,7 +746,9 @@ final class Leads
             $w[] = 'l.responsible_id = ?';
             $p[] = (int) $f['resp'];
         }
-        if (($f['task'] ?? '') !== '') {
+        if (($f['task'] ?? '') === 'none') {
+            $w[] = 'l.next_responsible_id IS NULL';
+        } elseif (($f['task'] ?? '') !== '') {
             $w[] = 'l.next_on IS NOT NULL AND l.next_responsible_id = ?';
             $p[] = (int) $f['task'];
         }
@@ -750,6 +772,9 @@ final class Leads
         } elseif (($f['f'] ?? '') === 'sched') {
             $w[] = 'l.next_on > ?';
             $p[] = $t;
+        } elseif (in_array($f['f'] ?? '', ['tomorrow', 'week', 'later'], true)) {
+            // faixas do Follow-up (09.4): o link "+ N na Lista" de uma coluna abre a Lista já nessa faixa
+            $w[] = self::dueSql($f['f'], $p);
         } elseif (($f['f'] ?? '') === 'none') {
             $w[] = 'l.next_on IS NULL AND l.do_not_contact = 0';
         } elseif (($f['f'] ?? '') === 'pot') {
@@ -792,16 +817,21 @@ final class Leads
         return ['rows' => $rows, 'total' => $total];
     }
 
-    /** Tela inicial do CRM escolhida em Configurar: 'board' (Quadro, padrão) ou 'list' (Lista). */
+    /** Tela inicial do CRM escolhida em Configurar: 'board' (Funil, padrão), 'follow' (Follow-up) ou 'list' (Lista). */
     public static function homeView(): string
     {
-        return Settings::get('crm_default_view', 'board') === 'list' ? 'list' : 'board';
+        $v = (string) Settings::get('crm_default_view', 'board');
+        return in_array($v, ['list', 'follow'], true) ? $v : 'board';
     }
 
     /** Caminho (sem o prefixo da instalação) da tela inicial do CRM; é para onde o item "CRM" do menu aponta. */
     public static function homeUrl(): string
     {
-        return self::homeView() === 'list' ? '/admin/crm' : '/admin/crm/quadro';
+        return match (self::homeView()) {
+            'list' => '/admin/crm',
+            'follow' => '/admin/crm/follow-up',
+            default => '/admin/crm/quadro',
+        };
     }
 
     /**
@@ -853,12 +883,219 @@ final class Leads
         return ['columns' => $cols, 'total' => $all];
     }
 
+    // ------------------------------------------------------------------ follow-up (09.4)
+    //
+    // Segunda visão dos MESMOS leads: em vez de colunas por etapa do funil, colunas por PRAZO do próximo retorno
+    // (Atrasados | Hoje | Amanhã | Próximos 7 dias | Depois | Sem retorno programado). Não cria dado novo: ler e reagendar usam leads.next_on.
+    // Entram os leads em aberto e as tarefas de reativação (perdido que autorizou novos contatos, com tentativa marcada). "Não contatar" nunca entra.
+
+    /** Resultado do ÚLTIMO contato registrado do lead (subconsulta; 'no_answer' = sem resposta). */
+    private const LAST_RESULT = "SELECT e.result FROM lead_events e WHERE e.lead_id = l.id AND e.kind = 'contact' ORDER BY e.happened_at DESC, e.id DESC LIMIT 1";
+
+    /** Atalhos (chips) do Follow-up. */
+    public const FOLLOW_CHIPS = [
+        '' => 'Todos', 'open' => 'Em aberto', 'recovery' => 'Reativação', 'hot' => 'Quentes', 'noanswer' => 'Sem resposta', 'never' => 'Nunca contatados',
+    ];
+
+    /** Faixa de prazo de uma data de retorno: late, today, tomorrow, week (2 a 7 dias), later (8 dias ou mais) ou none. */
+    public static function bucketOf(?string $nextOn): string
+    {
+        $d = days_until($nextOn);
+        if ($d === null) {
+            return 'none';
+        }
+        if ($d < 0) {
+            return 'late';
+        }
+        if ($d === 0) {
+            return 'today';
+        }
+        return $d === 1 ? 'tomorrow' : ($d <= 7 ? 'week' : 'later');
+    }
+
+    /** Condição SQL de uma faixa de prazo (acrescenta os parâmetros em $p, na ordem dos "?"). */
+    private static function dueSql(string $bucket, array &$p): string
+    {
+        $t = today();
+        switch ($bucket) {
+            case 'late':
+                $p[] = $t;
+                return 'l.next_on IS NOT NULL AND l.next_on < ?';
+            case 'today':
+                $p[] = $t;
+                return 'l.next_on = ?';
+            case 'tomorrow':
+                $p[] = date('Y-m-d', strtotime($t . ' +1 day'));
+                return 'l.next_on = ?';
+            case 'week':
+                $p[] = date('Y-m-d', strtotime($t . ' +2 days'));
+                $p[] = date('Y-m-d', strtotime($t . ' +7 days'));
+                return 'l.next_on BETWEEN ? AND ?';
+            case 'later':
+                $p[] = date('Y-m-d', strtotime($t . ' +7 days'));
+                return 'l.next_on > ?';
+        }
+        return 'l.next_on IS NULL';
+    }
+
+    /**
+     * WHERE do Follow-up. Filtros: q (busca), resp ("Retorno de": quem faz a tarefa; 'none' = ninguém definido) e c (atalho: open, recovery, hot, noanswer, never).
+     */
+    private static function followWhere(array $f, array &$p): string
+    {
+        $w = [self::FU_BASE];
+        if (($f['q'] ?? '') !== '') {
+            $w[] = self::searchClause($f['q'], $p);
+        }
+        // "Retorno de": quem faz a tarefa (o mesmo filtro da Lista); 'none' = ninguém escolhido para o retorno
+        if (($f['resp'] ?? '') === 'none') {
+            $w[] = 'l.next_responsible_id IS NULL';
+        } elseif (($f['resp'] ?? '') !== '') {
+            $w[] = 'l.next_on IS NOT NULL AND l.next_responsible_id = ?';
+            $p[] = (int) $f['resp'];
+        }
+        switch ($f['c'] ?? '') {
+            case 'open':
+                $w[] = "l.status = 'open'";
+                break;
+            case 'recovery':
+                $w[] = "l.status = 'lost'";
+                break;
+            case 'hot':
+                $w[] = "l.status = 'open' AND l.temperature = 'hot'";
+                break;
+            case 'noanswer':
+                $w[] = '(' . self::LAST_RESULT . ") = 'no_answer'";
+                break;
+            case 'never':
+                $w[] = "l.status = 'open' AND l.last_contact_at IS NULL";
+                break;
+        }
+        return implode(' AND ', $w);
+    }
+
+    /** SELECT dos cartões do Follow-up (lead + nomes do que é exibido). */
+    private const FU_SELECT = "SELECT l.*, s.name AS source_name, st.name AS stage_name, r.name AS responsible_name, nr.name AS next_responsible_name,
+                    sp.name AS sport_name, pl.name AS plan_name, lr.name AS lost_reason_name, (SELECT e.result FROM lead_events e WHERE e.lead_id = l.id AND e.kind = 'contact' ORDER BY e.happened_at DESC, e.id DESC LIMIT 1) AS last_result
+               FROM leads l
+               JOIN lead_stages st ON st.id = l.stage_id
+               LEFT JOIN lead_sources s ON s.id = l.source_id
+               LEFT JOIN responsibles r ON r.id = l.responsible_id
+               LEFT JOIN responsibles nr ON nr.id = l.next_responsible_id
+               LEFT JOIN sports sp ON sp.id = l.sport_id
+               LEFT JOIN plans pl ON pl.id = l.plan_id
+               LEFT JOIN lead_lost_reasons lr ON lr.id = l.lost_reason_id";
+
+    /**
+     * Colunas do Follow-up. Dentro da coluna: retorno mais antigo primeiro, lead quente antes do morno e do frio, depois o mais recente.
+     * Cada coluna mostra no máximo FOLLOW_LIMIT leads em aberto (o restante vira o link "+ N na Lista"); as tarefas de reativação aparecem todas.
+     * 'total' é sempre o número real; 'more' = leads em aberto que ficaram de fora.
+     */
+    public static function followBoard(array $f): array
+    {
+        $t = today();
+        $tm = date('Y-m-d', strtotime($t . ' +1 day'));
+        $w7 = date('Y-m-d', strtotime($t . ' +7 days'));
+        $p = [];
+        $where = self::followWhere($f, $p);
+        $n = [];
+        foreach (DB::all(
+            "SELECT CASE WHEN l.next_on IS NULL THEN 'none' WHEN l.next_on < ? THEN 'late' WHEN l.next_on = ? THEN 'today' WHEN l.next_on = ? THEN 'tomorrow' WHEN l.next_on <= ? THEN 'week' ELSE 'later' END AS bucket,
+                    l.status AS st, COUNT(*) AS n
+               FROM leads l WHERE $where GROUP BY 1, 2",
+            array_merge([$t, $t, $tm, $w7], $p)
+        ) as $r) {
+            $n[$r['bucket']][$r['st']] = (int) $r['n'];
+        }
+        $order = "(l.next_on IS NULL) ASC, l.next_on ASC, CASE l.temperature WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 ELSE 2 END ASC, l.id DESC";
+        $cols = [];
+        $all = 0;
+        foreach (self::FOLLOW_BUCKETS as $key => $label) {
+            $open = $n[$key]['open'] ?? 0;
+            $lost = $n[$key]['lost'] ?? 0;
+            $cards = [];
+            if ($open + $lost > 0) {
+                $pp = $p;
+                $due = self::dueSql($key, $pp);
+                if ($open > 0) {
+                    $cards = DB::all(self::FU_SELECT . " WHERE $where AND $due AND l.status = 'open' ORDER BY $order LIMIT " . self::FOLLOW_LIMIT, $pp);
+                }
+                if ($lost > 0) {
+                    $cards = array_merge($cards, DB::all(self::FU_SELECT . " WHERE $where AND $due AND l.status = 'lost' ORDER BY $order", $pp));
+                    usort($cards, fn($a, $b) => [$a['next_on'] === null, (string) $a['next_on']] <=> [$b['next_on'] === null, (string) $b['next_on']]);
+                }
+            }
+            $all += $open + $lost;
+            $cols[] = [
+                'key' => $key, 'label' => $label, 'total' => $open + $lost, 'cards' => $cards,
+                'more' => max(0, $open - count(array_filter($cards, fn($c) => $c['status'] === 'open'))),
+            ];
+        }
+        return ['columns' => $cols, 'total' => $all];
+    }
+
+    /** Números dos atalhos (chips) do Follow-up, respeitando a busca e o responsável escolhidos (mas não o atalho em si). */
+    public static function followChipCounts(array $f): array
+    {
+        $f['c'] = '';
+        $p = [];
+        $where = self::followWhere($f, $p);
+        $r = DB::one(
+            "SELECT COUNT(*) AS n,
+                    SUM(CASE WHEN l.status = 'open' THEN 1 ELSE 0 END) AS open_n,
+                    SUM(CASE WHEN l.status = 'lost' THEN 1 ELSE 0 END) AS lost_n,
+                    SUM(CASE WHEN l.status = 'open' AND l.temperature = 'hot' THEN 1 ELSE 0 END) AS hot_n,
+                    SUM(CASE WHEN (" . self::LAST_RESULT . ") = 'no_answer' THEN 1 ELSE 0 END) AS noanswer_n,
+                    SUM(CASE WHEN l.status = 'open' AND l.last_contact_at IS NULL THEN 1 ELSE 0 END) AS never_n
+               FROM leads l WHERE $where",
+            $p
+        ) ?: [];
+        return [
+            '' => (int) ($r['n'] ?? 0), 'open' => (int) ($r['open_n'] ?? 0), 'recovery' => (int) ($r['lost_n'] ?? 0),
+            'hot' => (int) ($r['hot_n'] ?? 0), 'noanswer' => (int) ($r['noanswer_n'] ?? 0), 'never' => (int) ($r['never_n'] ?? 0),
+        ];
+    }
+
+    /**
+     * Alertas do Painel e do selo do menu (09.4): retornos atrasados e de hoje (leads em aberto + reativação) e leads em aberto sem retorno programado.
+     * Nunca derruba a tela: se a tabela de leads ainda não existe (SQL do CRM não importado), devolve zeros.
+     */
+    public static function attention(): array
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        $cache = ['late' => 0, 'today' => 0, 'none' => 0, 'due' => 0];
+        try {
+            $t = today();
+            $r = DB::one(
+                'SELECT SUM(CASE WHEN l.next_on < ? THEN 1 ELSE 0 END) AS late, SUM(CASE WHEN l.next_on = ? THEN 1 ELSE 0 END) AS today
+                   FROM leads l WHERE ' . self::FU_BASE . ' AND l.next_on IS NOT NULL',
+                [$t, $t]
+            ) ?: [];
+            $cache['late'] = (int) ($r['late'] ?? 0);
+            $cache['today'] = (int) ($r['today'] ?? 0);
+            $cache['none'] = (int) DB::val("SELECT COUNT(*) FROM leads WHERE status = 'open' AND next_on IS NULL AND do_not_contact = 0");
+            $cache['due'] = $cache['late'] + $cache['today'];
+        } catch (\Throwable $e) {
+            // sem a tabela de leads: o CRM simplesmente não mostra alerta
+        }
+        return $cache;
+    }
+
     /** Números dos atalhos e do topo da lista (só oportunidades em aberto, mais os convertidos). */
     public static function counts(): array
     {
         $t = today();
         $open = "status = 'open'";
+        $due = function (string $bucket): int {
+            $p = [];
+            $c = self::dueSql($bucket, $p);
+            return (int) DB::val("SELECT COUNT(*) FROM leads l WHERE l.status = 'open' AND " . $c, $p);
+        };
         return [
+            'tomorrow' => $due('tomorrow'), 'week' => $due('week'), 'later' => $due('later'),
             'open' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE $open"),
             'new_month' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE entered_on >= ?", [substr($t, 0, 8) . '01']),
             'hot' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE $open AND temperature = 'hot'"),
@@ -978,17 +1215,34 @@ final class Leads
         return ['state' => $state, 'label' => $labels[$state]] + $nx;
     }
 
-    /** Mensagem de WhatsApp pronta (editável em Configurações). {nome} vira o primeiro nome. */
-    public static function message(string $name): string
+    /** Chaves das mensagens por tipo de ação em Configurações (lead_message_followup etc.). */
+    public static function messageKey(string $type): string
     {
-        $tpl = trim((string) Settings::get('lead_message', ''));
+        return 'lead_message_' . $type;
+    }
+
+    /**
+     * Mensagem de WhatsApp pronta (editável em Configurações). {nome} vira o primeiro nome.
+     * $type = tipo da ação do próximo retorno (followup, call, proposal, meeting). Ordem de escolha:
+     *   1) a mensagem que a equipe escreveu para aquele tipo;  2) a mensagem geral que a equipe escreveu ("lead_message");
+     *   3) o texto padrão daquele tipo (ACTION_MESSAGES);  4) o texto padrão geral (DEFAULT_MESSAGE).
+     * "Enviar WhatsApp", "Outra ação" e o lead sem retorno marcado vão direto para o passo 2.
+     * Assim, quem já personalizou a mensagem geral não perde o texto ao atualizar.
+     */
+    public static function message(string $name, ?string $type = null): string
+    {
+        $typed = $type !== null && isset(self::ACTION_MESSAGES[$type]);
+        $tpl = $typed ? trim((string) Settings::get(self::messageKey($type), '')) : '';
         if ($tpl === '') {
-            $tpl = self::DEFAULT_MESSAGE;
+            $tpl = trim((string) Settings::get('lead_message', ''));
+        }
+        if ($tpl === '') {
+            $tpl = $typed ? self::ACTION_MESSAGES[$type] : self::DEFAULT_MESSAGE;
         }
         return str_replace('{nome}', first_name($name), $tpl);
     }
 
-    /** Link do WhatsApp (null se não há telefone válido, se está como "Não contatar" ou se é um lead perdido sem autorização para novos contatos). */
+    /** Link do WhatsApp (null se não há telefone válido, se está como "Não contatar" ou se é um lead perdido sem autorização para novos contatos). A mensagem acompanha o tipo da ação do próximo retorno. */
     public static function waUrl(array $lead): ?string
     {
         if ((int) ($lead['do_not_contact'] ?? 0) === 1) {
@@ -998,6 +1252,7 @@ final class Leads
         if (($lead['status'] ?? '') === 'lost' && (int) ($lead['contact_ok'] ?? 0) !== 1) {
             return null;
         }
-        return wa_phone_url($lead['phone'] ?? '', self::message((string) $lead['name']));
+        $type = !empty($lead['next_on']) ? ($lead['next_type'] ?? null) : null;
+        return wa_phone_url($lead['phone'] ?? '', self::message((string) $lead['name'], is_string($type) ? $type : null));
     }
 }

@@ -1,7 +1,7 @@
 <?php
 use App\Services\Leads;
 
-/** Quadro (Kanban) do CRM: os mesmos leads em aberto da Lista, em colunas por etapa. */
+/** Funil (Kanban) do CRM: os mesmos leads em aberto da Lista, em colunas por etapa. */
 $link = function (array $over = []) use ($f) {
     $m = array_filter(array_merge($f, $over), fn($v) => $v !== '' && $v !== null);
     return url('/admin/crm/quadro') . ($m ? '?' . http_build_query($m) : '');
@@ -17,7 +17,7 @@ $backHere = current_path();
 <div class="page-head ppage-head">
     <div>
         <h2>CRM</h2>
-        <p class="muted small" style="margin:4px 0 0">Quem ainda não é paciente, em colunas por etapa do funil. Arraste o cartão para a etapa em que o lead está agora.</p>
+        <p class="muted small" style="margin:4px 0 0">Quem ainda não é paciente, em colunas por etapa do funil. Arraste o cartão para a etapa em que o lead está agora. Para ver por prazo de retorno, use a aba Follow-up.</p>
     </div>
     <a class="btn btn-sm" href="<?= e(url('/admin/crm/novo')) ?>"><?= icon('plus', 18) ?> Novo lead</a>
 </div>
@@ -59,7 +59,7 @@ $backHere = current_path();
 </div>
 <div class="kb-bar">
     <p class="kb-sum small muted">
-        <strong class="kb-sum-n"><?= (int) $total ?></strong> <?= $total === 1 ? 'lead no quadro' : 'leads no quadro' ?><?= $hasFilters ? ' (com os filtros)' : '' ?>
+        <strong class="kb-sum-n"><?= (int) $total ?></strong> <?= $total === 1 ? 'lead no funil' : 'leads no funil' ?><?= $hasFilters ? ' (com os filtros)' : '' ?>
         · <a href="<?= e(url('/admin/crm?f=pot')) ?>" title="Soma do valor do plano de interesse dos leads nas etapas marcadas em Configurar">Receita potencial em negociação: <strong data-pot-total data-total="<?= e((string) $ind['potential']) ?>"><?= e($mny($ind['potential'])) ?></strong></a>
         <span data-pot-unpriced-wrap<?= $ind['unpriced'] > 0 ? '' : ' hidden' ?>> · <span data-pot-unpriced data-n="<?= (int) $ind['unpriced'] ?>"><?= (int) $ind['unpriced'] ?></span> sem plano de interesse (fora da soma)</span>
     </p>
@@ -73,7 +73,7 @@ $backHere = current_path();
 <?php if (!$columns): ?>
     <div class="empty"><strong>Nenhuma etapa ativa</strong>Ative ou crie as etapas do funil em Configurar.</div>
 <?php else: ?>
-<div class="kboard" data-board data-csrf="<?= e(csrf_token()) ?>" role="list" aria-label="Quadro de leads por etapa">
+<div class="kboard" data-board data-csrf="<?= e(csrf_token()) ?>" role="list" aria-label="Funil de leads por etapa">
     <?php foreach ($columns as $col): $st = $col['stage']; $sid = (int) $st['id']; ?>
     <section class="kcol" role="listitem" data-stage="<?= $sid ?>" data-name="<?= e($st['name']) ?>" data-active="<?= (int) $st['active'] ?>" aria-labelledby="kh<?= $sid ?>">
         <header class="kcol-h">

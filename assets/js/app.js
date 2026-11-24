@@ -243,9 +243,11 @@
         }
     });
 
-    // Quadro do CRM (Kanban): arrastar o cartão para outra coluna muda a etapa do lead (o mesmo que "Mover para…" no cartão).
+    // Funil do CRM (Kanban): arrastar o cartão para outra coluna muda a etapa do lead (o mesmo que "Mover para…" no cartão).
     // Convertido e Perdido não são colunas: soltar na faixa "Finalizar" abre o fluxo próprio (converter / marcar como perdido).
     // O cartão só muda de coluna depois que o servidor confirma. Sem JavaScript ficam o seletor "Mover para…" e o botão "Mover".
+    // O Follow-up (09.4) usa o mesmo quadro, com colunas por PRAZO (data-follow): só "Hoje" e "Amanhã" aceitam soltar (data-drop = dias a partir de hoje),
+    // e o seletor "Reagendar para…" do cartão faz o mesmo para as outras datas. Reagendar só troca a data do retorno.
     function fmtMoney(v) {
         var whole = Math.abs(v - Math.round(v)) < 0.005;
         var parts = (whole ? String(Math.round(v)) : v.toFixed(2).replace('.', ',')).split(',');
@@ -257,6 +259,7 @@
         if (!board || !window.fetch) { return; }
         board.classList.add('is-js');
         var csrf = board.getAttribute('data-csrf') || '';
+        var follow = board.hasAttribute('data-follow');
         var bar = document.querySelector('[data-final]');
         var dragged = null;
         var busy = false;
@@ -327,7 +330,7 @@
                 var unit = col.querySelector('[data-unit]');
                 if (unit) { unit.textContent = word; }
                 var wrap = col.querySelector('[data-count-wrap]');
-                if (wrap) { wrap.setAttribute('title', n + ' ' + word + ' nesta etapa'); }
+                if (wrap) { wrap.setAttribute('title', n + ' ' + word + ' ' + (col.getAttribute('data-where') || 'nesta etapa')); }
             }
             var empty = col.querySelector('[data-empty]');
             if (empty) { empty.hidden = col.querySelectorAll('.kcard').length > 0; }
@@ -414,6 +417,44 @@
                 .catch(function () { window.location.reload(); });
         }
 
+        // Follow-up: troca a data do retorno. Sem alvo (seletor do cartão), o servidor diz em que faixa o cartão passa a ficar.
+        function reschedule(card, days, target) {
+            var from = card.closest('.kcol');
+            if (busy || !from || (target && target === from)) { resetSelect(card); return; }
+            var form = card.querySelector('.kc-move');
+            busy = true;
+            card.classList.add('is-busy');
+            var fd = new FormData();
+            fd.append('_csrf', csrf);
+            fd.append('days', days);
+            fetch(form.action, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    busy = false;
+                    card.classList.remove('is-busy');
+                    if (!d || !d.ok) { toast((d && d.error) || 'Não foi possível reagendar. Atualize a página e tente de novo.', true); resetSelect(card); return; }
+                    var dest = columns().filter(function (c) { return c.getAttribute('data-bucket') === d.bucket; })[0];
+                    if (!dest) { window.location.reload(); return; }
+                    var fu = card.querySelector('.kc-fu .fu');
+                    if (fu) { fu.className = 'fu fu-' + d.state; fu.textContent = d.text; }
+                    var dt = card.querySelector('[data-fu-date]');
+                    if (dt) { dt.textContent = d.date; }
+                    if (dest !== from) {
+                        var body = dest.querySelector('.kcol-body');
+                        body.insertBefore(card, body.querySelector('.kcard') || body.querySelector('[data-empty]'));
+                        setCount(from, -1);
+                        setCount(dest, 1);
+                    }
+                    resetSelect(card);
+                    toast(d.message || 'Retorno reagendado.');
+                })
+                .catch(function () { window.location.reload(); });
+        }
+        // no Follow-up só as colunas com data-drop (Hoje, Amanhã) aceitam o cartão
+        function canDrop(z) {
+            return !follow || (z.classList.contains('kcol') && z.hasAttribute('data-drop'));
+        }
+
         board.addEventListener('dragstart', function (ev) {
             var card = ev.target && ev.target.closest ? ev.target.closest('.kcard') : null;
             if (!card) { return; }
@@ -435,7 +476,7 @@
             if (!dragged) { return; }
             autoScroll(ev);
             var z = zoneAt(ev);
-            if (!z) { clearOver(); return; }
+            if (!z || !canDrop(z)) { clearOver(); return; }
             ev.preventDefault();
             ev.dataTransfer.dropEffect = 'move';
             if (!z.classList.contains('is-over')) { clearOver(); z.classList.add('is-over'); }
@@ -443,10 +484,11 @@
         document.addEventListener('drop', function (ev) {
             if (!dragged) { return; }
             var z = zoneAt(ev);
-            if (!z) { return; }
+            if (!z || !canDrop(z)) { return; }
             ev.preventDefault();
             var card = dragged;
             clearOver();
+            if (follow) { reschedule(card, z.getAttribute('data-drop'), z); return; }
             if (z.hasAttribute('data-final-to')) { move(card, z.getAttribute('data-final-to'), null); } else { move(card, z.getAttribute('data-stage'), z); }
         });
         // "Mover para…" no cartão (celular, teclado): mesma ação do arrastar
@@ -454,6 +496,12 @@
             var sel = ev.target;
             if (!sel || !sel.closest || !sel.closest('.kc-move') || !sel.value) { return; }
             var card = sel.closest('.kcard');
+            if (follow) {
+                // "Outra data…": a ficha do lead tem o campo de data
+                if (sel.value === 'date') { window.location.href = sel.closest('.kc-move').getAttribute('data-ficha') || '#'; return; }
+                reschedule(card, sel.value, null);
+                return;
+            }
             var col = columns().filter(function (c) { return c.getAttribute('data-stage') === sel.value; })[0] || null;
             move(card, sel.value, col);
         });

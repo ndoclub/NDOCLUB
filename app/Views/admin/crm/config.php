@@ -88,7 +88,7 @@
 
 <section class="panel">
     <h3>Tela inicial do CRM</h3>
-    <p class="muted small" style="margin-top:-6px">Qual tela abre quando você clica em "CRM" no menu. As duas continuam nas abas: o Quadro e a Lista mostram os mesmos leads, só de jeitos diferentes.</p>
+    <p class="muted small" style="margin-top:-6px">Qual tela abre quando você clica em "CRM" no menu. Todas continuam nas abas: o Funil (por etapa), o Follow-up (por prazo do retorno) e a Lista mostram os mesmos leads, só de jeitos diferentes.</p>
     <form method="post" action="<?= e(url('/admin/crm/tela-inicial')) ?>">
         <?= csrf_field() ?>
         <?php foreach (\App\Services\Leads::HOME_VIEWS as $k => $label): ?>

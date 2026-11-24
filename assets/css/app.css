@@ -730,6 +730,15 @@ circle.dn-1, circle.dn-2, circle.dn-3, circle.dn-4, circle.dn-x, circle.dn-0 { s
 .otask.is-zero .big { color: var(--line-strong); }
 .otask.is-zero .otask-ico { opacity: .55; }
 
+/* faixa do Follow-up do CRM (09.4): abaixo dos quatro cartões, só quando há retorno de lead para fazer */
+.ocrm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 0 0 14px; padding: 12px 18px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); font-size: 14px; }
+.ocrm.is-alert { border-color: #E7B9B4; }
+.ocrm-t { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+.ocrm a { color: var(--ink); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.ocrm a.bad { color: var(--bad); }
+.ocrm a:hover { color: var(--brand); }
+.ocrm .ocrm-go { margin-left: auto; color: var(--brand); text-decoration: none; }
+
 .ostats { display: flex; flex-wrap: wrap; gap: 6px 30px; margin: 0 0 22px; padding: 0 2px; font-size: 14px; color: var(--mute); }
 .ostats > * { display: inline-flex; align-items: baseline; gap: 7px; text-decoration: none; color: inherit; }
 .ostats a:hover { color: var(--brand); }
@@ -1291,6 +1300,23 @@ span.cfg-ord { display: inline-block; font-size: 20px; line-height: 42px; }
 .kfinal-zone { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; font-weight: 700; border: 2px dashed var(--line-strong); border-radius: 12px; background: var(--soft); }
 .kfinal-won { color: var(--brand); border-color: var(--brand); }
 .kfinal-zone.is-over { background: var(--brand); color: var(--on-ink, #fff); border-style: solid; border-color: var(--brand); }
+
+/* Follow-up (09.4): o mesmo quadro, com colunas por prazo. Só Hoje e Amanhã aceitam soltar o cartão; as outras datas pelo seletor, que fica sempre visível. */
+.kboard-follow { grid-auto-columns: minmax(236px, 1fr); }
+.kboard-follow.is-js .kc-move { display: flex; }
+.kcol-hint { margin: -2px 4px 8px; font-weight: 400; color: var(--mute); }
+.kcol-late .kcol-h h3 { color: var(--bad); }
+.kcol-today .kcol-h h3 { color: var(--brand); }
+.kboard-follow.is-dragging-board .kcol[data-drop] { border-color: var(--brand); border-style: dashed; }
+.kboard-follow.is-dragging-board .kcol:not([data-drop]) { opacity: .55; }
+.kcard-rec { border-left: 3px solid var(--line-strong); }
+.kc-tag { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; line-height: 1.5; vertical-align: 1px; }
+.kc-tag-rec { background: var(--soft); color: var(--ink); border: 1px solid var(--line-strong); }
+.kc-act { font-weight: 700; color: var(--brand); }
+.kc-noans { font-weight: 700; color: var(--ink); }
+.kb-late { color: var(--bad); }
+p.kcol-more { margin: 0; cursor: default; }
+.tab-n { display: inline-block; min-width: 20px; margin-left: 4px; padding: 0 6px; border-radius: 99px; background: var(--brand); color: var(--on-ink, #fff); font-size: 12px; font-weight: 700; line-height: 1.6; text-align: center; vertical-align: 1px; }
 
 /* filtros do quadro: a busca encolhe um pouco para a lupa não cair sozinha na linha de baixo em telas médias */
 .kb-filters .pf-search { flex-basis: 170px; }

@@ -26,6 +26,11 @@ $quick = [
     'sched' => ['Retorno agendado', $counts['sched']], 'none' => ['Sem retorno programado', $counts['none']], 'noresp' => ['Sem responsável', $counts['noresp']],
     'hot' => ['Quentes', $counts['hot']], 'dnc' => ['Não contatar', $counts['dnc']], 'won' => ['Convertidos', $counts['won']],
 ];
+// faixas de prazo que chegam do Follow-up (link "+ N na Lista"): só aparecem como atalho quando estão ativas
+$dueChips = ['tomorrow' => 'Retorno amanhã', 'week' => 'Retorno em 2 a 7 dias', 'later' => 'Retorno depois de 7 dias'];
+if (isset($dueChips[$f['f']])) {
+    $quick[$f['f']] = [$dueChips[$f['f']], $counts[$f['f']]];
+}
 ?>
 <div class="page-head ppage-head">
     <div>
@@ -133,6 +138,7 @@ $quick = [
                 <label for="task">Retorno de</label>
                 <select id="task" name="task" data-autosubmit>
                     <option value="">Todos</option>
+                    <option value="none"<?= $f['task'] === 'none' ? ' selected' : '' ?>>Ninguém definido</option>
                     <?php foreach ($responsibles as $rp): ?><option value="<?= (int) $rp['id'] ?>"<?= $f['task'] === (string) $rp['id'] ? ' selected' : '' ?>><?= e($rp['name']) ?><?= $rp['active'] ? '' : ' (desativada)' ?></option><?php endforeach; ?>
                 </select>
             </div>

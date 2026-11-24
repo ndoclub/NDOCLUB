@@ -21,7 +21,16 @@
     <div class="panel">
         <h3>Mensagem de WhatsApp para leads</h3>
         <div class="field"><textarea class="input" id="lead_message" name="lead_message" maxlength="300" style="min-height:96px" aria-label="Mensagem de WhatsApp para leads"><?= e($v('lead_message')) ?></textarea>
-            <p class="hint">Use <strong>{nome}</strong> onde quiser o primeiro nome do lead. Em branco = texto padrão. É o texto do botão de WhatsApp no CRM. Não é enviado sozinho: abre o WhatsApp com a mensagem pronta, e a pessoa da equipe envia.</p></div>
+            <p class="hint">Use <strong>{nome}</strong> onde quiser o primeiro nome do lead. Em branco = texto padrão. É o texto do botão de WhatsApp no CRM; vale para todos os tipos de retorno que não tiverem mensagem própria logo abaixo, e sempre para "Enviar WhatsApp", "Outra ação" e lead sem retorno marcado. Não é enviado sozinho: abre o WhatsApp com a mensagem pronta, e a pessoa da equipe envia.</p></div>
+    </div>
+
+    <div class="panel">
+        <h3>Mensagens de WhatsApp por tipo de retorno</h3>
+        <p class="hint" style="margin-top:-6px">O botão de WhatsApp do CRM escolhe o texto pelo tipo do próximo retorno do lead. Use <strong>{nome}</strong> para o primeiro nome. Em branco = vale a mensagem geral acima, se você escreveu uma; se não, o texto padrão que aparece em cinza no campo.</p>
+        <?php foreach (\App\Services\Leads::ACTION_MESSAGES as $type => $default): $k = \App\Services\Leads::messageKey($type); ?>
+        <div class="field"><label for="<?= e($k) ?>">Retorno do tipo "<?= e(\App\Services\Leads::ACTIONS[$type]) ?>"</label>
+            <textarea class="input" id="<?= e($k) ?>" name="<?= e($k) ?>" maxlength="300" style="min-height:84px" placeholder="<?= e($default) ?>"><?= e($v($k)) ?></textarea></div>
+        <?php endforeach; ?>
     </div>
 
     <div class="panel">

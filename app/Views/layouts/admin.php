@@ -2,6 +2,7 @@
 $path = strtok(current_path(), '?');
 $is = fn(string $prefix) => $path === $prefix || str_starts_with($path, $prefix . '/');
 $finBadge = \App\Services\Payments::attentionStats()['count'];
+$crmBadge = (int) \App\Services\Leads::attention()['due']; // retornos de leads atrasados ou para hoje (09.4)
 // Menu em grupos: o que a equipe usa todo dia, os cadastros, o que é do app do paciente e o sistema.
 $navGroups = [
     'Dia a dia' => [
@@ -51,7 +52,7 @@ $navGroups = [
         <div class="nav-sec" role="group" aria-labelledby="nav-g<?= $gi ?>">
             <p class="nav-label" id="nav-g<?= $gi ?>"><?= e($gLabel) ?></p>
             <?php foreach ($gItems as [$href, $label, $ico, $active]): ?>
-                <a href="<?= e(url($href)) ?>"<?= $active ? ' aria-current="page"' : '' ?>><?= icon($ico, 20) ?><span><?= e($label) ?></span><?php if ($href === '/admin/financeiro' && $finBadge > 0): ?><b class="nav-badge" title="Pix para cobrar ou conferir"><?= (int) $finBadge ?></b><?php endif; ?></a>
+                <a href="<?= e(url($href)) ?>"<?= $active ? ' aria-current="page"' : '' ?>><?= icon($ico, 20) ?><span><?= e($label) ?></span><?php if ($href === '/admin/financeiro' && $finBadge > 0): ?><b class="nav-badge" title="Pix para cobrar ou conferir"><?= (int) $finBadge ?></b><?php endif; ?><?php if ($label === 'CRM' && $crmBadge > 0): ?><b class="nav-badge" title="Retornos de leads atrasados ou para hoje"><?= $crmBadge ?></b><?php endif; ?></a>
             <?php endforeach; ?>
         </div>
         <?php endforeach; ?>

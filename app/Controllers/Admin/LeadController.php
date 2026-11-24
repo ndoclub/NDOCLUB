@@ -11,7 +11,7 @@ use App\Services\Settings;
 use App\Services\PersonalData;
 use App\Services\Responsibles;
 
-/** CRM / Leads (09.1 a 09.3): lista e quadro (Kanban) com indicadores, cadastro, ficha com linha do tempo, responsáveis, follow-up e listas editáveis (origens e etapas). */
+/** CRM / Leads (09.1 a 09.4): lista, Funil (Kanban por etapa) e Follow-up (colunas por prazo) com indicadores, cadastro, ficha com linha do tempo, responsáveis, follow-up e listas editáveis (origens e etapas). */
 final class LeadController
 {
     private const PER_PAGE = [10, 25, 50, 100];
@@ -29,9 +29,9 @@ final class LeadController
             'sport' => ctype_digit($g('sport')) ? $g('sport') : '',
             'plan' => ctype_digit($g('plan')) ? $g('plan') : '',
             'resp' => ($g('resp') === 'none' || ctype_digit($g('resp'))) ? $g('resp') : '',
-            'task' => ctype_digit($g('task')) ? $g('task') : '',
+            'task' => ($g('task') === 'none' || ctype_digit($g('task'))) ? $g('task') : '',
             'p' => isset(Leads::periods()[$g('p')]) ? $g('p') : '',
-            'f' => in_array($g('f'), ['late', 'today', 'sched', 'none', 'noresp', 'pot', 'hot', 'dnc', 'won'], true) ? $g('f') : '',
+            'f' => in_array($g('f'), ['late', 'today', 'tomorrow', 'week', 'later', 'sched', 'none', 'noresp', 'pot', 'hot', 'dnc', 'won'], true) ? $g('f') : '',
             'ord' => isset(Leads::sorts()[$g('ord')]) ? $g('ord') : 'new',
         ];
         $perPage = in_array((int) $g('pp'), self::PER_PAGE, true) ? (int) $g('pp') : 25;
@@ -57,9 +57,9 @@ final class LeadController
         ], 'admin');
     }
 
-    // ------------------------------------------------------------------ quadro (Kanban)
+    // ------------------------------------------------------------------ funil (Kanban por etapa)
 
-    /** Quadro: os mesmos leads em aberto da Lista, em colunas por etapa. Arrastar um cartão muda a etapa (ver stage()). */
+    /** Funil (antes "Quadro"): os mesmos leads em aberto da Lista, em colunas por etapa. Arrastar um cartão muda a etapa (ver stage()). */
     public function board(): void
     {
         $g = fn(string $k) => isset($_GET[$k]) && is_string($_GET[$k]) ? trim($_GET[$k]) : '';
@@ -72,8 +72,8 @@ final class LeadController
         ];
         $b = Leads::board($f);
         View::render('admin/crm/board', [
-            'title' => 'CRM · Quadro',
-            'wide' => true, // o Quadro usa a largura toda da tela (o conteúdo do painel normalmente tem limite)
+            'title' => 'CRM · Funil',
+            'wide' => true, // o Funil usa a largura toda da tela (o conteúdo do painel normalmente tem limite)
             'columns' => $b['columns'], 'total' => $b['total'], 'f' => $f,
             'counts' => Leads::counts(),
             'ind' => Leads::indicators(),
@@ -81,6 +81,92 @@ final class LeadController
             'sources' => DB::all('SELECT id, name, active FROM lead_sources ORDER BY active DESC, sort_order ASC, name ASC'),
             'moveStages' => Leads::stages(true),
         ], 'admin');
+    }
+
+    // ------------------------------------------------------------------ follow-up (09.4)
+
+    /** Follow-up: os mesmos leads em colunas por PRAZO do próximo retorno (Atrasados, Hoje, Amanhã, Próximos 7 dias, Depois, Sem retorno). */
+    public function followUp(): void
+    {
+        $g = fn(string $k) => isset($_GET[$k]) && is_string($_GET[$k]) ? trim($_GET[$k]) : '';
+        $f = [
+            'q' => mb_substr($g('q'), 0, 80),
+            'resp' => ($g('resp') === 'none' || ctype_digit($g('resp'))) ? $g('resp') : '',
+            'c' => isset(Leads::FOLLOW_CHIPS[$g('c')]) ? $g('c') : '',
+        ];
+        $b = Leads::followBoard($f);
+        View::render('admin/crm/followup', [
+            'title' => 'CRM · Follow-up',
+            'wide' => true,
+            'columns' => $b['columns'], 'total' => $b['total'], 'f' => $f,
+            'chipCounts' => Leads::followChipCounts($f),
+            'attn' => Leads::attention(),
+            'respChoices' => Responsibles::choices(),
+        ], 'admin');
+    }
+
+    /**
+     * Reagendar o próximo retorno de um lead pelo Follow-up (arrastar para Hoje/Amanhã, ou o seletor "Reagendar para…" do cartão).
+     * Só troca a DATA: o tipo da ação e quem faz a tarefa continuam como estavam. Entra na linha do tempo como qualquer agendamento.
+     *  - days: 0 (hoje), 1 (amanhã), 3, 7, 15 ou 30 dias a partir de hoje  ·  date: Y-m-d (hoje ou futura)
+     * Com o cabeçalho de fetch a resposta é JSON; sem ele, aviso + volta para a tela de origem.
+     */
+    public function reschedule(int $id): void
+    {
+        $ajax = is_ajax();
+        $lead = Leads::find($id);
+        $back = safe_back((string) ($_POST['back'] ?? ''), '/admin/crm/follow-up');
+        if (!str_starts_with($back, '/admin/crm')) {
+            $back = '/admin/crm/follow-up';
+        }
+        $fail = function (string $msg, int $code = 422) use ($ajax, $back): void {
+            if ($ajax) {
+                json_out(['ok' => false, 'error' => $msg], $code);
+            }
+            flash('err', $msg);
+            redirect($back);
+        };
+        if (!$lead) {
+            $fail('Lead não encontrado.', 404);
+        }
+        if (!in_array($lead['status'], ['open', 'lost'], true)) {
+            $fail('Este lead já virou paciente: não há mais retorno a agendar.');
+        }
+        if ((int) $lead['do_not_contact'] === 1) {
+            $fail('Este lead está como "Não contatar": não dá para agendar retorno.');
+        }
+        if ($lead['status'] === 'lost' && !Leads::recoveryEligible($lead)) {
+            $fail('Este lead perdido não autorizou novos contatos: não dá para agendar tentativa.');
+        }
+        $days = trim((string) ($_POST['days'] ?? ''));
+        $date = trim((string) ($_POST['date'] ?? ''));
+        if ($days === 'date' && !$ajax) {
+            redirect('/admin/crm/' . $id . '#retorno'); // "Outra data…": a ficha tem o campo de data
+        }
+        if ($days !== '' && ctype_digit($days) && isset(Leads::RESCHEDULE[(int) $days])) {
+            $nextOn = date('Y-m-d', strtotime(today() . ' +' . (int) $days . ' days'));
+        } elseif ($date !== '' && self::validDate($date) && $date >= today()) {
+            $nextOn = $date;
+        } else {
+            $fail('Escolha para quando reagendar (hoje, amanhã ou uma data futura).');
+        }
+        if ($lead['next_on'] === $nextOn) {
+            $fail('O retorno já está marcado para ' . fmt_date($nextOn) . '.');
+        }
+        $type = isset(Leads::ACTIONS[(string) $lead['next_type']]) ? (string) $lead['next_type'] : 'followup';
+        $was = $lead['next_on'] ? 'antes: ' . fmt_date($lead['next_on']) : 'antes: sem retorno';
+        Leads::schedule($lead, $nextOn, $type, $lead['next_responsible_id'] ? (int) $lead['next_responsible_id'] : null, 'Reagendado no Follow-up (' . $was . ').', (int) Auth::id());
+        Audit::log((int) Auth::id(), 'lead_schedule', 'lead', $id, $lead['name'] . ' -> ' . $nextOn . ' (Follow-up)');
+        $msg = first_name($lead['name']) . ': retorno reagendado para ' . fmt_date($nextOn) . '.';
+        if ($ajax) {
+            $fu = Leads::followUp(['next_on' => $nextOn, 'do_not_contact' => 0]);
+            json_out([
+                'ok' => true, 'message' => $msg, 'bucket' => Leads::bucketOf($nextOn), 'state' => $fu['state'],
+                'text' => $fu['state'] === 'today' ? 'Retorno hoje' : 'Retorno ' . $fu['text'], 'date' => substr(fmt_date($nextOn), 0, 5),
+            ]);
+        }
+        flash('ok', $msg);
+        redirect($back);
     }
 
     // ------------------------------------------------------------------ cadastro e edição
@@ -496,7 +582,7 @@ final class LeadController
     }
 
     /**
-     * Muda a etapa de um lead em aberto. Serve a ficha (formulário), o cartão do Quadro (seletor "Mover para…") e o arrastar e soltar (fetch).
+     * Muda a etapa de um lead em aberto. Serve a ficha (formulário), o cartão do Funil (seletor "Mover para…") e o arrastar e soltar (fetch).
      *  - stage_id numérico: etapa em andamento do funil (a mudança vai para a linha do tempo e para a auditoria).
      *  - stage_id "won" / "lost": não move nada; leva ao fluxo próprio ("Converter em paciente" ou "Marcar como perdido").
      * Com o cabeçalho de fetch (is_ajax) a resposta é JSON; sem ele, aviso + volta para a tela de origem.
@@ -744,16 +830,17 @@ final class LeadController
     }
 
     /** Dias da cadência de reativação: de 1 a 5 números, cada um de 20 a 365, separados por vírgula. */
-    /** Tela que abre quando se clica em "CRM" no menu: Quadro (padrão) ou Lista. É só uma preferência de abertura; as duas telas continuam nas abas. */
+    /** Tela que abre quando se clica em "CRM" no menu: Funil (padrão), Follow-up ou Lista. É só uma preferência de abertura; todas continuam nas abas. */
     public function saveView(): void
     {
         $v = input('view');
         if (!isset(Leads::HOME_VIEWS[$v])) {
-            $this->fail(['Escolha Quadro ou Lista.'], '/admin/crm/configurar');
+            $this->fail(['Escolha Funil, Follow-up ou Lista.'], '/admin/crm/configurar');
         }
         Settings::set('crm_default_view', $v);
-        Audit::log((int) Auth::id(), 'lead_view', 'setting', null, $v === 'list' ? 'Lista' : 'Quadro');
-        flash('ok', 'Pronto: o item "CRM" do menu agora abre ' . ($v === 'list' ? 'a Lista.' : 'o Quadro.'));
+        $names = ['list' => 'a Lista', 'follow' => 'o Follow-up', 'board' => 'o Funil'];
+        Audit::log((int) Auth::id(), 'lead_view', 'setting', null, ucfirst(substr($names[$v], 2)));
+        flash('ok', 'Pronto: o item "CRM" do menu agora abre ' . $names[$v] . '.');
         redirect('/admin/crm/configurar');
     }
 
