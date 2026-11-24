@@ -272,6 +272,57 @@ final class Payments
     }
 
     /**
+     * Lê e confere os campos de pagamento do formulário: method, installments, first_due e o
+     * recebimento (checkbox $paidKey = 1ª parcela já recebida; ou paid_count no registro avulso).
+     * Para USD/EUR com parcela já recebida é obrigatório informar o R$ creditado (received_brl).
+     * Retorna o array para Payments::create ou um texto de erro.
+     * Usado pelo cadastro e pela renovação do paciente e pela conversão de lead (CRM): uma regra só para todos.
+     */
+    public static function parseForm(float $total, string $cur, string $paidKey): array|string
+    {
+        $method = Payments::methodOrDefault($_POST['method'] ?? 'outro');
+        $n = (int) ($_POST['installments'] ?? 1);
+        if ($n < 1 || $n > 12) {
+            return 'Parcelas: escolha de 1 a 12.';
+        }
+        $firstDue = trim((string) ($_POST['first_due'] ?? ''));
+        if ($firstDue === '') {
+            $firstDue = today();
+        }
+        if (!Payments::validDate($firstDue)) {
+            return 'Data da 1ª parcela inválida.';
+        }
+        $paid = $paidKey === 'paid_count' ? (int) ($_POST['paid_count'] ?? 0) : (!empty($_POST[$paidKey]) ? 1 : 0);
+        if ($paid < 0 || $paid > $n) {
+            return 'As parcelas já recebidas não podem ser mais que o total de parcelas.';
+        }
+        // Cartão em reais cai sozinho no vencimento: não há "já recebida" para marcar
+        $auto = Payments::isAuto($method, $cur);
+        if ($auto) {
+            $paid = 0;
+        }
+        $brl = null;
+        if ($cur !== 'BRL' && $paid > 0) {
+            $brl = parse_money((string) ($_POST['received_brl'] ?? ''));
+            if ($brl === false || $brl === null || $brl <= 0) {
+                return 'Para ' . currencies()[$cur][1] . ' já recebido, informe quanto caiu em reais (R$).';
+            }
+        }
+        // Bandeira e taxa do cartão (taxa em branco = usa a tabela de Financeiro > Taxas do cartão)
+        $brand = null;
+        $fee = null;
+        if ($auto) {
+            $b = trim((string) ($_POST['card_brand'] ?? ''));
+            $brand = isset(Payments::brands()[$b]) ? $b : null;
+            $fee = Payments::parsePct((string) ($_POST['fee_pct'] ?? ''));
+            if ($fee === false) {
+                return 'Taxa do cartão inválida. Use um número de 0 a 30, por exemplo 2,5.';
+            }
+        }
+        return ['method' => $method, 'installments' => $n, 'first_due' => $firstDue, 'paid_count' => $paid, 'received_brl' => $brl, 'brand' => $brand, 'fee_pct' => $fee];
+    }
+
+    /**
      * Registra um pagamento com suas parcelas.
      * - Cartão em R$: a bandeira e a taxa (%) valem para a venda toda; cada parcela guarda o valor líquido.
      *   As parcelas caem sozinhas no vencimento, então "já recebidas" não se aplica ($paidCount é ignorado).

@@ -4,13 +4,15 @@ namespace App\Services;
 use App\Core\DB;
 
 /**
- * CRM / Leads (Atualização 09.1).
+ * CRM / Leads (Atualização 09.1 e 09.2).
  * Lead = alguém que ainda NÃO é paciente: de onde veio, em que etapa está, quando foi o último contato e o próximo.
  *
  * REGRAS:
  *  - A linha do tempo (lead_events) só ganha linhas novas. O sistema nunca edita nem apaga uma linha antiga
  *    (a única exceção é a exclusão do lead inteiro, pedido de exclusão pela LGPD, que também leva a linha do tempo).
  *  - "Não contatar" bloqueia o botão de WhatsApp e novos retornos agendados.
+ *  - 09.2: os indicadores, os responsáveis, o follow-up, a reativação e a conversão usam OS MESMOS registros (leads, lead_events,
+ *    lead_stages, lead_conversions). Não existe tabela paralela: tudo o que aparece nos números vem destas tabelas.
  *  - Nada aqui conversa com WhatsApp nem Instagram: toda interação é registrada à mão (source = 'manual').
  *    As colunas source e external_id da linha do tempo ficam prontas para integrações futuras.
  */
@@ -48,6 +50,10 @@ final class Leads
     /** Sugestão de dias até o próximo retorno, por temperatura (o time pode digitar outro valor). */
     public const SUGGEST_DAYS = ['hot' => 1, 'warm' => 3, 'cold' => 7];
 
+    /** Reativação: cadência padrão (dias depois da perda) e o mínimo permitido (a primeira tentativa só a partir de 20 dias). */
+    public const RECOVERY_DEFAULT = '20,30,45';
+    public const MIN_RECOVERY_DAYS = 20;
+
     public const DEFAULT_MESSAGE = 'Olá, {nome}! Tudo bem? Aqui é do No Days Off Club. Posso te ajudar com alguma dúvida sobre o acompanhamento nutricional?';
 
     // ------------------------------------------------------------------ listas
@@ -78,6 +84,20 @@ final class Leads
     {
         return DB::all(
             "SELECT st.*, (SELECT COUNT(*) FROM leads l WHERE l.stage_id = st.id AND l.status = 'open') AS leads FROM lead_stages st ORDER BY st.sort_order ASC, st.id ASC"
+        );
+    }
+
+    /** Motivos de perda ativos (mais o atual do lead, se foi desativado). */
+    public static function lostReasons(?int $keepId = null): array
+    {
+        return DB::all('SELECT * FROM lead_lost_reasons WHERE active = 1 OR id = ? ORDER BY sort_order ASC, id ASC', [(int) $keepId]);
+    }
+
+    public static function allLostReasons(): array
+    {
+        return DB::all(
+            'SELECT r.*, (SELECT COUNT(*) FROM leads l WHERE l.lost_reason_id = r.id AND l.status = ?) AS leads FROM lead_lost_reasons r ORDER BY r.active DESC, r.sort_order ASC, r.id ASC',
+            ['lost']
         );
     }
 
@@ -228,7 +248,7 @@ final class Leads
             $id = (int) $lead['id'];
             $nextTxt = null;
             if ($c['next_on']) {
-                $nextTxt = (self::ACTIONS[$c['next_type']] ?? 'Retorno') . ' em ' . fmt_date($c['next_on']);
+                $nextTxt = (self::ACTIONS[$c['next_type']] ?? 'Retorno') . ' em ' . fmt_date($c['next_on']) . self::taskOwnerText($c['next_responsible_id'] ?? null);
             }
             self::addEvent($id, 'contact', [
                 'happened_at' => $c['happened_at'], 'channel' => $c['channel'], 'summary' => $c['summary'], 'result' => $c['result'],
@@ -274,6 +294,10 @@ final class Leads
             return;
         }
         DB::run('UPDATE leads SET contact_ok = ?, contact_ok_at = ?, updated_by = ?, updated_at = ? WHERE id = ?', [$on ? 1 : 0, $on ? now() : null, $by, now(), (int) $lead['id']]);
+        if (!$on && ($lead['status'] ?? '') === 'lost') {
+            // sem autorização não há reativação: a tentativa agendada é cancelada
+            DB::run('UPDATE leads SET next_on = NULL, next_type = NULL, next_responsible_id = NULL, recovery_status = NULL WHERE id = ?', [(int) $lead['id']]);
+        }
         self::addEvent((int) $lead['id'], 'consent', ['summary' => $on ? 'Autorizou receber novos contatos' : 'Autorização para novos contatos removida'], $by);
     }
 
@@ -296,6 +320,360 @@ final class Leads
         });
     }
 
+    /** " · tarefa de Gabriel" (ou vazio) para as linhas da linha do tempo. */
+    private static function taskOwnerText(?int $respId): string
+    {
+        if (!$respId) {
+            return '';
+        }
+        $n = (string) DB::val('SELECT name FROM responsibles WHERE id = ?', [$respId]);
+        return $n !== '' ? ' · tarefa de ' . $n : '';
+    }
+
+    /**
+     * Define o responsável de vários leads de uma vez (0 = tirar o responsável). Vale para leads em aberto e perdidos
+     * (quem cuida da reativação também precisa de dono). Registra na linha do tempo só de quem realmente mudou.
+     * Retorna quantos leads mudaram.
+     */
+    public static function assign(array $leadIds, int $responsibleId, int $by): int
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $leadIds), fn($i) => $i > 0)));
+        if (!$ids) {
+            return 0;
+        }
+        $to = $responsibleId > 0 ? (string) DB::val('SELECT name FROM responsibles WHERE id = ?', [$responsibleId]) : 'Sem responsável';
+        return DB::tx(function () use ($ids, $responsibleId, $by, $to) {
+            $n = 0;
+            foreach ($ids as $id) {
+                $l = DB::one("SELECT id, responsible_id FROM leads WHERE id = ? AND status IN ('open', 'lost')", [$id]);
+                if (!$l) {
+                    continue;
+                }
+                $cur = $l['responsible_id'] !== null ? (int) $l['responsible_id'] : 0;
+                if ($cur === $responsibleId) {
+                    continue;
+                }
+                $from = $cur > 0 ? (string) DB::val('SELECT name FROM responsibles WHERE id = ?', [$cur]) : 'Sem responsável';
+                DB::run('UPDATE leads SET responsible_id = ?, updated_by = ?, updated_at = ? WHERE id = ?', [$responsibleId > 0 ? $responsibleId : null, $by, now(), $id]);
+                self::addEvent($id, 'assign', ['from' => $from, 'to' => $to], $by);
+                $n++;
+            }
+            return $n;
+        });
+    }
+
+    /**
+     * Agenda (ou remove) o próximo retorno SEM registrar um contato: só a data, o tipo de ação e quem faz a tarefa.
+     * $nextOn = null remove o retorno. Vale para leads em aberto e perdidos (nos perdidos é a tentativa de reativação).
+     */
+    public static function schedule(array $lead, ?string $nextOn, string $type, ?int $respId, ?string $note, int $by): void
+    {
+        DB::tx(function () use ($lead, $nextOn, $type, $respId, $note, $by) {
+            $id = (int) $lead['id'];
+            if ($nextOn === null) {
+                DB::run('UPDATE leads SET next_on = NULL, next_type = NULL, next_responsible_id = NULL, updated_by = ?, updated_at = ? WHERE id = ?', [$by, now(), $id]);
+                self::addEvent($id, 'schedule', ['summary' => 'Retorno removido: o lead ficou sem retorno programado', 'notes' => $note], $by);
+                return;
+            }
+            $type = isset(self::ACTIONS[$type]) ? $type : 'followup';
+            DB::run('UPDATE leads SET next_on = ?, next_type = ?, next_responsible_id = ?, updated_by = ?, updated_at = ? WHERE id = ?', [$nextOn, $type, $respId, $by, now(), $id]);
+            self::addEvent($id, 'schedule', [
+                'summary' => 'Retorno agendado para ' . fmt_date($nextOn) . self::taskOwnerText($respId),
+                'notes' => $note,
+                'next_action' => self::ACTIONS[$type] . ' em ' . fmt_date($nextOn),
+            ], $by);
+        });
+    }
+
+    // ------------------------------------------------------------------ perdidos e reativação (09.2)
+    //
+    // Lead perdido sai da lista de oportunidades abertas (status = 'lost') e passa a viver só na tela "Reativação".
+    // Elegível para recuperação = perdido + autorizou novos contatos + não está como "Não contatar".
+    // Cadência: dias depois da perda (Configurar, mínimo 20, padrão 20, 30 e 45). A tentativa agendada usa o mesmo campo next_on.
+    // recovery_status: 'pending' (cadência em andamento), 'done' (cadência concluída ou encerrada à mão), 'recovered' (voltou ao funil ou virou paciente).
+
+    /** Dias da cadência de reativação (Configurar). Valores inválidos ou abaixo do mínimo são ignorados. */
+    public static function recoveryDays(): array
+    {
+        $days = [];
+        foreach (explode(',', (string) Settings::get('lead_recovery_days', self::RECOVERY_DEFAULT)) as $p) {
+            $p = trim($p);
+            if (ctype_digit($p) && (int) $p >= self::MIN_RECOVERY_DAYS && (int) $p <= 365) {
+                $days[] = (int) $p;
+            }
+        }
+        $days = array_values(array_unique($days));
+        sort($days);
+        return $days ?: array_map('intval', explode(',', self::RECOVERY_DEFAULT));
+    }
+
+    /** Perdido, autorizou novos contatos e não está como "Não contatar". */
+    public static function recoveryEligible(array $lead): bool
+    {
+        return ($lead['status'] ?? '') === 'lost' && (int) ($lead['do_not_contact'] ?? 0) === 0 && (int) ($lead['contact_ok'] ?? 0) === 1;
+    }
+
+    /**
+     * Data (AAAA-MM-DD) da tentativa de número $step (0 = a primeira). A primeira é "dias da cadência" depois da perda;
+     * as seguintes respeitam o intervalo entre os dias da cadência a partir da tentativa anterior ($lastAttempt).
+     * Nunca devolve uma data passada. Null = a cadência acabou.
+     */
+    public static function recoveryDue(array $lead, int $step, ?string $lastAttempt = null): ?string
+    {
+        $days = self::recoveryDays();
+        if ($step < 0 || $step >= count($days)) {
+            return null;
+        }
+        if ($step === 0 || $lastAttempt === null) {
+            $from = substr((string) ($lead['lost_at'] ?: now()), 0, 10);
+            $due = date('Y-m-d', strtotime($from . ' +' . $days[$step] . ' days'));
+        } else {
+            $due = date('Y-m-d', strtotime(substr($lastAttempt, 0, 10) . ' +' . ($days[$step] - $days[$step - 1]) . ' days'));
+        }
+        return max($due, today());
+    }
+
+    /**
+     * Situação de um lead perdido na reativação. key: dnc, noauth, done, ready (pronto para contato), waiting (aguardando a data),
+     * unscheduled (elegível, sem tentativa programada). Devolve também label e step/steps (tentativa N de M).
+     */
+    public static function recoveryState(array $lead): array
+    {
+        $steps = count(self::recoveryDays());
+        $step = (int) ($lead['recovery_step'] ?? 0);
+        $base = ['step' => min($step + 1, $steps), 'steps' => $steps];
+        if ((int) ($lead['do_not_contact'] ?? 0) === 1) {
+            return ['key' => 'dnc', 'label' => 'Não contatar'] + $base;
+        }
+        if ((int) ($lead['contact_ok'] ?? 0) !== 1) {
+            return ['key' => 'noauth', 'label' => 'Sem autorização para novos contatos'] + $base;
+        }
+        if (($lead['recovery_status'] ?? '') === 'done') {
+            return ['key' => 'done', 'label' => 'Reativação concluída'] + $base;
+        }
+        if (!empty($lead['next_on'])) {
+            return ($lead['next_on'] <= today()
+                ? ['key' => 'ready', 'label' => 'Pronto para contato']
+                : ['key' => 'waiting', 'label' => 'Aguardando a data']) + $base;
+        }
+        return ['key' => 'unscheduled', 'label' => 'Sem reativação programada'] + $base;
+    }
+
+    /** Marca o lead como perdido (motivo obrigatório) e, se elegível, já programa a 1ª tentativa de reativação. */
+    public static function markLost(array $lead, int $reasonId, ?string $note, bool $contactOk, int $by): void
+    {
+        DB::tx(function () use ($lead, $reasonId, $note, $contactOk, $by) {
+            $id = (int) $lead['id'];
+            $lostStage = (int) DB::val("SELECT id FROM lead_stages WHERE kind = 'lost' ORDER BY sort_order ASC, id ASC LIMIT 1");
+            $reason = (string) DB::val('SELECT name FROM lead_lost_reasons WHERE id = ?', [$reasonId]);
+            DB::run(
+                "UPDATE leads SET status = 'lost', stage_id = ?, lost_reason_id = ?, lost_note = ?, lost_at = ?, next_on = NULL, next_type = NULL, next_responsible_id = NULL,
+                        recovery_status = NULL, recovery_step = 0, updated_by = ?, updated_at = ? WHERE id = ?",
+                [$lostStage, $reasonId, self::cut($note, 300), now(), $by, now(), $id]
+            );
+            self::addEvent($id, 'lost', [
+                'summary' => 'Motivo: ' . $reason,
+                'notes' => $note, 'from' => self::stageName((int) $lead['stage_id']), 'to' => self::stageName($lostStage),
+            ], $by);
+            if ((int) $lead['do_not_contact'] === 0) {
+                self::setConsent($lead, $contactOk, $by);
+            }
+            $fresh = self::find($id);
+            if ($fresh && self::recoveryEligible($fresh)) {
+                self::startRecovery($fresh, $by, false);
+            }
+        });
+    }
+
+    /** Programa a reativação (1ª tentativa). $restart = recomeça a cadência do zero depois de concluída. */
+    public static function startRecovery(array $lead, int $by, bool $restart): ?string
+    {
+        if (!self::recoveryEligible($lead)) {
+            return null;
+        }
+        $id = (int) $lead['id'];
+        if ($restart) {
+            // recomeçar conta os dias a partir de hoje (a perda já ficou para trás)
+            $lead['lost_at'] = now();
+        }
+        $due = self::recoveryDue($lead, 0);
+        $steps = count(self::recoveryDays());
+        DB::run(
+            "UPDATE leads SET recovery_status = 'pending', recovery_step = 0, next_on = ?, next_type = 'followup', next_responsible_id = ?, updated_by = ?, updated_at = ? WHERE id = ?",
+            [$due, $lead['responsible_id'] ?: null, $by, now(), $id]
+        );
+        self::addEvent($id, 'recovery', [
+            'summary' => ($restart ? 'Nova reativação programada' : 'Reativação programada') . ': 1ª tentativa em ' . fmt_date($due) . ' (1 de ' . $steps . ')',
+            'next_action' => 'Retomar contato em ' . fmt_date($due),
+        ], $by);
+        return $due;
+    }
+
+    /**
+     * Registra uma tentativa de reativação (contato com um lead perdido).
+     * $decision: 'cadence' = segue a cadência (agenda a próxima ou conclui) · 'stop' = encerra a reativação deste lead.
+     * Lead não elegível (sem autorização ou "Não contatar") só ganha o registro do contato, sem nova tentativa.
+     * $c: happened_at, channel, result, summary, notes
+     */
+    public static function logRecoveryAttempt(array $lead, array $c, string $decision, int $by): void
+    {
+        DB::tx(function () use ($lead, $c, $decision, $by) {
+            $id = (int) $lead['id'];
+            $days = self::recoveryDays();
+            $elig = self::recoveryEligible($lead);
+            $status = $lead['recovery_status'];
+            $step = (int) $lead['recovery_step'];
+            $nextOn = null;
+            $summaryNext = null;
+            if ($elig && $decision === 'stop') {
+                $status = 'done';
+                $summaryNext = 'Reativação encerrada por decisão da equipe';
+            } elseif ($elig) {
+                $step++;
+                if ($step >= count($days)) {
+                    $status = 'done';
+                    $summaryNext = 'Cadência de reativação concluída (' . count($days) . ' tentativas)';
+                } else {
+                    $status = 'pending';
+                    $nextOn = self::recoveryDue($lead, $step, $c['happened_at']);
+                    $summaryNext = 'Próxima tentativa em ' . fmt_date($nextOn) . ' (' . ($step + 1) . ' de ' . count($days) . ')';
+                }
+            }
+            self::addEvent($id, 'contact', [
+                'happened_at' => $c['happened_at'], 'channel' => $c['channel'], 'summary' => $c['summary'], 'result' => $c['result'],
+                'notes' => $c['notes'], 'next_action' => $summaryNext,
+            ], $by);
+            $last = $lead['last_contact_at'] && $lead['last_contact_at'] > $c['happened_at'] ? $lead['last_contact_at'] : $c['happened_at'];
+            DB::run(
+                'UPDATE leads SET last_contact_at = ?, recovery_status = ?, recovery_step = ?, next_on = ?, next_type = ?, next_responsible_id = ?, updated_by = ?, updated_at = ? WHERE id = ?',
+                [$last, $status, $step, $nextOn, $nextOn ? 'followup' : null, $nextOn ? ($lead['next_responsible_id'] ?: $lead['responsible_id'] ?: null) : null, $by, now(), $id]
+            );
+        });
+    }
+
+    /** O lead perdido voltou a se interessar: volta para as oportunidades abertas, na etapa escolhida, com retorno para hoje. */
+    public static function reopen(array $lead, int $stageId, ?string $note, int $by): bool
+    {
+        $to = DB::one("SELECT id, name FROM lead_stages WHERE id = ? AND kind = 'open' AND active = 1", [$stageId]);
+        if (!$to || ($lead['status'] ?? '') !== 'lost') {
+            return false;
+        }
+        DB::tx(function () use ($lead, $to, $note, $by) {
+            $id = (int) $lead['id'];
+            $dnc = (int) $lead['do_not_contact'] === 1;
+            DB::run(
+                "UPDATE leads SET status = 'open', stage_id = ?, lost_reason_id = NULL, lost_note = NULL, lost_at = NULL, recovery_status = 'recovered', recovery_step = 0,
+                        cycle = cycle + 1, next_on = ?, next_type = ?, next_responsible_id = ?, updated_by = ?, updated_at = ? WHERE id = ?",
+                [(int) $to['id'], $dnc ? null : today(), $dnc ? null : 'followup', $dnc ? null : ($lead['responsible_id'] ?: null), $by, now(), $id]
+            );
+            self::addEvent($id, 'reopen', [
+                'summary' => 'Reaberto: voltou às oportunidades em aberto' . ($dnc ? '' : ' (retorno para hoje)'),
+                'notes' => $note, 'from' => self::stageName((int) $lead['stage_id']), 'to' => $to['name'],
+            ], $by);
+        });
+        return true;
+    }
+
+    /** Filtros e WHERE da tela Reativação (só leads perdidos). */
+    private static function lostWhere(array $f, array &$p): string
+    {
+        $w = ["l.status = 'lost'"];
+        if (($f['q'] ?? '') !== '') {
+            $q = $f['q'];
+            $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $q) . '%';
+            $parts = ["l.name LIKE ? ESCAPE '!'", "l.email LIKE ? ESCAPE '!'", "l.instagram LIKE ? ESCAPE '!'", "l.phone LIKE ? ESCAPE '!'"];
+            array_push($p, $like, $like, $like, $like);
+            $key = self::phoneKey($q);
+            if ($key !== null && preg_match('/^[\d\s()+.-]+$/', $q)) {
+                $parts[] = 'l.phone_key = ?';
+                $p[] = $key;
+            }
+            $w[] = '(' . implode(' OR ', $parts) . ')';
+        }
+        if (($f['reason'] ?? '') !== '') {
+            $w[] = 'l.lost_reason_id = ?';
+            $p[] = (int) $f['reason'];
+        }
+        if (($f['resp'] ?? '') === 'none') {
+            $w[] = 'l.responsible_id IS NULL';
+        } elseif (($f['resp'] ?? '') !== '') {
+            $w[] = 'l.responsible_id = ?';
+            $p[] = (int) $f['resp'];
+        }
+        $elig = 'l.do_not_contact = 0 AND l.contact_ok = 1';
+        $t = today();
+        switch ($f['f'] ?? '') {
+            case 'ready':
+                $w[] = "$elig AND (l.recovery_status IS NULL OR l.recovery_status <> 'done') AND l.next_on IS NOT NULL AND l.next_on <= ?";
+                $p[] = $t;
+                break;
+            case 'waiting':
+                $w[] = "$elig AND (l.recovery_status IS NULL OR l.recovery_status <> 'done') AND l.next_on > ?";
+                $p[] = $t;
+                break;
+            case 'unscheduled':
+                $w[] = "$elig AND (l.recovery_status IS NULL OR l.recovery_status <> 'done') AND l.next_on IS NULL";
+                break;
+            case 'done':
+                $w[] = "$elig AND l.recovery_status = 'done'";
+                break;
+            case 'noauth':
+                $w[] = 'l.do_not_contact = 0 AND l.contact_ok = 0';
+                break;
+            case 'dnc':
+                $w[] = 'l.do_not_contact = 1';
+                break;
+        }
+        return implode(' AND ', $w);
+    }
+
+    public static function lostSorts(): array
+    {
+        return ['next' => 'Mais urgentes', 'lost' => 'Perdidos há mais tempo', 'lostnew' => 'Perdidos há menos tempo', 'name' => 'Nome (A a Z)'];
+    }
+
+    /** Uma página dos leads perdidos + o total. */
+    public static function lostListing(array $f, int $limit, int $offset): array
+    {
+        $p = [];
+        $where = self::lostWhere($f, $p);
+        $order = match ($f['ord'] ?? 'next') {
+            'lost' => 'l.lost_at ASC, l.id ASC',
+            'lostnew' => 'l.lost_at DESC, l.id DESC',
+            'name' => 'l.name ASC, l.id DESC',
+            default => '(l.next_on IS NULL) ASC, l.next_on ASC, l.lost_at ASC, l.id ASC',
+        };
+        $total = (int) DB::val('SELECT COUNT(*) FROM leads l WHERE ' . $where, $p);
+        $rows = DB::all(
+            'SELECT l.*, lr.name AS reason_name, r.name AS responsible_name, r.active AS responsible_active, nr.name AS next_responsible_name,
+                    s.name AS source_name, sp.name AS sport_name, pl.name AS plan_name
+               FROM leads l
+               LEFT JOIN lead_lost_reasons lr ON lr.id = l.lost_reason_id
+               LEFT JOIN responsibles r ON r.id = l.responsible_id
+               LEFT JOIN responsibles nr ON nr.id = l.next_responsible_id
+               LEFT JOIN lead_sources s ON s.id = l.source_id
+               LEFT JOIN sports sp ON sp.id = l.sport_id
+               LEFT JOIN plans pl ON pl.id = l.plan_id
+              WHERE ' . $where . ' ORDER BY ' . $order . ' LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset,
+            $p
+        );
+        return ['rows' => $rows, 'total' => $total];
+    }
+
+    /** Números da tela Reativação (cada lead perdido cai em UMA situação: ready, waiting, unscheduled, done, noauth ou dnc). */
+    public static function lostCounts(): array
+    {
+        $c = [];
+        foreach (['all' => '', 'ready' => 'ready', 'waiting' => 'waiting', 'unscheduled' => 'unscheduled', 'done' => 'done', 'noauth' => 'noauth', 'dnc' => 'dnc'] as $k => $f) {
+            $p = [];
+            $where = self::lostWhere(['f' => $f], $p);
+            $c[$k] = (int) DB::val('SELECT COUNT(*) FROM leads l WHERE ' . $where, $p);
+        }
+        $c['eligible'] = $c['ready'] + $c['waiting'] + $c['unscheduled'];
+        $c['recovered'] = (int) DB::val("SELECT COUNT(*) FROM leads WHERE status <> 'lost' AND recovery_status = 'recovered'");
+        return $c;
+    }
+
     // ------------------------------------------------------------------ lista
 
     public static function periods(): array
@@ -316,7 +694,8 @@ final class Leads
     /** Monta o WHERE da lista a partir dos filtros. */
     private static function where(array $f, array &$p): string
     {
-        $w = ["l.status = 'open'"];
+        // Convertidos têm a sua própria lista (atalho "Convertidos"); as demais telas só mostram oportunidades em aberto.
+        $w = [($f['f'] ?? '') === 'won' ? "l.status = 'won'" : "l.status = 'open'"];
         if (($f['q'] ?? '') !== '') {
             $q = $f['q'];
             // "!" é o caractere de escape do LIKE (funciona igual no MySQL e no SQLite)
@@ -342,6 +721,10 @@ final class Leads
             $w[] = 'l.responsible_id = ?';
             $p[] = (int) $f['resp'];
         }
+        if (($f['task'] ?? '') !== '') {
+            $w[] = 'l.next_on IS NOT NULL AND l.next_responsible_id = ?';
+            $p[] = (int) $f['task'];
+        }
         $t = today();
         if (($f['p'] ?? '') === '7d') {
             $w[] = 'l.entered_on >= ?';
@@ -359,6 +742,15 @@ final class Leads
         } elseif (($f['f'] ?? '') === 'today') {
             $w[] = 'l.next_on = ?';
             $p[] = $t;
+        } elseif (($f['f'] ?? '') === 'sched') {
+            $w[] = 'l.next_on > ?';
+            $p[] = $t;
+        } elseif (($f['f'] ?? '') === 'none') {
+            $w[] = 'l.next_on IS NULL AND l.do_not_contact = 0';
+        } elseif (($f['f'] ?? '') === 'pot') {
+            $w[] = 'l.stage_id IN (SELECT id FROM lead_stages WHERE potential = 1)';
+        } elseif (($f['f'] ?? '') === 'noresp') {
+            $w[] = 'l.responsible_id IS NULL';
         } elseif (($f['f'] ?? '') === 'hot') {
             $w[] = "l.temperature = 'hot'";
         } elseif (($f['f'] ?? '') === 'dnc') {
@@ -381,11 +773,12 @@ final class Leads
         $total = (int) DB::val('SELECT COUNT(*) FROM leads l WHERE ' . $where, $p);
         $rows = DB::all(
             'SELECT l.*, s.name AS source_name, st.name AS stage_name, r.name AS responsible_name, r.active AS responsible_active,
-                    sp.name AS sport_name, pl.name AS plan_name
+                    nr.name AS next_responsible_name, sp.name AS sport_name, pl.name AS plan_name
                FROM leads l
                JOIN lead_stages st ON st.id = l.stage_id
                LEFT JOIN lead_sources s ON s.id = l.source_id
                LEFT JOIN responsibles r ON r.id = l.responsible_id
+               LEFT JOIN responsibles nr ON nr.id = l.next_responsible_id
                LEFT JOIN sports sp ON sp.id = l.sport_id
                LEFT JOIN plans pl ON pl.id = l.plan_id
               WHERE ' . $where . ' ORDER BY ' . $order . ' LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset,
@@ -394,17 +787,59 @@ final class Leads
         return ['rows' => $rows, 'total' => $total];
     }
 
-    /** Números do topo da lista. */
+    /** Números dos atalhos e do topo da lista (só oportunidades em aberto, mais os convertidos). */
     public static function counts(): array
     {
         $t = today();
+        $open = "status = 'open'";
         return [
-            'open' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE status = 'open'"),
+            'open' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE $open"),
             'new_month' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE entered_on >= ?", [substr($t, 0, 8) . '01']),
-            'hot' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE status = 'open' AND temperature = 'hot'"),
-            'late' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE status = 'open' AND next_on IS NOT NULL AND next_on < ?", [$t]),
-            'today' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE status = 'open' AND next_on = ?", [$t]),
-            'dnc' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE status = 'open' AND do_not_contact = 1"),
+            'hot' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE $open AND temperature = 'hot'"),
+            'late' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE $open AND next_on IS NOT NULL AND next_on < ?", [$t]),
+            'today' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE $open AND next_on = ?", [$t]),
+            'sched' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE $open AND next_on > ?", [$t]),
+            'none' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE $open AND next_on IS NULL AND do_not_contact = 0"),
+            'noresp' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE $open AND responsible_id IS NULL"),
+            'dnc' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE $open AND do_not_contact = 1"),
+            'won' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE status = 'won'"),
+        ];
+    }
+
+    /**
+     * Indicadores comerciais do mês (09.2). Tudo calculado na hora a partir de leads, lead_stages, plans e lead_conversions.
+     *  - converted:  leads que viraram paciente neste mês (pela data da conversão).
+     *  - rate:       taxa de conversão = dos leads que ENTRARAM neste mês, quantos já viraram paciente (null se ninguém entrou).
+     *  - potential:  soma do valor do plano de interesse dos leads em aberto nas etapas marcadas como "conta na receita potencial".
+     *                Lead sem plano de interesse (ou plano sem valor) não entra na soma: aparece em 'unpriced'.
+     *  - contracted: soma do valor contratado nas conversões do mês, separado por moeda (sem converter câmbio).
+     */
+    public static function indicators(): array
+    {
+        $m0 = substr(today(), 0, 8) . '01';
+        $entered = (int) DB::val('SELECT COUNT(*) FROM leads WHERE entered_on >= ?', [$m0]);
+        $cohortWon = (int) DB::val("SELECT COUNT(*) FROM leads WHERE entered_on >= ? AND status = 'won'", [$m0]);
+        $pot = DB::one(
+            "SELECT COUNT(*) AS n, COALESCE(SUM(p.price), 0) AS total, SUM(CASE WHEN p.id IS NULL OR p.price IS NULL THEN 1 ELSE 0 END) AS unpriced
+               FROM leads l JOIN lead_stages st ON st.id = l.stage_id AND st.potential = 1 LEFT JOIN plans p ON p.id = l.plan_id
+              WHERE l.status = 'open'"
+        ) ?: ['n' => 0, 'total' => 0, 'unpriced' => 0];
+        $byCur = [];
+        $contracts = 0;
+        foreach (DB::all('SELECT currency, SUM(contracted_value) AS total, COUNT(*) AS n FROM lead_conversions WHERE contracted_on >= ? GROUP BY currency', [$m0]) as $r) {
+            $byCur[currency_or_brl($r['currency'])] = (float) $r['total'];
+            $contracts += (int) $r['n'];
+        }
+        return [
+            'converted' => (int) DB::val("SELECT COUNT(*) FROM leads WHERE status = 'won' AND converted_at >= ?", [$m0 . ' 00:00:00']),
+            'entered' => $entered,
+            'cohort_won' => $cohortWon,
+            'rate' => $entered > 0 ? round($cohortWon * 100 / $entered, 1) : null,
+            'potential' => (float) $pot['total'],
+            'potential_n' => (int) $pot['n'],
+            'unpriced' => (int) ($pot['unpriced'] ?? 0),
+            'contracted' => $byCur,
+            'contracts' => $contracts,
         ];
     }
 
@@ -413,7 +848,7 @@ final class Leads
         return DB::one(
             'SELECT l.*, s.name AS source_name, s.kind AS source_kind, st.name AS stage_name, st.kind AS stage_kind,
                     r.name AS responsible_name, nr.name AS next_responsible_name, sp.name AS sport_name, pl.name AS plan_name,
-                    ub.name AS referred_name, cb.name AS created_name
+                    ub.name AS referred_name, cb.name AS created_name, lr.name AS lost_reason_name, pt.name AS patient_name
                FROM leads l
                JOIN lead_stages st ON st.id = l.stage_id
                LEFT JOIN lead_sources s ON s.id = l.source_id
@@ -423,6 +858,8 @@ final class Leads
                LEFT JOIN plans pl ON pl.id = l.plan_id
                LEFT JOIN users ub ON ub.id = l.referred_by
                LEFT JOIN users cb ON cb.id = l.created_by
+               LEFT JOIN lead_lost_reasons lr ON lr.id = l.lost_reason_id
+               LEFT JOIN users pt ON pt.id = l.patient_id
               WHERE l.id = ?',
             [$id]
         );
@@ -460,6 +897,21 @@ final class Leads
         return ['text' => $d === 1 ? 'amanhã' : 'em ' . $d . ' dias', 'cls' => 'soon', 'days' => $d];
     }
 
+    /**
+     * Estado visual do follow-up de um lead: late (atrasado), today (hoje), scheduled (agendado), none (sem retorno programado)
+     * ou dnc (não contatar). Devolve também o texto de nextInfo() (text, cls, days).
+     */
+    public static function followUp(array $lead): array
+    {
+        if ((int) ($lead['do_not_contact'] ?? 0) === 1) {
+            return ['state' => 'dnc', 'label' => 'Não contatar', 'text' => '', 'cls' => '', 'days' => null];
+        }
+        $nx = self::nextInfo($lead['next_on'] ?? null);
+        $state = $nx['days'] === null ? 'none' : ($nx['days'] < 0 ? 'late' : ($nx['days'] === 0 ? 'today' : 'scheduled'));
+        $labels = ['none' => 'Sem retorno programado', 'late' => 'Retorno atrasado', 'today' => 'Retorno hoje', 'scheduled' => 'Próximo retorno agendado'];
+        return ['state' => $state, 'label' => $labels[$state]] + $nx;
+    }
+
     /** Mensagem de WhatsApp pronta (editável em Configurações). {nome} vira o primeiro nome. */
     public static function message(string $name): string
     {
@@ -470,10 +922,14 @@ final class Leads
         return str_replace('{nome}', first_name($name), $tpl);
     }
 
-    /** Link do WhatsApp (null se não há telefone válido ou se o lead está como "Não contatar"). */
+    /** Link do WhatsApp (null se não há telefone válido, se está como "Não contatar" ou se é um lead perdido sem autorização para novos contatos). */
     public static function waUrl(array $lead): ?string
     {
         if ((int) ($lead['do_not_contact'] ?? 0) === 1) {
+            return null;
+        }
+        // lead perdido que não autorizou novos contatos: sem mensagem pronta de abordagem (se ele escrever, a equipe responde à mão)
+        if (($lead['status'] ?? '') === 'lost' && (int) ($lead['contact_ok'] ?? 0) !== 1) {
             return null;
         }
         return wa_phone_url($lead['phone'] ?? '', self::message((string) $lead['name']));

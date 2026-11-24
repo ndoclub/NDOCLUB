@@ -9,6 +9,7 @@
  *   $amountName   name do valor ('plan_price', 'amount' ou 'total')       $amountId $amountLabel $amountValue $amountPlaceholder $amountHint $amountRequired
  *   $currencyName name da moeda ('plan_currency' ou 'currency')           $currency
  *   $method       forma escolhida ('' = ainda não escolheu)               $allowNone (true no cadastro: oferece "Só cadastrar, sem pagamento agora")
+ *                                                                         $hideNone (true na conversão de lead: obriga escolher uma forma, sem a opção "sem pagamento")
  *   $installments parcelas escolhidas                                     $due (AAAA-MM-DD)
  *   $paidMode     'first' (caixa "1ª parcela já recebida") ou 'count' (quantas já recebidas)   $paidChecked / $paidCount
  *   $brand, $fee  bandeira e taxa (%) já escolhidas, se houver
@@ -52,7 +53,7 @@ $needBrl = $currency !== 'BRL' && !$auto && !$noPay && ($paidMode === 'first' ? 
         <?php foreach (\App\Services\Payments::methods() as $k => $label): ?>
             <option value="<?= e($k) ?>"<?= $method === $k ? ' selected' : '' ?>><?= e($k === 'pix' ? 'Pix (à vista ou parcelado)' : $label) ?></option>
         <?php endforeach; ?>
-        <?php if ($allowNone): ?>
+        <?php if ($allowNone && empty($hideNone)): ?>
             <option value="none"<?= $method === 'none' ? ' selected' : '' ?>>Só cadastrar, sem pagamento agora</option>
         <?php endif; ?>
     </select></div>

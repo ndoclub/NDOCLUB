@@ -5,11 +5,13 @@ use App\Core\Auth;
 use App\Core\DB;
 use App\Core\View;
 use App\Services\Audit;
+use App\Services\LeadConversion;
 use App\Services\Leads;
+use App\Services\Settings;
 use App\Services\PersonalData;
 use App\Services\Responsibles;
 
-/** CRM / Leads (Atualização 09.1): lista, cadastro, ficha com linha do tempo e listas editáveis (origens e etapas). */
+/** CRM / Leads (09.1 e 09.2): lista com indicadores, cadastro, ficha com linha do tempo, responsáveis, follow-up e listas editáveis (origens e etapas). */
 final class LeadController
 {
     private const PER_PAGE = [10, 25, 50, 100];
@@ -27,8 +29,9 @@ final class LeadController
             'sport' => ctype_digit($g('sport')) ? $g('sport') : '',
             'plan' => ctype_digit($g('plan')) ? $g('plan') : '',
             'resp' => ($g('resp') === 'none' || ctype_digit($g('resp'))) ? $g('resp') : '',
+            'task' => ctype_digit($g('task')) ? $g('task') : '',
             'p' => isset(Leads::periods()[$g('p')]) ? $g('p') : '',
-            'f' => in_array($g('f'), ['late', 'today', 'hot', 'dnc'], true) ? $g('f') : '',
+            'f' => in_array($g('f'), ['late', 'today', 'sched', 'none', 'noresp', 'pot', 'hot', 'dnc', 'won'], true) ? $g('f') : '',
             'ord' => isset(Leads::sorts()[$g('ord')]) ? $g('ord') : 'new',
         ];
         $perPage = in_array((int) $g('pp'), self::PER_PAGE, true) ? (int) $g('pp') : 25;
@@ -44,6 +47,8 @@ final class LeadController
             'list' => $res['rows'], 'total' => $res['total'], 'f' => $f, 'perPage' => $perPage, 'page' => $page, 'pages' => $pages,
             'offset' => ($page - 1) * $perPage,
             'counts' => Leads::counts(),
+            'ind' => Leads::indicators(),
+            'respChoices' => Responsibles::choices(),
             'sources' => DB::all('SELECT id, name, active FROM lead_sources ORDER BY active DESC, sort_order ASC, name ASC'),
             'stages' => Leads::allStages(),
             'responsibles' => Responsibles::all(),
@@ -137,6 +142,31 @@ final class LeadController
         redirect($back);
     }
 
+    /**
+     * Lê o próximo retorno do formulário: uma data, ou "em N dias" (0 = hoje). Devolve Y-m-d ou null (nada preenchido).
+     * Erros de preenchimento vão para $err.
+     */
+    private function readNextDate(array &$err): ?string
+    {
+        $nd = input('next_date');
+        $days = input('next_days');
+        if ($nd !== '') {
+            if (!self::validDate($nd) || $nd < today()) {
+                $err[] = 'A data do próximo retorno precisa ser hoje ou uma data futura.';
+                return null;
+            }
+            return $nd;
+        }
+        if ($days !== '') {
+            if (!ctype_digit($days) || (int) $days < 0 || (int) $days > 365) {
+                $err[] = 'Próximo retorno em quantos dias? Digite um número de 0 a 365.';
+                return null;
+            }
+            return date('Y-m-d', strtotime(today() . ' +' . (int) $days . ' days'));
+        }
+        return null;
+    }
+
     private static function validDate(string $d): bool
     {
         $dt = \DateTimeImmutable::createFromFormat('Y-m-d', $d);
@@ -222,6 +252,13 @@ final class LeadController
             'events' => Leads::timeline($id),
             'stages' => Leads::stages(true, (int) $lead['stage_id']),
             'responsibles' => Responsibles::choices((int) $lead['responsible_id']),
+            'respTask' => Responsibles::choices((int) $lead['next_responsible_id']),
+            'reasons' => Leads::lostReasons(),
+            'openStages' => Leads::stages(true),
+            'rec' => $lead['status'] === 'lost' ? Leads::recoveryState($lead) : null,
+            'recDays' => Leads::recoveryDays(),
+            'conv' => $lead['status'] === 'won' ? LeadConversion::forLead($id) : null,
+            'fu' => Leads::followUp($lead),
             'next' => Leads::nextInfo($lead['next_on']),
             'wa' => Leads::waUrl($lead),
         ], 'admin');
@@ -271,26 +308,30 @@ final class LeadController
         $result = isset(Leads::RESULTS[$result]) ? $result : null;
         $stage = (int) ($_POST['stage_id'] ?? 0);
 
+        if ($lead['status'] === 'won') {
+            flash('err', 'Este lead já virou paciente: o acompanhamento agora é feito na ficha do paciente.');
+            redirect($back);
+        }
+        if ($lead['status'] === 'lost') {
+            // lead perdido: o contato é uma tentativa de reativação (segue a cadência ou encerra)
+            if ($err) {
+                $this->fail($err, $back);
+            }
+            Leads::logRecoveryAttempt($lead, [
+                'happened_at' => $at, 'channel' => $channel, 'result' => $result, 'summary' => $summary, 'notes' => mb_substr(input('notes'), 0, 600) ?: null,
+            ], input('after') === 'stop' ? 'stop' : 'cadence', (int) Auth::id());
+            Audit::log((int) Auth::id(), 'lead_contact', 'lead', $id, $lead['name'] . ' (reativação)');
+            $fresh = Leads::find($id);
+            flash('ok', 'Tentativa de reativação registrada' . ($fresh && $fresh['next_on'] ? '. Próxima tentativa em ' . fmt_date($fresh['next_on']) . '.' : '.'));
+            redirect($back);
+        }
+
         // Próximo retorno: uma data, ou "em N dias". Lead "Não contatar" não recebe novo retorno.
         $nextOn = null;
         $nextType = input('next_type');
         $nextType = isset(Leads::ACTIONS[$nextType]) ? $nextType : 'followup';
         if ((int) $lead['do_not_contact'] === 0) {
-            $nd = input('next_date');
-            $days = input('next_days');
-            if ($nd !== '') {
-                if (!self::validDate($nd) || $nd < today()) {
-                    $err[] = 'A data do próximo retorno precisa ser hoje ou uma data futura.';
-                } else {
-                    $nextOn = $nd;
-                }
-            } elseif ($days !== '') {
-                if (!ctype_digit($days) || (int) $days < 0 || (int) $days > 365) {
-                    $err[] = 'Próximo retorno em quantos dias? Digite um número de 0 a 365.';
-                } else {
-                    $nextOn = date('Y-m-d', strtotime(today() . ' +' . (int) $days . ' days'));
-                }
-            }
+            $nextOn = $this->readNextDate($err);
         }
         $nextResp = (int) ($_POST['next_responsible_id'] ?? 0);
         $nextResp = $nextResp > 0 && Responsibles::exists($nextResp) ? $nextResp : ($lead['responsible_id'] ? (int) $lead['responsible_id'] : null);
@@ -305,6 +346,126 @@ final class LeadController
         ], (int) Auth::id());
         Audit::log((int) Auth::id(), 'lead_contact', 'lead', $id, $lead['name']);
         flash('ok', 'Contato registrado' . ($nextOn ? '. Próximo retorno em ' . fmt_date($nextOn) . '.' : '. Atenção: este lead está sem próximo retorno agendado.'));
+        redirect($back);
+    }
+
+    /** Agendar (ou remover) o próximo retorno sem registrar contato, escolhendo quem faz a tarefa. */
+    public function schedule(int $id): void
+    {
+        $lead = $this->open($id);
+        $back = '/admin/crm/' . $id . '#retorno';
+        if (!in_array($lead['status'], ['open', 'lost'], true)) {
+            flash('err', 'Este lead já virou paciente: não há mais retorno a agendar.');
+            redirect('/admin/crm/' . $id);
+        }
+        if ($lead['status'] === 'lost' && !Leads::recoveryEligible($lead) && (int) $lead['do_not_contact'] === 0) {
+            flash('err', 'Este lead perdido não autorizou novos contatos: não dá para agendar tentativa. Marque a autorização na ficha só se ele aceitou.');
+            redirect($back);
+        }
+        $note = mb_substr(input('note'), 0, 600) ?: null;
+        if (!empty($_POST['clear'])) {
+            if ($lead['next_on'] === null) {
+                flash('err', 'Este lead já está sem retorno programado.');
+                redirect($back);
+            }
+            Leads::schedule($lead, null, 'followup', null, $note, (int) Auth::id());
+            Audit::log((int) Auth::id(), 'lead_schedule', 'lead', $id, $lead['name'] . ' (retorno removido)');
+            flash('ok', 'Retorno removido. Atenção: este lead está sem retorno programado.');
+            redirect($back);
+        }
+        if ((int) $lead['do_not_contact'] === 1) {
+            flash('err', 'Este lead está como "Não contatar": não dá para agendar retorno. Libere o contato antes.');
+            redirect($back);
+        }
+        $err = [];
+        $nextOn = $this->readNextDate($err);
+        if (!$err && $nextOn === null) {
+            // dias e data em branco: mantém o retorno que já existe e só troca a ação ou quem faz a tarefa
+            if ($lead['next_on'] !== null) {
+                $nextOn = (string) $lead['next_on'];
+            } else {
+                $err[] = 'Informe em quantos dias ou escolha a data do retorno.';
+            }
+        }
+        $type = input('next_type');
+        $type = isset(Leads::ACTIONS[$type]) ? $type : 'followup';
+        $rid = (int) ($_POST['next_responsible_id'] ?? 0);
+        $resp = null;
+        if ($rid > 0) {
+            if (Responsibles::exists($rid) && (Responsibles::isActive($rid) || $rid === (int) $lead['next_responsible_id'])) {
+                $resp = $rid;
+            } else {
+                $err[] = 'Esse responsável não existe ou está desativado.';
+            }
+        }
+        if ($err) {
+            $this->fail($err, $back);
+        }
+        Leads::schedule($lead, $nextOn, $type, $resp, $note, (int) Auth::id());
+        Audit::log((int) Auth::id(), 'lead_schedule', 'lead', $id, $lead['name'] . ' -> ' . $nextOn);
+        $who = $resp ? (string) DB::val('SELECT name FROM responsibles WHERE id = ?', [$resp]) : '';
+        flash('ok', 'Retorno agendado para ' . fmt_date($nextOn) . ($who !== '' ? ', tarefa de ' . $who : ', sem responsável pela tarefa') . '.');
+        redirect($back);
+    }
+
+    /** Lê e valida o responsável escolhido (0 = sem responsável). Retorna null e avisa se for inválido. */
+    private function readResponsible(string $back): ?int
+    {
+        $raw = (string) ($_POST['responsible_id'] ?? '');
+        if ($raw === '' || !ctype_digit($raw)) {
+            flash('err', 'Escolha o responsável (ou "Sem responsável").');
+            redirect($back);
+        }
+        $rid = (int) $raw;
+        if ($rid > 0 && !Responsibles::isActive($rid)) {
+            flash('err', 'Esse responsável não existe ou está desativado. Cadastre ou ative em Responsáveis.');
+            redirect($back);
+        }
+        return $rid;
+    }
+
+    /** Atribuir o responsável de UM lead (ficha). */
+    public function assignOne(int $id): void
+    {
+        $lead = $this->open($id);
+        $back = '/admin/crm/' . $id;
+        if (!in_array($lead['status'], ['open', 'lost'], true)) {
+            flash('err', 'Este lead já virou paciente: o responsável agora é o do paciente.');
+            redirect($back);
+        }
+        $rid = $this->readResponsible($back);
+        $n = Leads::assign([$id], (int) $rid, (int) Auth::id());
+        if ($n > 0) {
+            $label = $rid > 0 ? (string) DB::val('SELECT name FROM responsibles WHERE id = ?', [$rid]) : 'sem responsável';
+            Audit::log((int) Auth::id(), 'lead_assign', 'lead', $id, $lead['name'] . ' -> ' . $label);
+            flash('ok', $rid > 0 ? 'Responsável: ' . $label . '.' : 'Responsável removido.');
+        } else {
+            flash('err', 'Esse já é o responsável atual.');
+        }
+        redirect($back);
+    }
+
+    /** Atribuir o responsável de VÁRIOS leads de uma vez (lista). */
+    public function assignMany(): void
+    {
+        $back = safe_back((string) ($_POST['back'] ?? ''), '/admin/crm');
+        $ids = $_POST['ids'] ?? [];
+        $ids = is_array($ids) ? array_values(array_unique(array_filter(array_map('intval', $ids), fn($i) => $i > 0))) : [];
+        if (!$ids) {
+            flash('err', 'Marque pelo menos um lead na lista.');
+            redirect($back);
+        }
+        $rid = (int) $this->readResponsible($back);
+        $n = Leads::assign($ids, $rid, (int) Auth::id());
+        $label = $rid > 0 ? (string) DB::val('SELECT name FROM responsibles WHERE id = ?', [$rid]) : 'sem responsável';
+        Audit::log((int) Auth::id(), 'lead_assign', 'responsible', $rid ?: null, count($ids) . ' lead(s) -> ' . $label);
+        if ($n === 0) {
+            flash('err', 'Nenhuma mudança: os leads marcados já estavam com ' . ($rid > 0 ? $label : 'esse status') . '.');
+        } elseif ($rid > 0) {
+            flash('ok', $n . ($n === 1 ? ' lead agora é de ' : ' leads agora são de ') . $label . '.');
+        } else {
+            flash('ok', 'Responsável removido de ' . $n . ($n === 1 ? ' lead.' : ' leads.'));
+        }
         redirect($back);
     }
 
@@ -339,7 +500,9 @@ final class LeadController
         }
         Leads::setConsent($lead, !empty($_POST['on']), (int) Auth::id());
         Audit::log((int) Auth::id(), 'lead_consent', 'lead', $id, $lead['name'] . (!empty($_POST['on']) ? ' (autorizou)' : ' (removida)'));
-        flash('ok', !empty($_POST['on']) ? 'Autorização registrada.' : 'Autorização removida.');
+        flash('ok', !empty($_POST['on'])
+            ? 'Autorização registrada.' . ($lead['status'] === 'lost' ? ' Agora este lead é elegível: use "Programar reativação".' : '')
+            : 'Autorização removida.' . ($lead['status'] === 'lost' ? ' A reativação deste lead foi cancelada.' : ''));
         redirect('/admin/crm/' . $id);
     }
 
@@ -371,7 +534,10 @@ final class LeadController
 
     public function config(): void
     {
-        View::render('admin/crm/config', ['title' => 'CRM · Configurar', 'sources' => Leads::allSources(), 'stages' => Leads::allStages()], 'admin');
+        View::render('admin/crm/config', [
+            'title' => 'CRM · Configurar', 'sources' => Leads::allSources(), 'stages' => Leads::allStages(),
+            'reasons' => Leads::allLostReasons(), 'recDays' => Leads::recoveryDays(), 'minDays' => Leads::MIN_RECOVERY_DAYS,
+        ], 'admin');
     }
 
     public function addSource(): void
@@ -458,9 +624,75 @@ final class LeadController
         } else {
             $order = (int) $row['sort_order'];
         }
-        DB::run('UPDATE lead_stages SET name = ?, active = ?, sort_order = ? WHERE id = ?', [$name, $active, $order, $id]);
+        $potential = $row['kind'] === 'open' && !empty($_POST['potential']) ? 1 : 0;
+        DB::run('UPDATE lead_stages SET name = ?, active = ?, sort_order = ?, potential = ? WHERE id = ?', [$name, $active, $order, $potential, $id]);
         Audit::log((int) Auth::id(), 'lead_stage_cfg', 'lead_stage', $id, $row['name'] . ' -> ' . $name . ($active ? '' : ' (desativada)'));
         flash('ok', 'Etapa salva.');
+        redirect('/admin/crm/configurar');
+    }
+
+    // ------------------------------------------------------------------ motivos de perda e cadência da reativação (09.2)
+
+    public function addReason(): void
+    {
+        $name = input('name');
+        if (mb_strlen($name) < 2 || mb_strlen($name) > 80) {
+            $this->fail(['Informe o motivo de perda (2 a 80 letras).'], '/admin/crm/configurar');
+        }
+        if (DB::val('SELECT id FROM lead_lost_reasons WHERE LOWER(name) = ?', [mb_strtolower($name)])) {
+            $this->fail(['Já existe um motivo com esse nome.'], '/admin/crm/configurar');
+        }
+        $next = (int) DB::val('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM lead_lost_reasons');
+        $id = DB::insert('INSERT INTO lead_lost_reasons (name, sort_order, active) VALUES (?, ?, 1)', [$name, $next]);
+        Audit::log((int) Auth::id(), 'lead_reason', 'lead_reason', $id, 'novo: ' . $name);
+        flash('ok', 'Motivo de perda criado.');
+        redirect('/admin/crm/configurar');
+    }
+
+    public function saveReason(int $id): void
+    {
+        $row = DB::one('SELECT * FROM lead_lost_reasons WHERE id = ?', [$id]);
+        if (!$row) {
+            redirect('/admin/crm/configurar');
+        }
+        $name = input('name');
+        if (mb_strlen($name) < 2 || mb_strlen($name) > 80) {
+            $this->fail(['Informe o motivo de perda (2 a 80 letras).'], '/admin/crm/configurar');
+        }
+        if (DB::val('SELECT id FROM lead_lost_reasons WHERE LOWER(name) = ? AND id <> ?', [mb_strtolower($name), $id])) {
+            $this->fail(['Já existe um motivo com esse nome.'], '/admin/crm/configurar');
+        }
+        $active = empty($_POST['active']) ? 0 : 1;
+        if (!$active && (int) DB::val('SELECT COUNT(*) FROM lead_lost_reasons WHERE active = 1 AND id <> ?', [$id]) === 0) {
+            $this->fail(['Precisa sobrar pelo menos um motivo de perda ativo.'], '/admin/crm/configurar');
+        }
+        DB::run('UPDATE lead_lost_reasons SET name = ?, active = ? WHERE id = ?', [$name, $active, $id]);
+        Audit::log((int) Auth::id(), 'lead_reason', 'lead_reason', $id, $row['name'] . ' -> ' . $name . ($active ? '' : ' (desativado)'));
+        flash('ok', 'Motivo salvo.');
+        redirect('/admin/crm/configurar');
+    }
+
+    /** Dias da cadência de reativação: de 1 a 5 números, cada um de 20 a 365, separados por vírgula. */
+    public function saveCadence(): void
+    {
+        $raw = input('days');
+        $parts = preg_split('/[\s,;]+/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $min = Leads::MIN_RECOVERY_DAYS;
+        $days = [];
+        foreach ($parts as $p) {
+            if (!ctype_digit($p) || (int) $p < $min || (int) $p > 365) {
+                $this->fail(['Cadência: use números de ' . $min . ' a 365, separados por vírgula (ex.: 20, 30, 45). O primeiro contato só pode acontecer a partir de ' . $min . ' dias.'], '/admin/crm/configurar');
+            }
+            $days[] = (int) $p;
+        }
+        $days = array_values(array_unique($days));
+        sort($days);
+        if (!$days || count($days) > 5) {
+            $this->fail(['Cadência: informe de 1 a 5 prazos (ex.: 20, 30, 45).'], '/admin/crm/configurar');
+        }
+        Settings::set('lead_recovery_days', implode(',', $days));
+        Audit::log((int) Auth::id(), 'lead_cadence', 'setting', null, implode(', ', $days) . ' dias');
+        flash('ok', 'Cadência salva: ' . implode(', ', $days) . ' dias depois da perda. Vale para as próximas tentativas.');
         redirect('/admin/crm/configurar');
     }
 }

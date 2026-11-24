@@ -430,6 +430,7 @@ CREATE TABLE lead_stages (
   kind VARCHAR(8) NOT NULL DEFAULT 'open',
   sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   active TINYINT(1) NOT NULL DEFAULT 1,
+  potential TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   UNIQUE KEY uq_lead_stages_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -526,6 +527,8 @@ CREATE TABLE lead_conversions (
   responsible_id INT UNSIGNED NULL,
   source_id INT UNSIGNED NULL,
   by_user_id INT UNSIGNED NULL,
+  payment_id INT UNSIGNED NULL,
+  mode VARCHAR(8) NOT NULL DEFAULT 'new',
   created_at DATETIME NOT NULL,
   PRIMARY KEY (id),
   KEY idx_lead_conversions_lead (lead_id),
@@ -605,6 +608,7 @@ INSERT INTO settings (skey, svalue) VALUES
 ('warn_red_days', '7'),
 ('birthday_message', 'Feliz aniversário, {nome}! 🎉 Que este novo ciclo venha com muita saúde, energia e conquistas. Conte comigo e com a equipe do No Days Off Club. Um abraço!'),
 ('consent_version', '1.0'),
+('lead_recovery_days', '20,30,45'),
 ('theme_1', 'Segunda de foco'),    ('theme_1_q', 'Qual é a sua meta para esta semana?'),
 ('theme_2', 'Terça do prato'),     ('theme_2_q', 'Mostre uma refeição sua de hoje.'),
 ('theme_3', 'Quarta de treino'),   ('theme_3_q', 'Conte como foi o seu treino de hoje.'),
@@ -626,15 +630,15 @@ INSERT INTO lead_sources (name, kind, sort_order, active) VALUES
 ('Eventos e parcerias', 'other', 8, 1),
 ('Outros', 'other', 9, 1);
 
-INSERT INTO lead_stages (name, kind, sort_order, active) VALUES
-('Novo lead', 'open', 1, 1),
-('Primeiro contato', 'open', 2, 1),
-('Qualificação', 'open', 3, 1),
-('Engajamento', 'open', 4, 1),
-('Proposta enviada', 'open', 5, 1),
-('Negociação', 'open', 6, 1),
-('Convertido', 'won', 7, 1),
-('Perdido', 'lost', 8, 1);
+INSERT INTO lead_stages (name, kind, sort_order, active, potential) VALUES
+('Novo lead', 'open', 1, 1, 0),
+('Primeiro contato', 'open', 2, 1, 0),
+('Qualificação', 'open', 3, 1, 0),
+('Engajamento', 'open', 4, 1, 0),
+('Proposta enviada', 'open', 5, 1, 1),
+('Negociação', 'open', 6, 1, 1),
+('Convertido', 'won', 7, 1, 0),
+('Perdido', 'lost', 8, 1, 0);
 
 INSERT INTO lead_lost_reasons (name, sort_order, active) VALUES
 ('Preço / investimento', 1, 1),
