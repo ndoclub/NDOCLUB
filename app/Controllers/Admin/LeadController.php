@@ -11,7 +11,7 @@ use App\Services\Settings;
 use App\Services\PersonalData;
 use App\Services\Responsibles;
 
-/** CRM / Leads (09.1 e 09.2): lista com indicadores, cadastro, ficha com linha do tempo, responsáveis, follow-up e listas editáveis (origens e etapas). */
+/** CRM / Leads (09.1 a 09.3): lista e quadro (Kanban) com indicadores, cadastro, ficha com linha do tempo, responsáveis, follow-up e listas editáveis (origens e etapas). */
 final class LeadController
 {
     private const PER_PAGE = [10, 25, 50, 100];
@@ -54,6 +54,31 @@ final class LeadController
             'responsibles' => Responsibles::all(),
             'sports' => DB::all('SELECT id, name FROM sports ORDER BY active DESC, name ASC'),
             'plans' => DB::all('SELECT id, name FROM plans ORDER BY active DESC, name ASC'),
+        ], 'admin');
+    }
+
+    // ------------------------------------------------------------------ quadro (Kanban)
+
+    /** Quadro: os mesmos leads em aberto da Lista, em colunas por etapa. Arrastar um cartão muda a etapa (ver stage()). */
+    public function board(): void
+    {
+        $g = fn(string $k) => isset($_GET[$k]) && is_string($_GET[$k]) ? trim($_GET[$k]) : '';
+        $f = [
+            'q' => mb_substr($g('q'), 0, 80),
+            'temp' => isset(Leads::TEMPS[$g('temp')]) ? $g('temp') : '',
+            'source' => ctype_digit($g('source')) ? $g('source') : '',
+            'resp' => ($g('resp') === 'none' || ctype_digit($g('resp'))) ? $g('resp') : '',
+            'f' => in_array($g('f'), ['late', 'today', 'hot', 'noresp'], true) ? $g('f') : '',
+        ];
+        $b = Leads::board($f);
+        View::render('admin/crm/board', [
+            'title' => 'CRM · Quadro',
+            'columns' => $b['columns'], 'total' => $b['total'], 'f' => $f,
+            'counts' => Leads::counts(),
+            'ind' => Leads::indicators(),
+            'respChoices' => Responsibles::choices(),
+            'sources' => DB::all('SELECT id, name, active FROM lead_sources ORDER BY active DESC, sort_order ASC, name ASC'),
+            'moveStages' => Leads::stages(true),
         ], 'admin');
     }
 
@@ -469,16 +494,60 @@ final class LeadController
         redirect($back);
     }
 
+    /**
+     * Muda a etapa de um lead em aberto. Serve a ficha (formulário), o cartão do Quadro (seletor "Mover para…") e o arrastar e soltar (fetch).
+     *  - stage_id numérico: etapa em andamento do funil (a mudança vai para a linha do tempo e para a auditoria).
+     *  - stage_id "won" / "lost": não move nada; leva ao fluxo próprio ("Converter em paciente" ou "Marcar como perdido").
+     * Com o cabeçalho de fetch (is_ajax) a resposta é JSON; sem ele, aviso + volta para a tela de origem.
+     */
     public function stage(int $id): void
     {
-        $lead = $this->open($id);
-        if (Leads::moveStage($lead, (int) ($_POST['stage_id'] ?? 0), (int) Auth::id())) {
-            Audit::log((int) Auth::id(), 'lead_stage', 'lead', $id, $lead['name']);
-            flash('ok', 'Etapa atualizada.');
-        } else {
-            flash('err', 'Escolha uma etapa diferente da atual (Convertido e Perdido têm botões próprios, nas próximas atualizações).');
+        $ajax = is_ajax();
+        $lead = Leads::find($id);
+        if (!$lead) {
+            if ($ajax) {
+                json_out(['ok' => false, 'error' => 'Lead não encontrado.'], 404);
+            }
+            flash('err', 'Lead não encontrado.');
+            redirect('/admin/crm');
         }
-        redirect('/admin/crm/' . $id);
+        $back = safe_back((string) ($_POST['back'] ?? ''), '/admin/crm/' . $id);
+        if (!str_starts_with($back, '/admin/crm')) {
+            $back = '/admin/crm/' . $id;
+        }
+        $fail = function (string $msg) use ($ajax, $back): void {
+            if ($ajax) {
+                json_out(['ok' => false, 'error' => $msg], 422);
+            }
+            flash('err', $msg);
+            redirect($back);
+        };
+        if ($lead['status'] !== 'open') {
+            $fail('Só dá para mudar a etapa de leads em aberto.');
+        }
+        $to = trim((string) ($_POST['stage_id'] ?? ''));
+        if ($to === 'won' || $to === 'lost') {
+            $next = $to === 'won' ? '/admin/crm/' . $id . '/converter' : '/admin/crm/' . $id . '?perder=1#perder';
+            if ($ajax) {
+                json_out(['ok' => true, 'redirect' => url($next)]);
+            }
+            redirect($next);
+        }
+        $stageId = ctype_digit($to) ? (int) $to : 0;
+        if ($stageId > 0 && $stageId === (int) $lead['stage_id']) {
+            $fail('O lead já está nessa etapa.');
+        }
+        if (!Leads::moveStage($lead, $stageId, (int) Auth::id())) {
+            $final = $stageId > 0 && (int) DB::val("SELECT COUNT(*) FROM lead_stages WHERE id = ? AND kind <> 'open'", [$stageId]) > 0;
+            $fail($final ? 'Convertido e Perdido têm fluxo próprio: use "Converter em paciente" ou "Marcar como perdido".' : 'Escolha uma etapa válida do funil.');
+        }
+        Audit::log((int) Auth::id(), 'lead_stage', 'lead', $id, $lead['name']);
+        $stageName = Leads::stageName($stageId);
+        if ($ajax) {
+            json_out(['ok' => true, 'stage' => $stageName, 'message' => first_name($lead['name']) . ' foi para ' . $stageName . '.']);
+        }
+        flash('ok', 'Etapa atualizada.');
+        redirect($back);
     }
 
     public function temperature(int $id): void
@@ -537,6 +606,7 @@ final class LeadController
         View::render('admin/crm/config', [
             'title' => 'CRM · Configurar', 'sources' => Leads::allSources(), 'stages' => Leads::allStages(),
             'reasons' => Leads::allLostReasons(), 'recDays' => Leads::recoveryDays(), 'minDays' => Leads::MIN_RECOVERY_DAYS,
+            'homeView' => Leads::homeView(),
         ], 'admin');
     }
 
@@ -673,6 +743,19 @@ final class LeadController
     }
 
     /** Dias da cadência de reativação: de 1 a 5 números, cada um de 20 a 365, separados por vírgula. */
+    /** Tela que abre quando se clica em "CRM" no menu: Quadro (padrão) ou Lista. É só uma preferência de abertura; as duas telas continuam nas abas. */
+    public function saveView(): void
+    {
+        $v = input('view');
+        if (!isset(Leads::HOME_VIEWS[$v])) {
+            $this->fail(['Escolha Quadro ou Lista.'], '/admin/crm/configurar');
+        }
+        Settings::set('crm_default_view', $v);
+        Audit::log((int) Auth::id(), 'lead_view', 'setting', null, $v === 'list' ? 'Lista' : 'Quadro');
+        flash('ok', 'Pronto: o item "CRM" do menu agora abre ' . ($v === 'list' ? 'a Lista.' : 'o Quadro.'));
+        redirect('/admin/crm/configurar');
+    }
+
     public function saveCadence(): void
     {
         $raw = input('days');

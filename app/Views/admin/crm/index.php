@@ -11,9 +11,9 @@ $hasFilters = $f['q'] !== '' || $f['temp'] !== '' || $f['source'] !== '' || $f['
 $moreOn = ($f['resp'] !== '' || $f['task'] !== '' || $f['sport'] !== '' || $f['plan'] !== '' || $f['p'] !== '' || $f['ord'] !== 'new');
 $won = $f['f'] === 'won';
 // valores dos indicadores (sem casas decimais quando o valor é redondo)
-$mny = fn(float $v, string $cur = 'BRL') => money($v, fmod($v, 1.0) == 0.0 ? 0 : 2, $cur);
+$mny = fn(float $v, string $currency = 'BRL') => money($v, fmod($v, 1.0) == 0.0 ? 0 : 2, $currency);
 $contracted = [];
-foreach ($ind['contracted'] as $cur => $v) { $contracted[] = $mny((float) $v, $cur); }
+foreach ($ind['contracted'] as $curCode => $v) { $contracted[] = $mny((float) $v, $curCode); }
 $rate = $ind['rate'] === null ? '-' : rtrim(rtrim(number_format((float) $ind['rate'], 1, ',', ''), '0'), ',') . '%';
 $activeResp = array_values(array_filter($respChoices, fn($x) => $x['active']));
 $from = $total > 0 ? $offset + 1 : 0;

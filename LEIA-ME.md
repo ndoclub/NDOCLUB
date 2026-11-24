@@ -357,7 +357,7 @@ Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.
 - **Preparado para depois, sem fazer nada sozinho:** o sistema **não envia mensagem nenhuma** (nem WhatsApp, nem e-mail, nem Instagram). Cada linha da linha do tempo já tem os campos `source` e `external_id`, reservados para integrações futuras.
 
 **Como as próximas etapas encaixam** (combinado):
-- **09.2** (já feita, veja abaixo) indicadores, responsáveis, follow-up, ficha completa, reativação e conversão em paciente · **09.3** Funil em quadro (Kanban, arrastar o lead entre as etapas) · **09.4** Central de follow-up e alertas no Painel (inclui "lead sem próxima ação") · **09.5** Bloco **Comercial** no Painel e filtros dos indicadores por período, origem, responsável e modalidade.
+- **09.2** (já feita, veja abaixo) indicadores, responsáveis, follow-up, ficha completa, reativação e conversão em paciente · **09.3** (já feita, veja abaixo) Funil em quadro (Kanban, arrastar o lead entre as etapas) · **09.4** Central de follow-up e alertas no Painel (inclui "lead sem próxima ação") · **09.5** Bloco **Comercial** no Painel e filtros dos indicadores por período, origem, responsável e modalidade.
 - **Definições já combinadas:** *receita potencial* = valor do plano de interesse dos leads em aberto nas etapas **Proposta enviada + Negociação**; *receita contratada* = valor das conversões do período (**não** é o mesmo que *recebido*).
 - **Atualização 10 — Equipe e perfis:** login próprio para a secretária e para você e o Gabriel, perfis de acesso (Administrador e Secretaria, com CRM + Pacientes + Financeiro, sem Visão executiva, sem excluir paciente, sem planos e taxas, sem configurações e auditoria), "Conferência do mês" opcional e revisão de segurança. A regra de acesso do CRM já está em **um lugar só** no código, para esse ajuste ser pequeno.
 
@@ -386,6 +386,23 @@ Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.
 - **Taxa de conversão** = dos leads que **entraram** neste mês, quantos **já viraram** paciente (aparece "N de M leads do mês"; sem leads no mês mostra "-").
 - **Receita potencial em negociação** = soma do **valor do plano de interesse** dos leads **em aberto** nas etapas marcadas como "conta na receita potencial" (de fábrica: **Proposta enviada** e **Negociação**). Lead sem plano de interesse, ou com plano sem valor, **fica fora da soma** e o cartão avisa quantos são.
 - **Receita efetivamente contratada** = soma do **valor contratado** nas conversões do mês, **separado por moeda** (sem câmbio inventado). **Não é o mesmo que recebido**: o recebimento continua no Financeiro.
+
+### Atualização 09.3 (CRM: Quadro Kanban e abas organizadas)
+**Esta atualização NÃO tem SQL.** Não precisa importar nada no phpMyAdmin (se a 09 e a 09.2 ainda não foram importadas, importe antes, na ordem: 09 → 09.2).
+
+1. Atualize os arquivos (`git pull` no terminal do VS Code, ou copie a pasta nova por cima).
+2. Aperte **Ctrl + F5** (o navegador troca para a versão `ndo-v18` do app).
+
+**O que mudou (cores, cartões, lista e tudo o que já existia continuam iguais):**
+- **Quadro (Kanban):** nova aba, com uma **coluna para cada etapa do funil** (Novo lead, Primeiro contato, Qualificação... na ordem de *Configurar*). Cada lead é um cartão com nome, temperatura, interesse, origem, **estado do follow-up** (hoje / atrasado / agendado / sem retorno), responsável, último contato e atalho do WhatsApp. **São os mesmos leads e os mesmos registros da Lista**: não existe cadastro paralelo. Mover no Quadro muda a etapa na Lista, na ficha, na linha do tempo e na Auditoria, e vice-versa.
+- **Mudar a etapa:** **arraste o cartão** para outra coluna (computador) ou use o seletor **"Mover para…"** do cartão (celular, teclado ou se o JavaScript estiver desligado). O cartão só troca de coluna **depois** que o sistema confirma; se der erro, ele fica onde estava e aparece um aviso.
+- **Convertido e Perdido não são colunas.** Ao arrastar um cartão, aparece embaixo da tela a faixa **Finalizar**: solte em *Converter em paciente* para abrir a conversão (com a tela "nada foi gravado ainda") ou em *Marcar como perdido* para abrir o formulário do motivo da perda. Nada é convertido nem perdido só por arrastar.
+- **Dentro da coluna:** os retornos mais urgentes ficam em cima (atrasados primeiro, depois hoje, agendados e sem retorno). Cada coluna mostra até **30 cartões**; se houver mais, aparece "+ N leads na Lista" (abre a Lista já filtrada naquela etapa). O número no alto da coluna é sempre o total real.
+- **Receita potencial na coluna:** nas etapas marcadas em *Configurar* como "Conta na receita potencial" (de fábrica, Proposta enviada e Negociação), a coluna mostra a soma do plano de interesse dos leads dela; é a mesma conta do indicador da Lista.
+- **Filtros e atalhos:** busca, temperatura, origem e responsável + atalhos *Retorno atrasado*, *Retorno hoje*, *Quentes* e *Sem responsável*. Valem as mesmas regras da Lista.
+- **Abas do CRM organizadas:** **Quadro | Lista | Reativação | Configurar**. A antiga aba "Leads" agora se chama **Lista**. O que é de cada aba: *Quadro* = enxergar e mover o funil; *Lista* = tabela com indicadores, filtros e atribuição em lote; *Reativação* = leads perdidos; *Configurar* = origens, etapas, motivos e cadência.
+- **Tela inicial do CRM:** em *Configurar > Tela inicial do CRM* você escolhe se o item **CRM** do menu abre o **Quadro** (padrão) ou a **Lista**. É só a tela que abre primeiro: as duas continuam nas abas.
+- **Segurança:** só administrador acessa; o arrastar usa o mesmo token de segurança (CSRF) dos formulários; sem script na página (o código fica em `assets/js/app.js`).
 
 ### Acessos para teste
 | Perfil | E-mail | Senha |
@@ -636,12 +653,26 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Follow-up:** na ficha, **Agendar follow-up** → "em 5 dias", ação *Ligar*, tarefa do *Comercial* → **Agendar**. Na lista aparece **Próximo retorno agendado**. Troque para "0 dias": **Retorno hoje**. Use o filtro **Retorno de: Comercial**. Remova o retorno: **Sem retorno programado**. Um lead **Não contatar** não deixa agendar.
 - [ ] **Ficha completa:** confira dados pessoais, origem, temperatura, modalidade, plano de interesse, responsável, etapa, estado do follow-up, linha do tempo e os 3 botões (**Registrar interação**, **Agendar follow-up**, **Converter em paciente**).
 - [ ] **Perder:** na ficha de um lead → *Marcar como perdido*: sem motivo, **recusa**. Escolha o motivo e marque "aceita receber novos contatos": a mensagem diz "Reativação programada: 1º contato em (hoje + 20 dias)". O lead **sai** da lista de abertos e dos indicadores e **aparece em Reativação**. Faça outro **sem** marcar a caixinha: não há reativação programada.
-- [ ] **Reativação:** abas **Leads / Reativação / Configurar**; indicadores (perdidos, elegíveis, prontos, recuperados), atalhos com contagem, filtros por motivo, responsável e busca. Registre uma tentativa na ficha do perdido: a próxima vem **10 dias depois** (cadência 20 → 30). Na 3ª, a cadência conclui. **Reabrir lead** devolve o lead às oportunidades, com retorno para hoje.
+- [ ] **Reativação:** abas **Quadro / Lista / Reativação / Configurar**; indicadores (perdidos, elegíveis, prontos, recuperados), atalhos com contagem, filtros por motivo, responsável e busca. Registre uma tentativa na ficha do perdido: a próxima vem **10 dias depois** (cadência 20 → 30). Na 3ª, a cadência conclui. **Reabrir lead** devolve o lead às oportunidades, com retorno para hoje.
 - [ ] **Configurar:** troque a cadência para `25, 40` (aceita) e tente `10, 30` ou `20, 400` (recusa). Crie um motivo de perda, renomeie e desative (o último ativo não deixa).
 - [ ] **Converter em paciente (use um lead de teste):** *Converter em paciente* → confira os dados → escolha plano, valor e forma de pagamento → **Revisar conversão**. Na tela 2 está escrito **"nada foi gravado ainda"**: abra **Pacientes** e **Financeiro** em outra aba e confirme que **ainda não existe** o paciente nem a venda. Volte, marque **"Confirmo que o plano contratado é..."** → **Confirmar conversão**. Agora existem o paciente, a venda e as parcelas no Financeiro; a ficha abre com a mensagem de boas-vindas e a senha provisória (aparece **uma vez**).
 - [ ] **Duplicidade:** crie um lead com o **telefone de um paciente que já existe** e converta: aparece "Já existe um paciente com este contato". Teste **Vincular** (o plano do paciente é renovado e a venda entra no Financeiro, sem cadastro novo) e **É outra pessoa**. Tente usar o **e-mail** de um paciente: recusa.
 - [ ] **Depois de converter:** o lead sai dos abertos e aparece em **Convertidos**. A ficha mostra "Virou paciente", o plano, o valor e "A venda está em Financeiro". Não dá mais para registrar contato, agendar nem perder. Os indicadores **Leads convertidos**, **Taxa de conversão** e **Receita efetivamente contratada** sobem.
 - [ ] **Privacidade:** entrar como paciente e abrir `/admin/crm/reativacao` → bloqueado.
+
+### E9.3. CRM: Quadro Kanban
+> Antes: deu Ctrl + F5 (versão `ndo-v18`). Não tem SQL nesta atualização. Use a janela anônima, entrando como administrador, e tenha alguns leads (o `demo_crm.sql` serve).
+- [ ] **Abas:** o CRM tem **Quadro | Lista | Reativação | Configurar**. Cada aba abre a sua tela e a aba atual fica sublinhada. Nenhum botão ou indicador que existia na Lista sumiu.
+- [ ] **Mesmos leads:** o número no alto de cada coluna bate com o filtro *Etapa* da Lista. Cadastre um lead novo: ele aparece na coluna **Novo lead** do Quadro e na Lista.
+- [ ] **Arrastar:** arraste um cartão para outra coluna: ele muda de coluna, os dois números do alto se ajustam e aparece "Fulano foi para (etapa)". Abra a ficha dele: a etapa mudou e a linha do tempo tem "Mudou de etapa". Confira em **Auditoria**.
+- [ ] **Celular / sem arrastar:** no cartão, use **Mover para…** e escolha uma etapa: mesmo resultado. Escolha **Converter em paciente…**: abre a conversão ("nada foi gravado ainda"). Escolha **Marcar como perdido…**: abre a ficha com o formulário da perda já aberto.
+- [ ] **Faixa Finalizar:** ao arrastar um cartão aparece a faixa **Converter em paciente / Marcar como perdido**. Solte em uma: abre a tela correspondente, **sem** converter nem perder nada ainda.
+- [ ] **Follow-up no cartão:** *Retorno atrasado* (vermelho, único), *Retorno hoje* (vinho cheio), *Retorno em N dias* (greige) e *Sem retorno programado* (tracejado). Lead **Não contatar** não mostra o botão do WhatsApp.
+- [ ] **Filtros:** busque por nome, escolha uma temperatura, uma origem, um responsável e clique nos atalhos (*Retorno atrasado*, *Quentes*...). A Lista, com os mesmos filtros, mostra os mesmos leads.
+- [ ] **Receita potencial:** as colunas Proposta enviada e Negociação mostram a soma do plano de interesse. Arraste um cartão de **Qualificação** para **Negociação**: a soma da coluna e o total "Receita potencial em negociação" sobem o valor do plano dele (lead sem plano de interesse aparece em "sem plano").
+- [ ] **Coluna cheia:** com mais de 30 leads numa etapa, aparece "+ N leads na Lista" e o número do alto continua sendo o total.
+- [ ] **Tela inicial:** em *Configurar > Tela inicial do CRM* escolha **Lista**, salve, e clique em **CRM** no menu: abre a Lista. Volte para **Quadro**.
+- [ ] **Privacidade:** entrar como paciente e abrir `/admin/crm/quadro` → bloqueado.
 
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
@@ -700,7 +731,8 @@ Ideal: faça no celular e depois no computador.
 | **Painel gerencial**: visão executiva (financeiro, carteira, crescimento, equipe, alertas), períodos com comparação, "Paciente desde" | ✅ **Neste MVP** (atualização 07) |
 | **CRM / Comercial — 09.1 Leads**: cadastro rápido, lista com busca e filtros, ficha com linha do tempo imutável, próximo retorno, temperatura, "Não contatar" e autorização (LGPD), origens e etapas editáveis, WhatsApp com mensagem pronta | ✅ **Neste MVP** (atualização 09.1) |
 | **CRM — 09.2 evolução**: indicadores comerciais (convertidos, taxa de conversão, receita potencial e contratada), controle de responsáveis, follow-up com estados visuais e tarefa por pessoa, ficha completa, **Reativação** de perdidos (cadência de 20 dias, só com autorização) e **conversão em paciente** ligada a Pacientes, Planos e Financeiro, com checagem de duplicidade e confirmação do plano | ✅ **Neste MVP** (atualização 09.2) |
-| CRM 09.3 Funil em quadro (Kanban) · 09.4 Central de follow-up e alertas no Painel · 09.5 Bloco Comercial no Painel e filtros dos indicadores por período, origem, responsável e modalidade | ⏭️ Próximas rodadas (atualização 09, por etapas) |
+| **CRM — 09.3 Funil em quadro (Kanban)**: colunas por etapa com os mesmos leads da Lista, arrastar para mudar de etapa (ou "Mover para…" no celular), faixa Finalizar para converter/perder, filtros iguais aos da Lista, abas Quadro · Lista · Reativação · Configurar e tela inicial escolhida em Configurar | ✅ **Neste MVP** (atualização 09.3) |
+| CRM 09.4 Central de follow-up e alertas no Painel · 09.5 Bloco Comercial no Painel e filtros dos indicadores por período, origem, responsável e modalidade | ⏭️ Próximas rodadas (atualização 09, por etapas) |
 | **Equipe e perfis** (Atualização 10): login próprio para cada pessoa, perfil Secretaria × Administrador, "Conferência do mês", revisão de segurança. **Obrigatório antes de usar leads reais** | ⏭️ Logo depois do CRM |
 | **Aniversários**: data de nascimento, aniversariantes do dia/semana/mês, botão de WhatsApp com mensagem pronta e editável, caixinha de autorização | ✅ **Neste MVP** (atualização 08) |
 | **Cadastro completo**: sexo (gráfico por sexo na carteira), CPF para recibo/nota fiscal, Instagram, endereço completo, filtro "Cadastro incompleto"; telas de Planos/Responsáveis/Modalidades mais limpas | ✅ **Neste MVP** (atualização 08.1) |

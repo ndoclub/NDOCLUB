@@ -53,6 +53,11 @@ final class Leads
     /** Reativação: cadência padrão (dias depois da perda) e o mínimo permitido (a primeira tentativa só a partir de 20 dias). */
     public const RECOVERY_DEFAULT = '20,30,45';
     public const MIN_RECOVERY_DAYS = 20;
+    /** Quadro (Kanban): quantos cartões aparecem por coluna (o resto fica na Lista, com o filtro da etapa). */
+    public const BOARD_LIMIT = 30;
+
+    /** Telas iniciais possíveis do CRM (Configurar). */
+    public const HOME_VIEWS = ['board' => 'Quadro (colunas por etapa)', 'list' => 'Lista (tabela)'];
 
     public const DEFAULT_MESSAGE = 'Olá, {nome}! Tudo bem? Aqui é do No Days Off Club. Posso te ajudar com alguma dúvida sobre o acompanhamento nutricional?';
 
@@ -785,6 +790,67 @@ final class Leads
             $p
         );
         return ['rows' => $rows, 'total' => $total];
+    }
+
+    /** Tela inicial do CRM escolhida em Configurar: 'board' (Quadro, padrão) ou 'list' (Lista). */
+    public static function homeView(): string
+    {
+        return Settings::get('crm_default_view', 'board') === 'list' ? 'list' : 'board';
+    }
+
+    /** Caminho (sem o prefixo da instalação) da tela inicial do CRM; é para onde o item "CRM" do menu aponta. */
+    public static function homeUrl(): string
+    {
+        return self::homeView() === 'list' ? '/admin/crm' : '/admin/crm/quadro';
+    }
+
+    /**
+     * Quadro (Kanban): os MESMOS leads em aberto da Lista, agrupados por etapa (09.3). Usa o mesmo WHERE da Lista,
+     * então busca, temperatura, origem, responsável e atalhos valem igual nas duas telas.
+     * Uma coluna por etapa em andamento (ativa, ou desativada mas ainda com leads, para ninguém sumir do quadro).
+     * Dentro da coluna: retorno mais urgente primeiro (atrasados no topo), depois sem retorno. Cada coluna mostra no máximo BOARD_LIMIT cartões;
+     * 'total' é sempre o número real de leads da coluna. Nas etapas que contam na receita potencial, 'potential' soma o plano de interesse.
+     */
+    public static function board(array $f): array
+    {
+        $f['f'] = in_array($f['f'] ?? '', ['late', 'today', 'hot', 'noresp'], true) ? $f['f'] : '';
+        $p = [];
+        $where = self::where($f, $p);
+        $cols = [];
+        $all = 0;
+        foreach (DB::all(
+            "SELECT st.*, (SELECT COUNT(*) FROM leads x WHERE x.stage_id = st.id AND x.status = 'open') AS open_leads
+               FROM lead_stages st WHERE st.kind = 'open' ORDER BY st.sort_order ASC, st.id ASC"
+        ) as $st) {
+            if (!(int) $st['active'] && (int) $st['open_leads'] === 0) {
+                continue;
+            }
+            $pp = array_merge($p, [(int) $st['id']]);
+            $sum = DB::one(
+                'SELECT COUNT(*) AS n, COALESCE(SUM(pl.price), 0) AS total, SUM(CASE WHEN pl.id IS NULL OR pl.price IS NULL THEN 1 ELSE 0 END) AS unpriced
+                   FROM leads l LEFT JOIN plans pl ON pl.id = l.plan_id WHERE ' . $where . ' AND l.stage_id = ?',
+                $pp
+            ) ?: ['n' => 0, 'total' => 0, 'unpriced' => 0];
+            $cards = DB::all(
+                'SELECT l.*, s.name AS source_name, r.name AS responsible_name, nr.name AS next_responsible_name, sp.name AS sport_name, pl.name AS plan_name, pl.price AS plan_price
+                   FROM leads l
+                   LEFT JOIN lead_sources s ON s.id = l.source_id
+                   LEFT JOIN responsibles r ON r.id = l.responsible_id
+                   LEFT JOIN responsibles nr ON nr.id = l.next_responsible_id
+                   LEFT JOIN sports sp ON sp.id = l.sport_id
+                   LEFT JOIN plans pl ON pl.id = l.plan_id
+                  WHERE ' . $where . ' AND l.stage_id = ?
+                  ORDER BY (l.next_on IS NULL) ASC, l.next_on ASC, l.id DESC LIMIT ' . self::BOARD_LIMIT,
+                $pp
+            );
+            $n = (int) $sum['n'];
+            $all += $n;
+            $cols[] = [
+                'stage' => $st, 'total' => $n, 'cards' => $cards, 'more' => max(0, $n - count($cards)),
+                'potential' => (float) $sum['total'], 'unpriced' => (int) ($sum['unpriced'] ?? 0),
+            ];
+        }
+        return ['columns' => $cols, 'total' => $all];
     }
 
     /** Números dos atalhos e do topo da lista (só oportunidades em aberto, mais os convertidos). */

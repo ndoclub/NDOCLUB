@@ -1226,3 +1226,67 @@ span.cfg-ord { display: inline-block; font-size: 20px; line-height: 42px; }
 .cfg-act { flex: 0 0 auto; margin: 0; font-size: 14px; }
 .cfg-n { flex: 0 0 auto; min-width: 52px; text-align: right; }
 .cfg-add { border-top: 1px dashed var(--line-strong); margin-top: 6px; padding-top: 14px; }
+
+/* =====================================================================
+   CRM · Quadro / Kanban (Atualização 09.3)
+   Colunas por etapa, cartões com o essencial. Vinho só para o que pede ação (hoje / quente); vermelho só para atrasado.
+   ===================================================================== */
+.kb-sum { margin: 0 0 12px; line-height: 1.5; }
+.kb-sum a { color: inherit; text-decoration-color: var(--line-strong); }
+.kb-sum a:hover { color: var(--brand); }
+.kb-sum strong { color: var(--txt); }
+.kboard { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 12px; align-items: start; overflow-x: auto; padding: 2px 2px 14px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+@media (max-width: 639px) { .kboard { grid-auto-columns: 84vw; margin-right: -4px; } }
+.kcol { display: flex; flex-direction: column; min-width: 0; background: var(--soft); border: 1px solid var(--line); border-radius: 16px; padding: 10px; scroll-snap-align: start; transition: border-color .12s, background-color .12s; }
+.kcol.is-over { border-color: var(--brand); border-style: dashed; background: rgba(103, 0, 1, .06); }
+.kcol-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 8px; }
+.kcol-h h3 { margin: 0; font-size: 15px; line-height: 1.25; min-width: 0; overflow-wrap: anywhere; }
+.kcol-n { flex: none; min-width: 28px; padding: 2px 8px; text-align: center; font-weight: 700; font-size: 13px; background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px; }
+.kcol-sum { margin: -2px 4px 8px; font-weight: 700; color: var(--brand); }
+.kcol-body { display: flex; flex-direction: column; gap: 8px; min-height: 76px; max-height: min(68vh, 720px); overflow-y: auto; padding: 2px; }
+.kcol-empty { margin: 0; padding: 14px 8px; text-align: center; border: 1.5px dashed var(--line-strong); border-radius: 12px; }
+.kcol-empty[hidden] { display: none; }
+.kcol-more { display: block; padding: 8px; text-align: center; font-weight: 700; color: var(--brand); text-decoration: none; border-radius: 10px; }
+.kcol-more:hover { background: var(--card); }
+.kcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 11px 11px; box-shadow: 0 1px 0 rgba(103, 0, 1, .04); cursor: grab; transition: opacity .12s, border-color .12s; }
+.kcard:hover { border-color: var(--line-strong); }
+.kcard.is-dragging { opacity: .4; cursor: grabbing; }
+.kcard.is-busy { opacity: .55; pointer-events: none; }
+.kc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.kc-name { min-width: 0; font-size: 15px; font-weight: 700; line-height: 1.3; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.kc-name:hover { color: var(--brand); text-decoration: underline; }
+.kc-top .temp { flex: none; padding: 2px 8px; font-size: 12px; }
+.kc-meta { margin: 4px 0 0; line-height: 1.35; overflow-wrap: anywhere; }
+.kc-fu { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin: 8px 0 0; }
+.kc-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 8px; min-height: 30px; }
+.kc-last { flex: 1 1 8em; min-width: 0; line-height: 1.3; }
+.kc-nores { flex: none; padding: 2px 9px; color: var(--mute); border: 1px dashed var(--line-strong); border-radius: 999px; font-size: 12.5px; }
+.kc-wa { flex: none; margin-left: auto; }
+.kc-move { display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.kc-move select { flex: 1 1 auto; min-width: 0; min-height: 40px; font-size: 14px; color: var(--mute); }
+.kboard.is-js .kc-move button { display: none; }
+.kboard.is-js .kc-move { padding-top: 6px; }
+/* com mouse e arrastar disponível, o seletor "Mover para…" some (quadro mais limpo); aparece quando o cartão recebe o foco do teclado.
+   No celular e sem JavaScript ele fica sempre à vista. */
+@media (hover: hover) and (pointer: fine) {
+    .kboard.is-js .kc-move { display: none; }
+    .kboard.is-js .kcard:focus-within .kc-move { display: flex; }
+}
+
+/* faixa "Finalizar": só aparece enquanto um cartão está sendo arrastado */
+.kfinal { position: fixed; left: 50%; bottom: 18px; z-index: 45; transform: translateX(-50%); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; width: max-content; max-width: calc(100vw - 24px); padding: 10px 14px; background: var(--card); border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: 0 8px 28px rgba(60, 20, 20, .22); }
+.kfinal[hidden] { display: none; }
+.kfinal-t { color: var(--mute); font-weight: 700; }
+.kfinal-zone { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; font-weight: 700; border: 2px dashed var(--line-strong); border-radius: 12px; background: var(--soft); }
+.kfinal-won { color: var(--brand); border-color: var(--brand); }
+.kfinal-zone.is-over { background: var(--brand); color: var(--on-ink, #fff); border-style: solid; border-color: var(--brand); }
+
+/* filtros do quadro: a busca encolhe um pouco para a lupa não cair sozinha na linha de baixo em telas médias */
+.kb-filters .pf-search { flex-basis: 170px; }
+/* celular: busca + lupa na 1ª linha e os 3 filtros embaixo, para o quadro começar mais perto do alto da tela */
+@media (max-width: 639px) {
+    .kb-filters .pf-search { order: 1; flex: 1 1 calc(100% - 54px); }
+    .kb-filters .pf-go { order: 2; flex: 0 0 46px; }
+    .kb-filters .pf-go-t { display: none; }
+    .kb-filters .pf-row > select { order: 3; }
+}

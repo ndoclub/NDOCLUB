@@ -12,9 +12,9 @@
         });
     }
 
-    function toast(text) {
+    function toast(text, bad) {
         var el = document.createElement('div');
-        el.className = 'flash flash-ok';
+        el.className = 'flash ' + (bad ? 'flash-err' : 'flash-ok');
         el.setAttribute('role', 'status');
         el.style.position = 'fixed';
         el.style.top = '12px';
@@ -25,7 +25,7 @@
         el.style.margin = '0 auto';
         el.textContent = text;
         document.body.appendChild(el);
-        setTimeout(function () { el.remove(); }, 2200);
+        setTimeout(function () { el.remove(); }, bad ? 4200 : 2200);
     }
 
     // Avisos: fechar no X e sumir sozinho
@@ -242,6 +242,163 @@
             });
         }
     });
+
+    // Quadro do CRM (Kanban): arrastar o cartão para outra coluna muda a etapa do lead (o mesmo que "Mover para…" no cartão).
+    // Convertido e Perdido não são colunas: soltar na faixa "Finalizar" abre o fluxo próprio (converter / marcar como perdido).
+    // O cartão só muda de coluna depois que o servidor confirma. Sem JavaScript ficam o seletor "Mover para…" e o botão "Mover".
+    function fmtMoney(v) {
+        var whole = Math.abs(v - Math.round(v)) < 0.005;
+        var parts = (whole ? String(Math.round(v)) : v.toFixed(2).replace('.', ',')).split(',');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return 'R$ ' + parts.join(',');
+    }
+    function initBoard() {
+        var board = document.querySelector('[data-board]');
+        if (!board || !window.fetch) { return; }
+        board.classList.add('is-js');
+        var csrf = board.getAttribute('data-csrf') || '';
+        var bar = document.querySelector('[data-final]');
+        var dragged = null;
+        var busy = false;
+
+        function columns() { return Array.prototype.slice.call(board.querySelectorAll('.kcol')); }
+        function num(el, name) { var v = parseFloat(el.getAttribute(name)); return isNaN(v) ? 0 : v; }
+        function clearOver() {
+            Array.prototype.forEach.call(document.querySelectorAll('.is-over'), function (el) { el.classList.remove('is-over'); });
+        }
+        function zoneOf(ev) {
+            return ev.target && ev.target.closest ? ev.target.closest('.kcol, [data-final-to]') : null;
+        }
+        function setCount(col, delta) {
+            var out = col.querySelector('[data-count]');
+            if (out) { out.textContent = Math.max(0, (parseInt(out.textContent, 10) || 0) + delta); }
+            var empty = col.querySelector('[data-empty]');
+            if (empty) { empty.hidden = col.querySelectorAll('.kcard').length > 0; }
+        }
+        // receita potencial: só as colunas marcadas em Configurar têm a soma (.kcol-sum); o total do alto acompanha
+        function adjustSum(col, hasPrice, price, sign) {
+            var s = col.querySelector('.kcol-sum');
+            if (!s) { return false; }
+            var sum = num(s, 'data-sum') + sign * (hasPrice ? price : 0);
+            var un = Math.max(0, num(s, 'data-unpriced') + (hasPrice ? 0 : sign));
+            s.setAttribute('data-sum', String(sum));
+            s.setAttribute('data-unpriced', String(un));
+            s.textContent = fmtMoney(sum) + (un > 0 ? ' · ' + un + ' sem plano' : '');
+            return true;
+        }
+        function adjustTotal(hasPrice, price, sign) {
+            var t = document.querySelector('[data-pot-total]');
+            if (t) {
+                var v = num(t, 'data-total') + sign * (hasPrice ? price : 0);
+                t.setAttribute('data-total', String(v));
+                t.textContent = fmtMoney(v);
+            }
+            var u = document.querySelector('[data-pot-unpriced]');
+            if (u) {
+                var n = Math.max(0, num(u, 'data-n') + (hasPrice ? 0 : sign));
+                u.setAttribute('data-n', String(n));
+                u.textContent = n;
+                var wrap = u.closest('[data-pot-unpriced-wrap]');
+                if (wrap) { wrap.hidden = n === 0; }
+            }
+        }
+        function rebuildSelect(card, col) {
+            var sel = card.querySelector('.kc-move select');
+            if (!sel) { return; }
+            var grp = sel.querySelector('optgroup');
+            for (var i = sel.children.length - 1; i > 0; i--) {
+                if (sel.children[i].tagName === 'OPTION') { sel.removeChild(sel.children[i]); }
+            }
+            columns().forEach(function (c) {
+                if (c === col || c.getAttribute('data-active') === '0') { return; }
+                var o = document.createElement('option');
+                o.value = c.getAttribute('data-stage');
+                o.textContent = c.getAttribute('data-name');
+                sel.insertBefore(o, grp);
+            });
+            sel.selectedIndex = 0;
+        }
+        function resetSelect(card) {
+            var sel = card.querySelector('.kc-move select');
+            if (sel) { sel.selectedIndex = 0; }
+        }
+        function move(card, to, target) {
+            var from = card.closest('.kcol');
+            if (busy || !from || (target && target === from)) { resetSelect(card); return; }
+            var form = card.querySelector('.kc-move');
+            busy = true;
+            card.classList.add('is-busy');
+            var fd = new FormData();
+            fd.append('_csrf', csrf);
+            fd.append('stage_id', to);
+            fetch(form.action, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    busy = false;
+                    card.classList.remove('is-busy');
+                    if (!d || !d.ok) { toast((d && d.error) || 'Não foi possível mover o cartão. Atualize a página e tente de novo.', true); resetSelect(card); return; }
+                    if (d.redirect) { window.location.href = d.redirect; return; }
+                    if (!target) { window.location.reload(); return; }
+                    var body = target.querySelector('.kcol-body');
+                    var first = body.querySelector('.kcard');
+                    body.insertBefore(card, first || body.querySelector('[data-empty]'));
+                    var raw = card.getAttribute('data-price');
+                    var hasPrice = raw !== null && raw !== '';
+                    var price = hasPrice ? parseFloat(raw) : 0;
+                    var wasPot = adjustSum(from, hasPrice, price, -1);
+                    var isPot = adjustSum(target, hasPrice, price, 1);
+                    if (wasPot && !isPot) { adjustTotal(hasPrice, price, -1); }
+                    if (!wasPot && isPot) { adjustTotal(hasPrice, price, 1); }
+                    setCount(from, -1);
+                    setCount(target, 1);
+                    rebuildSelect(card, target);
+                    toast(d.message || 'Etapa atualizada.');
+                })
+                .catch(function () { window.location.reload(); });
+        }
+
+        board.addEventListener('dragstart', function (ev) {
+            var card = ev.target && ev.target.closest ? ev.target.closest('.kcard') : null;
+            if (!card) { return; }
+            dragged = card;
+            card.classList.add('is-dragging');
+            ev.dataTransfer.effectAllowed = 'move';
+            try { ev.dataTransfer.setData('text/plain', card.getAttribute('data-lead') || ''); } catch (e) {}
+            if (bar) { bar.hidden = false; }
+        });
+        document.addEventListener('dragend', function () {
+            if (dragged) { dragged.classList.remove('is-dragging'); }
+            dragged = null;
+            clearOver();
+            if (bar) { bar.hidden = true; }
+        });
+        document.addEventListener('dragover', function (ev) {
+            if (!dragged) { return; }
+            var z = zoneOf(ev);
+            if (!z) { return; }
+            ev.preventDefault();
+            ev.dataTransfer.dropEffect = 'move';
+            if (!z.classList.contains('is-over')) { clearOver(); z.classList.add('is-over'); }
+        });
+        document.addEventListener('drop', function (ev) {
+            if (!dragged) { return; }
+            var z = zoneOf(ev);
+            if (!z) { return; }
+            ev.preventDefault();
+            var card = dragged;
+            clearOver();
+            if (z.hasAttribute('data-final-to')) { move(card, z.getAttribute('data-final-to'), null); } else { move(card, z.getAttribute('data-stage'), z); }
+        });
+        // "Mover para…" no cartão (celular, teclado): mesma ação do arrastar
+        board.addEventListener('change', function (ev) {
+            var sel = ev.target;
+            if (!sel || !sel.closest || !sel.closest('.kc-move') || !sel.value) { return; }
+            var card = sel.closest('.kcard');
+            var col = columns().filter(function (c) { return c.getAttribute('data-stage') === sel.value; })[0] || null;
+            move(card, sel.value, col);
+        });
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initBoard); } else { initBoard(); }
 
     // Abas pequenas (Visão executiva > Distribuição da carteira: Plano | Sexo | Modalidade).
     // Sem JavaScript os painéis aparecem todos, um embaixo do outro.

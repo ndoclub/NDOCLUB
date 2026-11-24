@@ -305,7 +305,7 @@ $contact = array_filter([$lead['phone'], $lead['email'], $lead['instagram'] ? '@
         <?php if ($open): ?>
         <section class="panel" id="perder">
             <h3>Marcar como perdido</h3>
-            <details class="lead-more">
+            <details class="lead-more"<?= isset($_GET['perder']) ? ' open' : '' ?>>
                 <summary>Registrar a perda deste lead</summary>
                 <form method="post" action="<?= e(url('/admin/crm/' . $id . '/perder')) ?>" class="side-form first" style="padding-top:8px">
                     <?= csrf_field() ?>

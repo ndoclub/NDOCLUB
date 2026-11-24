@@ -85,4 +85,16 @@
     </form>
     <p class="hint">Hoje: <?= e(implode(', ', $recDays)) ?> dias, ou seja, <?= count($recDays) ?> <?= count($recDays) === 1 ? 'tentativa' : 'tentativas' ?>. A mudança vale para as próximas tentativas; as já agendadas continuam nas datas marcadas.</p>
 </section>
+
+<section class="panel">
+    <h3>Tela inicial do CRM</h3>
+    <p class="muted small" style="margin-top:-6px">Qual tela abre quando você clica em "CRM" no menu. As duas continuam nas abas: o Quadro e a Lista mostram os mesmos leads, só de jeitos diferentes.</p>
+    <form method="post" action="<?= e(url('/admin/crm/tela-inicial')) ?>">
+        <?= csrf_field() ?>
+        <?php foreach (\App\Services\Leads::HOME_VIEWS as $k => $label): ?>
+            <label class="checkbox mb"><input type="radio" name="view" value="<?= e($k) ?>"<?= $homeView === $k ? ' checked' : '' ?>><span><?= e($label) ?></span></label>
+        <?php endforeach; ?>
+        <button class="btn btn-ghost btn-sm" type="submit">Salvar</button>
+    </form>
+</section>
 </div>
