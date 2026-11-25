@@ -444,20 +444,12 @@ final class Insights
         $growth = $g0 > 0 ? (int) round(($g1 - $g0) / $g0 * 100) : null;
 
         // Alertas (mesmas definições dos filtros da lista de pacientes, para o número bater com o clique)
-        $weekAgo = date('Y-m-d H:i:s', strtotime('-7 day'));
         $yellow = (int) Settings::get('warn_yellow_days', 15);
         $c = fn(string $sql, array $p = []) => (int) DB::val($sql, $p);
         $alerts = [
             'd7' => $c("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND renewal_date >= ? AND renewal_date <= ?", [$today, date('Y-m-d', strtotime($today . ' +7 day'))]),
             'expired' => $c("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND renewal_date IS NOT NULL AND renewal_date < ?", [$today]),
-            'away' => $c("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND app_access = 1 AND (last_seen_at IS NULL OR last_seen_at < ?)", [$weekAgo]),
-            'risk' => $c(
-                "SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND app_access = 1 AND renewal_date >= ? AND renewal_date <= ? AND (last_seen_at IS NULL OR last_seen_at < ?)",
-                [$today, date('Y-m-d', strtotime($today . ' +' . $yellow . ' day')), $weekAgo]
-            ),
             'late' => $openLate['count'],
-            'reports' => $c("SELECT COUNT(*) FROM reports WHERE status = 'open'"),
-            'redemptions' => $c("SELECT COUNT(*) FROM redemptions WHERE status = 'pending'"),
         ];
         $events1 = Athletes::upcoming(1);
 

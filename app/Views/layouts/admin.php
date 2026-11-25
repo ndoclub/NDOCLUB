@@ -3,7 +3,9 @@ $path = strtok(current_path(), '?');
 $is = fn(string $prefix) => $path === $prefix || str_starts_with($path, $prefix . '/');
 $finBadge = \App\Services\Payments::attentionStats()['count'];
 $crmBadge = (int) \App\Services\Leads::attention()['due']; // retornos de leads atrasados ou para hoje (09.4)
+$appBadge = (int) \App\Services\AppModule::pending()['total']; // resgates pendentes + denúncias abertas (09.5)
 // Menu em grupos: o que a equipe usa todo dia, os cadastros, o que é do app do paciente e o sistema.
+// 09.5: o grupo "App do paciente" é uma barra com seta (recolhida); abre sozinha quando a página é do app.
 $navGroups = [
     'Dia a dia' => [
         ['/admin',             'Painel',         'grid',     $path === '/admin'],
@@ -18,12 +20,14 @@ $navGroups = [
         ['/admin/modalidades', 'Modalidades',    'tag',      $is('/admin/modalidades')],
     ],
     'App do paciente' => [
+        ['/admin/app',         'Visão geral',    'grid',     $path === '/admin/app'],
         ['/admin/treinos',     'Treinos',        'dumbbell', $is('/admin/treinos')],
         ['/admin/ranking',     'Ranking',        'trophy',   $is('/admin/ranking')],
         ['/admin/loja',        'Loja',           'bag',      $is('/admin/loja')],
         ['/admin/resgates',    'Resgates',       'check',    $is('/admin/resgates')],
         ['/admin/pontos',      'Regras de pontos', 'star',   $is('/admin/pontos')],
         ['/admin/moderacao',   'Moderação',      'shield',   $is('/admin/moderacao')],
+        ['/admin/app/ajustes', 'Ajustes do app', 'gear',     $is('/admin/app/ajustes')],
         ['/feed',              'Ver o feed',     'chat',     $is('/feed') || $is('/post')],
     ],
     'Sistema' => [
@@ -49,6 +53,14 @@ $navGroups = [
     <a class="admin-logo" href="<?= e(url('/admin')) ?>"><img src="<?= e(asset('img/logo-circular-claro.png')) ?>" alt="<?= e(app_name()) ?>" width="150" height="156"></a>
     <nav>
         <?php $gi = 0; foreach ($navGroups as $gLabel => $gItems): $gi++; ?>
+        <?php if ($gLabel === 'App do paciente'): $appOpen = false; foreach ($gItems as $gi2) { if ($gi2[3]) { $appOpen = true; } } ?>
+        <details class="nav-sec nav-fold"<?= $appOpen ? ' open' : '' ?>>
+            <summary><?= icon('trophy', 20) ?><span><?= e($gLabel) ?></span><?php if ($appBadge > 0): ?><b class="nav-badge" title="Resgates e denúncias esperando por você"><?= $appBadge ?></b><?php endif; ?><i class="nav-caret" aria-hidden="true"></i></summary>
+            <?php foreach ($gItems as [$href, $label, $ico, $active]): ?>
+                <a class="nav-sub" href="<?= e(url($href)) ?>"<?= $active ? ' aria-current="page"' : '' ?>><span><?= e($label) ?></span><?php if ($appBadge > 0 && ($href === '/admin/resgates' || $href === '/admin/moderacao')): $nb = $href === '/admin/resgates' ? \App\Services\AppModule::pending()['redemptions'] : \App\Services\AppModule::pending()['reports']; if ($nb > 0): ?><b class="nav-badge"><?= (int) $nb ?></b><?php endif; endif; ?></a>
+            <?php endforeach; ?>
+        </details>
+        <?php continue; endif; ?>
         <div class="nav-sec" role="group" aria-labelledby="nav-g<?= $gi ?>">
             <p class="nav-label" id="nav-g<?= $gi ?>"><?= e($gLabel) ?></p>
             <?php foreach ($gItems as [$href, $label, $ico, $active]): ?>

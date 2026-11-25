@@ -66,7 +66,7 @@ $listBox = function (string $title, array $items, string $empty) {
         <li><strong>Linhas com erro nunca entram.</strong> Você baixa um relatório dos problemas, corrige a planilha e envia de novo.</li>
         <li><strong>Duplicados são pulados:</strong> e-mail que já existe (ou repetido na planilha), ou mesmo nome com o mesmo WhatsApp. Nome ou WhatsApp parecidos viram aviso.</li>
         <li><strong>Até <?= (int) $maxRows ?> pacientes por arquivo.</strong> Em caso de dúvida, comece com poucas linhas.</li>
-        <li><strong>Paciente importado não recebe senha nem acesso ao app.</strong> Você libera depois, um a um, em <em>Gerar senha provisória</em> na ficha. Até lá ele não entra, não aparece no ranking e não conta como "sumido".</li>
+        <li><strong>Paciente importado entra sem senha e sem acesso ao app.</strong> O acesso é liberado depois, um a um, na aba <em>App do paciente</em> da ficha.</li>
         <li><strong>Valores (plano, combinado, pagamentos) são só do admin.</strong> O paciente nunca vê. Ao informar pagamento, as parcelas entram no Financeiro com as mesmas regras do cadastro manual.</li>
         <li><strong>Privacidade:</strong> a planilha tem dados pessoais. Não envie por WhatsApp ou e-mail, e apague o arquivo do computador depois de importar. O sistema não guarda o arquivo, só o resultado.</li>
     </ul>

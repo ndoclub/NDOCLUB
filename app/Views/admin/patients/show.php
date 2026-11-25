@@ -29,9 +29,6 @@ if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
             <div class="row wrap" style="gap:8px;margin-top:6px">
                 <span class="tag<?= $planStatus['tag'] ? ' ' . e($planStatus['tag']) : '' ?>"><?= e($planStatus['label']) ?></span>
                 <?php if ($p['status'] !== 'inactive') { partial('seal', ['renew' => $renew]); } ?>
-                <?php $noApp = (int) ($p['app_access'] ?? 1) === 0; $awayNow = !$noApp && (empty($p['last_seen_at']) || $p['last_seen_at'] < date('Y-m-d H:i:s', strtotime('-7 day'))); ?>
-                <?php if ($noApp): ?><a class="tag" href="<?= e(url(\App\Controllers\Admin\PatientController::ficha($id, 'app'))) ?>" title="Veio de importação. Gere a senha provisória na aba App do paciente para liberar o acesso.">Sem acesso ao app</a>
-                <?php else: ?><span class="tag<?= $awayNow ? ' warn' : '' ?>" title="Última vez que o paciente abriu o app"><?= !empty($p['last_seen_at']) ? 'Visto ' . e(time_ago($p['last_seen_at'])) : 'Nunca entrou no app' ?></span><?php endif; ?>
                 <?php foreach ($athleteNames as $sn): ?><span class="sport"><?= e($sn) ?></span><?php endforeach; ?>
                 <?php if ($planRow): ?><span class="tag"><?= $consSummary['quota'] !== null ? (int) $consSummary['done'] . ' de ' . (int) $consSummary['quota'] . ' consultas' : (int) $consSummary['done'] . ' consultas' ?></span><?php endif; ?>
                 <?php if ($respName): ?><span class="tag">Responsável: <?= e($respName) ?></span><?php endif; ?>
@@ -206,7 +203,7 @@ if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
 
     <div class="panel">
         <h3>Renovar acompanhamento</h3>
-        <p class="muted small">Soma os dias a partir do vencimento atual (ou de hoje, se já venceu) e lança o bônus de pontos. Com valor preenchido, também registra o pagamento e as parcelas em Financeiro.</p>
+        <p class="muted small">Soma os dias a partir do vencimento atual (ou de hoje, se já venceu) e registra a renovação. Com valor preenchido, também registra o pagamento e as parcelas em Financeiro.</p>
         <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/renovar')) ?>" data-confirm="Confirmar a renovação?" data-pay-form data-fees="<?= e(json_encode($fees ?: new stdClass())) ?>">
             <?= csrf_field() ?>
             <div class="form-grid">
@@ -326,7 +323,9 @@ if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
 </div>
 
 <?php else: ?>
-<p class="muted small" style="margin:0 0 12px">Tudo o que o paciente faz e ganha dentro do app. Nível atual: <?php partial('level', ['level' => $level]); ?></p>
+<?php $noApp = (int) ($p['app_access'] ?? 1) === 0; $awayNow = !$noApp && (empty($p['last_seen_at']) || $p['last_seen_at'] < date('Y-m-d H:i:s', strtotime('-7 day'))); ?>
+<p class="muted small" style="margin:0 0 12px">Tudo o que o paciente faz e ganha dentro do app. Nível atual: <?php partial('level', ['level' => $level]); ?>
+    <span class="tag<?= $awayNow ? ' warn' : '' ?>" style="margin-left:6px" title="Última vez que o paciente abriu o app"><?= $noApp ? 'Sem acesso ao app' : (!empty($p['last_seen_at']) ? 'Visto ' . e(time_ago($p['last_seen_at'])) : 'Nunca entrou no app') ?></span></p>
 <div class="kpis">
     <div class="kpi"><span class="big num"><?= (int) $streak ?></span><span class="lbl">dias seguidos</span></div>
     <div class="kpi"><span class="big num"><?= pts($balance) ?></span><span class="lbl">saldo de pontos</span></div>

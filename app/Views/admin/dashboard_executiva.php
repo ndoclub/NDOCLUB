@@ -49,8 +49,6 @@ $items = [
     ['bad',  $al['expired'],   'plano vencido',                  'planos vencidos',                 url('/admin/pacientes?v=expired'), 'Pacientes com plano vencido'],
     ['bad',  $al['late'],      'parcela em atraso',              'parcelas em atraso',              url('/admin/financeiro?f=late'), 'Parcelas em atraso (inadimplência)'],
     ['warn', $al['noresp'],    'sem responsável',                'sem responsável',                 url('/admin/pacientes?st=active&r=none'), 'Pacientes em carteira sem responsável (sem acompanhamento)'],
-    ['warn', $al['away'],      'sem abrir o app há 7+ dias',     'sem abrir o app há 7+ dias',      url('/admin/pacientes?f=away'), 'Pacientes sem abrir o app há 7 dias ou mais'],
-    ['info', $al['risk'],      'renovação em risco',             'renovações em risco',             url('/admin'), 'Vencem em até ' . $yellow . ' dias e estão sumidos do app'],
     ['info', $al['birthdays'], 'aniversariante hoje',            'aniversariantes hoje',            url('/admin/aniversarios?q=hoje'), 'Aniversariantes de hoje'],
 ];
 $shown = array_values(array_filter($items, fn($i) => (int) $i[1] > 0));

@@ -177,6 +177,9 @@ $router->get('/admin/pontos', 'Admin\PointsController@index', $A);
 $router->post('/admin/pontos', 'Admin\PointsController@save', $A);
 $router->get('/admin/ranking', 'Admin\PointsController@ranking', $A);
 
+$router->get('/admin/app', 'Admin\AppModuleController@index', $A);
+$router->get('/admin/app/ajustes', 'Admin\AppModuleController@settings', $A);
+$router->post('/admin/app/ajustes', 'Admin\AppModuleController@saveSettings', $A);
 $router->get('/admin/config', 'Admin\SettingsController@index', $A);
 $router->post('/admin/config', 'Admin\SettingsController@save', $A);
 $router->get('/admin/auditoria', 'Admin\SettingsController@audit', $A);

@@ -713,7 +713,6 @@ circle.dn-1, circle.dn-2, circle.dn-3, circle.dn-4, circle.dn-x, circle.dn-0 { s
 /* Operação: o que fazer hoje */
 .osec { margin: 0 0 10px; font-family: var(--body); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
 .otasks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
-@media (min-width: 1100px) { .otasks { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .otask { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); min-width: 0; }
 .otask:hover { border-color: var(--brand); }
 .otask-main { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; align-items: center; text-decoration: none; color: inherit; }
@@ -885,6 +884,18 @@ body.admin .admin-nav nav a[aria-current="page"] { color: var(--brand); backgrou
 body.admin .admin-nav nav a[aria-current="page"] .icon { color: var(--brand); }
 body.admin .nav-badge { background: var(--cream); color: var(--brand); }
 body.admin .admin-nav nav a[aria-current="page"] .nav-badge { background: var(--brand); color: var(--cream); }
+/* Menu: grupo recolhível "App do paciente" (09.5). Recolhido, é uma linha só; abre sozinho nas páginas do app. */
+.nav-fold > summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 10px 12px; font-weight: 600; color: var(--mute); border-radius: var(--r); cursor: pointer; }
+.nav-fold > summary::-webkit-details-marker { display: none; }
+.nav-fold > summary:hover { color: var(--ink); background: var(--soft); }
+.nav-caret { margin-left: auto; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .15s; flex: none; }
+.nav-badge + .nav-caret { margin-left: 8px; }
+.nav-fold > summary > span { white-space: nowrap; }
+@media (max-width: 959px) { .nav-fold > summary { gap: 10px; padding-right: 10px; } .nav-fold > summary > span { font-size: 16px; } }
+.nav-fold[open] > summary .nav-caret { transform: rotate(-135deg); }
+body.admin .nav-fold > summary { color: rgba(246, 243, 227, .86); }
+body.admin .nav-fold > summary:hover { color: var(--cream); background: rgba(246, 243, 227, .10); }
+body.admin .admin-nav nav a.nav-sub { padding: 7px 12px 7px 44px; font-size: 14.5px; font-weight: 500; }
 .admin-motto { margin: 16px 0 0; padding: 14px 12px 0; border-top: 1px solid rgba(246, 243, 227, .20); font-size: 11px; line-height: 1.7; letter-spacing: .16em; text-transform: uppercase; color: rgba(246, 243, 227, .74); }
 body.admin .admin-user { border-top: 0; padding-top: 10px; color: var(--cream); }
 body.admin .admin-user .link-btn { color: var(--cream); }
@@ -1052,6 +1063,8 @@ a.pg:hover { border-color: var(--brand); color: var(--brand); }
     body.admin .admin-logo img { width: 104px; }
     body.admin .admin-logo { padding-bottom: 8px; }
     body.admin .admin-nav nav a { padding: 6px 12px; font-size: 14.5px; }
+    body.admin .nav-fold > summary { padding: 6px 12px; font-size: 14.5px; }
+    body.admin .admin-nav nav a.nav-sub { padding-top: 4px; padding-bottom: 4px; font-size: 14px; }
     body.admin .nav-sec + .nav-sec { margin-top: 8px; }
     body.admin .nav-label { margin-bottom: 2px; font-size: 11px; }
     .admin-motto { margin-top: 8px; padding-top: 10px; line-height: 1.55; }

@@ -34,27 +34,19 @@ final class DashboardController
 
         $yellow = (int) Settings::get('warn_yellow_days', 15);
         $limitDate = date('Y-m-d', strtotime('+' . $yellow . ' day'));
-        $weekAgo = date('Y-m-d H:i:s', strtotime('-7 day'));
 
         $stats = [
             'patients' => (int) DB::val("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND renewal_date >= ?", [today()]),
             'expiring' => (int) DB::val("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND renewal_date IS NOT NULL AND renewal_date >= ? AND renewal_date <= ?", [today(), $limitDate]),
             'expired' => (int) DB::val("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND renewal_date IS NOT NULL AND renewal_date < ?", [today()]),
-            'checkins' => (int) DB::val('SELECT COUNT(*) FROM checkins WHERE checkin_date = ?', [today()]),
-            'redemptions' => (int) DB::val("SELECT COUNT(*) FROM redemptions WHERE status = 'pending'"),
-            'reports' => (int) DB::val("SELECT COUNT(*) FROM reports WHERE status = 'open'"),
-            'active7' => (int) DB::val("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND last_seen_at >= ?", [$weekAgo]),
-            // mesma conta do alerta "sem abrir o app há 7 dias" da Visão executiva e do filtro Pacientes > Sumidos
-            'away' => (int) DB::val("SELECT COUNT(*) FROM users WHERE role = 'patient' AND status = 'active' AND app_access = 1 AND (last_seen_at IS NULL OR last_seen_at < ?)", [$weekAgo]),
         ];
 
-        // Painel de risco: quem vence logo (ou já venceu) e quanto tempo está sem abrir o app
+        // Painel de risco: quem vence logo (ou já venceu). O que é do app do paciente fica no módulo App do paciente (09.5)
         $rows = DB::all(
-            "SELECT u.id, u.name, u.avatar, u.phone, u.renewal_date, u.last_seen_at, u.app_access,
+            "SELECT u.id, u.name, u.avatar, u.phone, u.renewal_date,
                     pl.name AS plan_name,
                     CASE WHEN bl.price IS NOT NULL AND bl.source <> 'reajuste' THEN bl.price ELSE pl.price END AS plan_value,
-                    CASE WHEN bl.price IS NOT NULL AND bl.source <> 'reajuste' THEN bl.currency ELSE 'BRL' END AS plan_currency,
-                    (SELECT MAX(c.checkin_date) FROM checkins c WHERE c.user_id = u.id) AS last_checkin
+                    CASE WHEN bl.price IS NOT NULL AND bl.source <> 'reajuste' THEN bl.currency ELSE 'BRL' END AS plan_currency
                FROM users u
                LEFT JOIN plans pl ON pl.id = u.plan_id
                LEFT JOIN patient_billing bl ON bl.user_id = u.id
@@ -65,13 +57,9 @@ final class DashboardController
         $risk = [];
         foreach ($rows as $r) {
             $r['renew'] = Renewal::info($r['renewal_date']);
-            $r['noapp'] = (int) $r['app_access'] === 0;
-            $r['away'] = !$r['noapp'] && (empty($r['last_seen_at']) || $r['last_seen_at'] < $weekAgo);
             $r['wa'] = wa_phone_url($r['phone'], 'Oi, ' . first_name($r['name']) . '! Aqui é do No Days Off Club. Vamos conversar sobre a renovação do seu plano' . ($r['plan_name'] ? ' ' . $r['plan_name'] : '') . '?');
             $risk[] = $r;
         }
-        // Quem está sumido do app aparece primeiro
-        usort($risk, fn($a, $b) => [(int) !$a['away'], $a['renewal_date']] <=> [(int) !$b['away'], $b['renewal_date']]);
 
         $events = Athletes::upcoming(8);
         $stats['athletes'] = Athletes::countAthletes();

@@ -88,8 +88,17 @@ final class PatientController
     /** Outros atalhos (dentro de "Mais filtros"). Os links antigos do Painel continuam funcionando. */
     public static function moreFilters(): array
     {
-        return ['green' => 'Em dia', 'yellow' => 'Vencem logo', 'red' => 'Críticos', 'away' => 'Sumidos', 'noapp' => 'Sem acesso ao app', 'inactive' => 'Desativados',
+        return ['green' => 'Em dia', 'yellow' => 'Vencem logo', 'red' => 'Críticos', 'inactive' => 'Desativados',
                 'athletes' => 'Atletas', 'compete' => 'Competem', 'nocoach' => 'Sem assessoria', 'incomplete' => 'Cadastro incompleto'];
+    }
+
+    /**
+     * Atalhos que são do app do paciente (09.5): não aparecem em "Mais filtros", mas os links
+     * (?f=away, ?f=noapp) continuam funcionando, e o módulo App do paciente aponta para eles.
+     */
+    public static function appFilters(): array
+    {
+        return ['away' => 'Sem abrir o app há 7 dias ou mais', 'noapp' => 'Sem acesso ao app'];
     }
 
     /**
@@ -124,7 +133,7 @@ final class PatientController
         $get = fn(string $k, string $d = ''): string => is_string($_GET[$k] ?? null) ? $_GET[$k] : $d;
         $q = trim($get('q'));
         $filter = $get('f', 'all');
-        if (!isset(self::quickFilters()[$filter]) && !isset(self::moreFilters()[$filter])) {
+        if (!isset(self::quickFilters()[$filter]) && !isset(self::moreFilters()[$filter]) && !isset(self::appFilters()[$filter])) {
             $filter = 'all';
         }
         $perOptions = [10, 25, 50, 100];
@@ -289,7 +298,7 @@ final class PatientController
         View::render('admin/patients/index', [
             'title' => 'Pacientes', 'list' => $shown, 'q' => $q, 'filter' => $filter,
             'cards' => ['ins' => $ins, 'soon' => $soon, 'soon7' => $soon7, 'yellow' => $yellowDays],
-            'counts' => $counts, 'quick' => self::quickFilters(), 'more' => self::moreFilters(),
+            'counts' => $counts, 'quick' => self::quickFilters(), 'more' => self::moreFilters(), 'appf' => self::appFilters(),
             'total' => $total, 'page' => $page, 'pages' => $pages, 'perPage' => $perPage, 'perOptions' => $perOptions, 'offset' => $offset,
             'sportId' => $sportId, 'sports' => Athletes::sports(false),
             'planFilter' => $planFilter, 'planOptions' => Plans::withCounts(),
@@ -729,7 +738,7 @@ final class PatientController
             }
         }
         Audit::log((int) Auth::id(), 'renewal', 'user', $id, $detail);
-        flash('ok', 'Renovado até ' . fmt_date($new) . '. O bônus de pontos foi lançado.' . ($pay ? ' Pagamento e parcelas registrados em Financeiro.' : ''));
+        flash('ok', 'Renovado até ' . fmt_date($new) . '.' . ($pay ? ' Pagamento e parcelas registrados em Financeiro.' : ''));
         redirect(self::ficha($id, 'plano'));
     }
 

@@ -181,6 +181,7 @@ $statusTag = function (array $r) use ($cards) {
     <?php foreach ($quick as $k => $label): ?>
         <a class="chip" href="<?= e($link(['f' => $k])) ?>"<?= $filter === $k ? ' aria-current="true"' : '' ?>><?= e($label) ?> <span class="chip-n">(<?= (int) $counts[$k] ?>)</span></a>
     <?php endforeach; ?>
+    <?php if (isset($appf[$filter])): ?><a class="chip" href="<?= e($link(['f' => $filter])) ?>" aria-current="true"><?= e($appf[$filter]) ?></a><?php endif; ?>
     <?php if ($hasFilters): ?><a class="chip chip-clear" href="<?= e(url('/admin/pacientes' . ($ord !== 'name_asc' ? '?ord=' . urlencode($ord) : ''))) ?>">Limpar filtros</a><?php endif; ?>
 </div>
 

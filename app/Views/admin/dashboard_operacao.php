@@ -1,6 +1,6 @@
 <?php
 /**
- * Aba Operação: "o que eu faço hoje?". Quatro cartões de tarefa no alto (cada um leva para a lista),
+ * Aba Operação: "o que eu faço hoje?". Dois cartões de tarefa no alto (cada um leva para a lista; o que é do app do paciente fica no módulo App do paciente, desde a 09.5),
  * (se houver retornos de leads para fazer, uma faixa do Follow-up do CRM), uma linha de resumo, a previsão de renovação e as listas do dia (risco, aniversários, provas).
  * Os números são os mesmos de antes; só a apresentação mudou.
  */
@@ -11,11 +11,6 @@ $nPix = (int) $pix['count'];
 $nLate = (int) $pix['late'];
 $nExp = (int) $stats['expiring'];
 $nOld = (int) $stats['expired'];
-$nAway = (int) $stats['away'];
-$nRep = (int) $stats['reports'];
-$nRes = (int) $stats['redemptions'];
-$pendApp = $nRes + $nRep;
-$pendHref = $nRep > 0 && $nRes === 0 ? '/admin/moderacao' : '/admin/resgates';
 ?>
 
 <h3 class="osec">Para fazer hoje</h3>
@@ -37,26 +32,6 @@ $pendHref = $nRep > 0 && $nRes === 0 ? '/admin/moderacao' : '/admin/resgates';
         </a>
         <span class="otask-sub"><?php if ($nOld > 0): ?><a class="bad" href="<?= e(url('/admin/pacientes?f=red')) ?>"><?= $nOld ?> <?= $nOld === 1 ? 'vencido' : 'vencidos' ?></a> <span class="muted">sem renovar</span><?php else: ?>Nenhum plano vencido.<?php endif; ?></span>
     </div>
-
-    <div class="otask<?= $nAway === 0 ? ' is-zero' : '' ?>">
-        <a class="otask-main" href="<?= e(url('/admin/pacientes?f=away')) ?>">
-            <span class="otask-ico"><?= icon('eye', 20) ?></span>
-            <span class="big num"><?= $nAway ?></span>
-            <span class="lbl">sem abrir o app há 7 dias ou mais</span>
-        </a>
-        <span class="otask-sub"><?= $nAway > 0 ? 'Hora de mandar uma mensagem.' : 'Todo mundo apareceu esta semana.' ?></span>
-    </div>
-
-    <div class="otask<?= $nRep > 0 ? ' is-alert' : ($pendApp === 0 ? ' is-zero' : '') ?>">
-        <a class="otask-main" href="<?= e(url($pendHref)) ?>">
-            <span class="otask-ico"><?= icon('flag', 20) ?></span>
-            <span class="big num"><?= $pendApp ?></span>
-            <span class="lbl">pendências no app</span>
-        </a>
-        <span class="otask-sub"><?php if ($pendApp === 0): ?>Nada esperando por você.<?php else: ?>
-            <a href="<?= e(url('/admin/resgates')) ?>"><?= e($plural($nRes, 'resgate', 'resgates')) ?></a> ·
-            <a class="<?= $nRep > 0 ? 'bad' : '' ?>" href="<?= e(url('/admin/moderacao')) ?>"><?= e($plural($nRep, 'denúncia', 'denúncias')) ?></a><?php endif; ?></span>
-    </div>
 </div>
 
 <?php if ($crm['late'] + $crm['today'] + $crm['none'] > 0): ?>
@@ -71,8 +46,6 @@ $pendHref = $nRep > 0 && $nRes === 0 ? '/admin/moderacao' : '/admin/resgates';
 
 <div class="ostats" aria-label="Resumo">
     <a href="<?= e(url('/admin/pacientes?st=active')) ?>"><b class="num"><?= (int) $stats['patients'] ?></b><span class="lbl">pacientes em carteira</span></a>
-    <span><b class="num"><?= (int) $stats['active7'] ?></b><span class="lbl">abriram o app em 7 dias</span></span>
-    <span><b class="num"><?= (int) $stats['checkins'] ?></b><span class="lbl">check-ins hoje</span></span>
     <a href="<?= e(url('/admin/pacientes?f=athletes')) ?>"><b class="num"><?= (int) $stats['athletes'] ?></b><span class="lbl">atletas</span></a>
 </div>
 
@@ -83,7 +56,7 @@ $pendHref = $nRep > 0 && $nRes === 0 ? '/admin/moderacao' : '/admin/resgates';
                 <h3 id="h-risk">Risco de renovação</h3>
                 <a class="tiny muted-link" href="<?= e(url('/admin/pacientes?f=yellow')) ?>">Ver na lista de pacientes →</a>
             </div>
-            <p class="muted small" style="margin:0 0 12px">Quem vence em até <?= (int) $yellow ?> dias (ou já venceu). Quem está sem abrir o app há 7 dias ou mais aparece primeiro: é a hora de uma mensagem.</p>
+            <p class="muted small" style="margin:0 0 12px">Quem vence em até <?= (int) $yellow ?> dias (ou já venceu).</p>
 
             <a class="oforecast" href="<?= e(url('/admin/pacientes?f=yellow')) ?>">
                 <span class="big num"><?= e($brlDue) ?></span>
@@ -98,9 +71,9 @@ $pendHref = $nRep > 0 && $nRes === 0 ? '/admin/moderacao' : '/admin/resgates';
                 <tbody>
                 <?php foreach ($risk as $r): ?>
                     <tr>
-                        <td><a class="who" href="<?= e(url('/admin/pacientes/' . $r['id'])) ?>"><?= avatar($r, 34) ?><span><span class="rk-name"><?= e($r['name']) ?><?php if ($r['away']): ?> <span class="tag warn">sumido</span><?php endif; ?></span>
+                        <td><a class="who" href="<?= e(url('/admin/pacientes/' . $r['id'])) ?>"><?= avatar($r, 34) ?><span><span class="rk-name"><?= e($r['name']) ?></span>
                             <span class="rk-plan small muted"><?php if ($r['plan_name']): ?><?= e($r['plan_name']) ?> · <?= $r['plan_value'] !== null ? e(money((float) $r['plan_value'], floor((float) $r['plan_value']) == (float) $r['plan_value'] ? 0 : 2, (string) $r['plan_currency'])) : 'sem valor' ?><?php else: ?>sem plano<?php endif; ?></span>
-                            <span class="rk-chk small muted"><?= $r['noapp'] ? 'Sem acesso ao app' : ($r['last_seen_at'] ? 'visto ' . e(time_ago($r['last_seen_at'])) : 'nunca entrou') ?> · <?= $r['last_checkin'] ? 'check-in em ' . e(fmt_date($r['last_checkin'])) : 'sem check-in' ?></span></span></a></td>
+</span></a></td>
                         <td><?php partial('seal', ['renew' => $r['renew']]); ?></td>
                         <td class="r">
                             <div class="row-actions">

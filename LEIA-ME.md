@@ -31,7 +31,7 @@ Gabriel. A ideia central é um ciclo simples:
 | **Perfil esportivo** | Para quem treina: modalidades (Corrida, Musculação, Hyrox, Natação...), se tem assessoria, se compete e a próxima prova. O paciente edita o dele e escolhe se mostra as **modalidades** no perfil da comunidade (assessoria e provas nunca aparecem para outros). |
 
 ### Para o Gabriel (painel `/admin`, funciona no celular e no computador)
-**Painel** (tela inicial, duas abas: **Operação**, que abre primeiro, com o que fazer hoje: parcelas para cobrar, renovações, sumidos do app e pendências; e **Visão executiva**: pontos de atenção, pacientes em carteira, vendido, recebido, taxa de renovação, evolução financeira, carteira por plano/sexo/modalidade, crescimento e equipe) · **CRM** (leads: cadastro rápido, lista com busca e filtros, ficha com linha do tempo, próximo retorno, "Não contatar" e WhatsApp com mensagem pronta; hoje só para testar, até existir login por pessoa) · **Aniversários** (data de nascimento opcional na ficha, aniversariantes de hoje e dos próximos dias com botão de WhatsApp e mensagem pronta e editável, caixinha de autorização para receber mensagens) · Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)** · **risco de renovação** (quem vence logo e quem sumiu há 7+ dias, com botão de
+**Painel** (tela inicial, duas abas: **Operação**, que abre primeiro, com o que fazer hoje: parcelas para cobrar, renovações e o Follow-up de leads; e **Visão executiva**: pontos de atenção, pacientes em carteira, vendido, recebido, taxa de renovação, evolução financeira, carteira por plano/sexo/modalidade, crescimento e equipe) · **CRM** (leads: cadastro rápido, lista com busca e filtros, ficha com linha do tempo, próximo retorno, "Não contatar" e WhatsApp com mensagem pronta; hoje só para testar, até existir login por pessoa) · **Aniversários** (data de nascimento opcional na ficha, aniversariantes de hoje e dos próximos dias com botão de WhatsApp e mensagem pronta e editável, caixinha de autorização para receber mensagens) · Painel com indicadores e **quanto está para renovar nos próximos 30 dias (R$)** · **risco de renovação** (quem vence logo, com botão de
 WhatsApp) · **planos e valores** (só o admin vê R$) · pacientes (cadastro com plano e "valor combinado",
 renovar com a duração do plano e bônus, pontos manuais, dieta, senha provisória, exclusão LGPD) · **lista de pacientes completa** (status Ativo/Inativo, vencimento, consultas "x de y" por plano, responsável da equipe, ordenar clicando na coluna, filtros por vencimento 15/30 dias, status, responsável e consultas, atribuição em lote) · **responsáveis** ("modo babá": quem cuida de quais pacientes) · **importação de pacientes por planilha** (modelo oficial em Excel, prévia antes de salvar, duplicados e erros) ·
 **atletas** (etiquetas de modalidade nos pacientes, filtros Atletas / Competem / Sem assessoria / por modalidade,
@@ -425,10 +425,26 @@ Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.
 - **Cartão do Follow-up:** nome, temperatura, etapa (ou motivo da perda), interesse, origem, **o que fazer** (Ligar, Enviar proposta…), prazo, quem faz o retorno, último contato, aviso **"sem resposta"** quando o último contato foi sem resposta e WhatsApp.
 - **Atalhos:** *Todos*, *Em aberto*, *Reativação*, *Quentes*, *Sem resposta* e *Nunca contatados* (com a contagem de cada um) + busca (nome, WhatsApp, e-mail, Instagram) + **"Retorno de"** (quem faz a tarefa; o mesmo filtro da Lista, que ganhou a opção "Ninguém definido").
 - **Dentro da coluna:** retorno mais antigo primeiro e, na mesma data, leads quentes antes. Cada coluna mostra até **40 leads em aberto** (as tarefas de reativação aparecem todas); o resto vira **"+ N leads na Lista"**, que abre a Lista já naquela faixa de prazo. O número do alto da coluna é sempre o total real.
-- **Alertas no Painel e no menu:** o Painel (aba Operação) ganhou uma faixa **"Follow-up de leads"** abaixo dos 4 cartões, com **retornos atrasados**, **para hoje** e **leads sem retorno programado** (só aparece quando há algo a fazer). O item **CRM** do menu ganha um selo com atrasados + hoje.
+- **Alertas no Painel e no menu:** o Painel (aba Operação) ganhou uma faixa **"Follow-up de leads"** abaixo dos cartões de tarefa, com **retornos atrasados**, **para hoje** e **leads sem retorno programado** (só aparece quando há algo a fazer). O item **CRM** do menu ganha um selo com atrasados + hoje.
 - **Mensagem de WhatsApp pelo tipo do retorno:** o botão de WhatsApp agora usa um texto pelo **tipo do próximo retorno** do lead: *Retomar contato*, *Ligar*, *Enviar proposta* e *Marcar conversa* (textos prontos que não prometem preço, prazo nem desconto; só abrem a conversa). *Enviar WhatsApp*, *Outra ação* e lead sem retorno marcado usam a mensagem geral. **Em Configurações** você edita cada uma (use `{nome}`). Ordem de escolha: **mensagem do tipo que você escreveu → mensagem geral que você escreveu → texto padrão do tipo**. Quem já tinha personalizado a mensagem geral **não perde nada**: ela continua valendo até você escrever uma mensagem para um tipo.
 - **Tela inicial do CRM:** em *Configurar > Tela inicial do CRM* agora há 3 opções: **Funil** (padrão), **Follow-up** ou **Lista**.
 - **Segurança:** só administrador; reagendar usa o token de segurança (CSRF); sem script na página; o "voltar" só aceita endereços do próprio sistema.
+
+### Atualização 09.5 (App do paciente separado: menu com seta, Visão geral e Ajustes do app)
+**Esta atualização NÃO tem SQL.** Não precisa importar nada no phpMyAdmin. Só `git pull` (ou copiar a pasta nova) e **Ctrl + F5** (o app passa para a versão `ndo-v21`).
+
+**Motivo:** o app do paciente fica para a segunda onda. Tudo o que é do app saiu das telas do dia a dia e foi reunido num lugar só, para não poluir o Painel. **Nenhum dado foi apagado nem mudou**: só mudou onde aparece.
+
+**O que mudou:**
+- **Menu:** o grupo "App do paciente" virou **uma barra com seta**. Fechada, é uma linha só. Ao clicar, abre: **Visão geral, Treinos, Ranking, Loja, Resgates, Regras de pontos, Moderação, Ajustes do app, Ver o feed**. Ela **abre sozinha** quando você está numa página do app. Se houver **resgates para entregar ou denúncias para analisar**, aparece um número vermelho na barra (e em Resgates e Moderação).
+- **Nova página "Visão geral" (App do paciente):** *resgates para entregar*, *denúncias para analisar*, *sem abrir o app há 7 dias ou mais* (com quantos desses vencem logo: renovação em risco), *sem acesso ao app*, e a linha *com acesso liberado · abriram o app em 7 dias · check-ins hoje*, mais atalhos para as páginas do app.
+- **Painel (Operação):** saíram os cartões *sem abrir o app* e *pendências no app*, a linha *abriram o app em 7 dias / check-ins hoje* e, na tabela **Risco de renovação**, a etiqueta *sumido*, o "visto …" e o "check-in em …". A tabela agora é ordenada só pelo vencimento.
+- **Painel (Visão executiva):** saíram os avisos *sem abrir o app há 7+ dias* e *renovação em risco*.
+- **Pacientes:** *Sumidos* e *Sem acesso ao app* saíram de "Mais filtros". Os links antigos continuam funcionando (mostram a etiqueta do filtro e "Limpar filtros"), e a Visão geral do app aponta para eles.
+- **Ficha do paciente:** a etiqueta "Visto há… / Nunca entrou no app / Sem acesso ao app" saiu do topo e foi para dentro da aba **App do paciente**, junto do nível.
+- **Configurações:** *Níveis, Tema do dia no feed, Regras de convivência e Termo de consentimento* foram para **App do paciente > Ajustes do app** (formulário próprio: salvar um não apaga o outro). Em Configurações ficaram WhatsApp da renovação, aniversário, mensagens de leads e avisos de renovação.
+- **Renovação e Importação:** os textos deixaram de falar em "bônus de pontos" e em "sumido". **Os pontos continuam sendo lançados em silêncio** (renovação, indicação); quando o app for lançado, o extrato começa do zero (combinado: decidir isso na hora do lançamento).
+- **O que NÃO mudou:** nenhuma página do app mudou de endereço (`/admin/treinos`, `/admin/ranking`, `/admin/loja`…). Cálculos e bancos são os mesmos; só foram movidos para o módulo.
 
 ### Acessos para teste
 | Perfil | E-mail | Senha |
@@ -439,7 +455,7 @@ Mesmo processo, **depois** da Atualização 08 (ordem: ... → 07 → 08 → 08.
 
 Pacientes de demonstração úteis: **Ana** (nível Ouro, 21 dias seguidos, treinos e medidas),
 **Heitor** (renovação vermelha, vence em 3 dias), **Felipe** (renovação amarela, ainda sem check-in hoje),
-**João** (renovação vencida e "sumido" no painel).
+**João** (renovação vencida; o "sumido" dele aparece no módulo **App do paciente**).
 
 > As datas da demonstração são relativas a **hoje** (importe os dados no dia em que for testar).
 
@@ -506,7 +522,7 @@ Ideal: faça no celular e depois no computador.
 
 ### E. Admin (Gabriel) — use a janela anônima
 - [ ] Login com `admin@ndoclub.local` / `Trocar@123` → obrigado a criar nova senha (anote!).
-- [ ] **Painel:** números de pacientes ativos, check-ins de hoje, vencem em até 15 dias, vencidos, resgates pendentes, denúncias abertas; tabela **Risco de renovação** com João marcado como *sumido*.
+- [ ] **Painel:** números de pacientes em carteira, vencem em até 15 dias e vencidos; tabela **Risco de renovação** com João (renovação vencida). Os números do app (resgates, denúncias, check-ins, quem sumiu) ficam em **App do paciente > Visão geral** (veja o E9.5).
 - [ ] **Pacientes:** buscar por nome; abrir um; editar dados; **Novo paciente** (anote a senha provisória que aparece **uma vez**); gerar nova senha provisória.
 - [ ] **Pontos manuais:** lançar +50 na Ana → aparece no extrato dela. Lançar −10 → desconta.
 - [ ] **Dieta:** colocar link e/ou subir um PDF para uma paciente → ela vê em *Dieta*. Outra paciente **não** consegue abrir o PDF (teste colando o endereço em outra conta → bloqueado).
@@ -556,7 +572,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Status:** paciente com vencimento no futuro aparece **Ativo**; com data passada aparece **Inativo**; conta bloqueada (ficha → Acesso → Desativado) aparece **Desativado**.
 - [ ] **Vencimento:** filtro **16 a 30 dias** mostra só quem vence nessa faixa. Conferir a data na coluna Vencimento.
 - [ ] **Ordenar:** clicar em **Vencimento** (mais próximo primeiro), clicar de novo (mais distante primeiro). Clicar em **Plano**, **Status**, **Responsável**; em **Mais filtros → Ordenar por** também há *Consultas feitas*. O filtro escolhido não se perde ao ordenar.
-- [ ] **Sumido:** em **Mais filtros → Sumidos** aparecem só os pacientes que não abrem o app há 7+ dias. Na ficha, a etiqueta "Visto ..." mostra a última vez que ele entrou.
+- [ ] **Sumido:** em **App do paciente > Visão geral**, o cartão *sem abrir o app há 7 dias ou mais* leva à lista só com quem não abre o app há 7+ dias. Na ficha, na aba **App do paciente**, a etiqueta "Visto ..." mostra a última vez que ele entrou.
 - [ ] **Registrar consulta:** ficha → aba **Acompanhamento** → **Consultas presenciais** → data de hoje → **Registrar consulta**. Mostra "1 de 4", "restam 3". Data futura é recusada. Quantidade 2 lança duas de uma vez. **Apagar** remove.
 - [ ] **Cota completa:** ao chegar em "4 de 4" aparece **cota completa** na ficha; em **Mais filtros → Consultas → Cota de consultas completa** o paciente aparece na lista.
 - [ ] **Renovar zera o contador:** renovar o paciente → volta para "0 de 4"; o histórico mostra as consultas antigas como **anterior**.
@@ -628,7 +644,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Indicadores:** 5 cartões (Pacientes em carteira, Novos no mês, Faturamento contratado, Renovações próximas, Taxa de renovação). Confira com o **Painel**: os números e as setas devem ser iguais. *Renovações próximas* leva para o atalho de mesmo nome.
 - [ ] **Atalhos:** clique em **Ativos**, **Inativos**, **Em atraso** e **Renovação próxima**. O número entre parênteses é a quantidade de pacientes que a lista mostra. **Em atraso** inclui quem tem **plano vencido** e quem tem **parcela vencida e não recebida** (aparece o selo vermelho *Parcela atrasada*).
 - [ ] **Busca:** procure por parte do nome, do e-mail, do **CPF** (com ou sem pontos) e do **WhatsApp** (com ou sem máscara). "Limpar filtros" volta ao começo.
-- [ ] **Mais filtros:** abre e fecha; mostra Responsável, Consultas, Ordenar por e os atalhos Sumidos, Sem acesso ao app, Cadastro incompleto, Atletas, Competem e Sem assessoria. Com um deles ligado, o quadro já abre aberto.
+- [ ] **Mais filtros:** abre e fecha; mostra Responsável, Consultas, Ordenar por e os atalhos Cadastro incompleto, Atletas, Competem e Sem assessoria (Sumidos e Sem acesso ao app saíram em 09.5: ficam no módulo App do paciente). Com um deles ligado, o quadro já abre aberto.
 - [ ] **Tabela:** só avatar, nome/e-mail, plano, modalidade, vencimento, status, responsável e ações. **Nada de pontos, "visto por último" ou valores em dinheiro.**
 - [ ] **Ações:** 👁 abre a ficha; ✏️ abre a ficha já no bloco *Dados do paciente*; ⋯ mostra Plano e financeiro, Acompanhamento, App do paciente e (com telefone) Abrir WhatsApp. Clicar fora fecha o menu.
 - [ ] **Lote:** marque 2 pacientes → escolha a estagiária → **Aplicar** → você volta **para a mesma página**. **Selecionar todos** marca só os da página.
@@ -638,9 +654,9 @@ Ideal: faça no celular e depois no computador.
 
 ### E8.4. Painel mais limpo
 - [ ] **Abrir o Painel:** abre na **Operação**. As abas aparecem na ordem **Operação, Visão executiva**. O texto de cima diz "O que precisa de você hoje." (e "Como está o negócio." na Visão executiva).
-- [ ] **4 cartões de tarefa:** *parcelas para cobrar ou conferir* (igual ao Financeiro), *vencem em até 15 dias* (com "N vencidos sem renovar"), *sem abrir o app há 7 dias ou mais* (igual a Pacientes > Sumidos) e *pendências no app* (resgates + denúncias). Clique em cada um: vai para a lista certa. Clique também em "N atrasadas", "N vencidos", "N resgates" e "N denúncias".
+- [ ] **2 cartões de tarefa:** *parcelas para cobrar ou conferir* (igual ao Financeiro) e *vencem em até 15 dias* (com "N vencidos sem renovar"). Clique em cada um: vai para a lista certa. Clique também em "N atrasadas" e "N vencidos". (Os outros dois cartões, *sem abrir o app* e *pendências no app*, foram para **App do paciente > Visão geral** na 09.5.)
 - [ ] **Resumo e previsão:** a linha com pacientes em carteira / abriram o app em 7 dias / check-ins hoje / atletas; e "R$ … a renovar em 30 dias" acima da lista de risco (com o exterior à parte, quando houver US$ ou €).
-- [ ] **Risco de renovação:** cada paciente com plano e valor, "visto …" e "check-in em …", selo de renovação, botão **WhatsApp** (só com telefone) e o ícone 👁 que abre a ficha. Quem está sumido aparece primeiro, com a etiqueta *sumido*.
+- [ ] **Risco de renovação:** cada paciente com plano e valor, "visto …" e "check-in em …", selo de renovação, botão **WhatsApp** (só com telefone) e o ícone 👁 que abre a ficha. Ordem por data de vencimento (a etiqueta *sumido* e o "visto …" saíram em 09.5).
 - [ ] **Aniversariantes e Próximas provas** aparecem ao lado (computador) ou embaixo (celular), sem rolagem horizontal.
 - [ ] **Visão executiva:** faixa **Pontos de atenção** no topo (só com números maiores que zero; compare com Pacientes e Financeiro), depois 4 números grandes. Confira que "Pacientes em carteira", "Vendido", "Recebido" e "Taxa de renovação" estão iguais aos de antes.
 - [ ] **Evolução financeira:** troque 6 meses / 12 meses / Ano atual; veja "Vendido no ano" e "A receber" no alto, a linha de **inadimplência** em vermelho e os valores do último mês à direita do gráfico, sem um por cima do outro. "Ver em tabela" mostra os mesmos valores.
@@ -715,11 +731,25 @@ Ideal: faça no celular e depois no computador.
 - [ ] **Reagendar tarefa de reativação:** a data muda e a tarefa continua na reativação (mesmo passo da cadência).
 - [ ] **Atalhos:** *Em aberto*, *Reativação*, *Quentes*, *Sem resposta* e *Nunca contatados* mostram só quem se encaixa, e o número ao lado de cada atalho bate com o que aparece. Busque por nome ou telefone. Escolha uma pessoa em **Retorno de**.
 - [ ] **Coluna cheia:** com mais de 40 leads em aberto numa coluna aparece "+ N leads na Lista"; clicar abre a Lista já filtrada naquele prazo (aparece o atalho "Retorno depois de 7 dias", "Retorno amanhã" etc.).
-- [ ] **Painel:** na aba Operação, abaixo dos 4 cartões, a faixa **Follow-up de leads** mostra atrasados, para hoje e sem retorno programado. O item **CRM** do menu mostra o selo com atrasados + hoje; a aba **Follow-up** mostra o mesmo número. Quando tudo está em dia, a faixa, o selo e o número somem.
+- [ ] **Painel:** na aba Operação, abaixo dos 2 cartões de tarefa, a faixa **Follow-up de leads** mostra atrasados, para hoje e sem retorno programado. O item **CRM** do menu mostra o selo com atrasados + hoje; a aba **Follow-up** mostra o mesmo número. Quando tudo está em dia, a faixa, o selo e o número somem.
 - [ ] **Mensagens por tipo:** em **Configurações**, os quatro campos *Retomar contato, Ligar, Enviar proposta e Marcar conversa* mostram o texto padrão. Num lead com retorno do tipo **Ligar**, o botão de WhatsApp abre com o texto de ligar; em *Enviar proposta*, com o texto de proposta. Escreva uma mensagem própria para um tipo: só aquele tipo muda. Apague: volta ao padrão.
 - [ ] **Tela inicial:** em *Configurar > Tela inicial do CRM* escolha **Follow-up**, salve e clique em **CRM** no menu: abre o Follow-up. Volte para **Funil**.
 - [ ] **Celular:** o seletor **Reagendar para…** aparece em cada cartão e funciona (no computador ele também fica sempre visível no Follow-up, porque as outras datas dependem dele).
 - [ ] **Privacidade:** entrar como paciente e abrir `/admin/crm/follow-up` → bloqueado.
+
+### E9.5. App do paciente separado
+> Antes: deu Ctrl + F5 (versão `ndo-v21`). Não tem SQL nesta atualização. Use a janela anônima, entrando como administrador.
+- [ ] **Menu:** a barra **App do paciente** aparece fechada, com uma seta. Clique: abre e mostra *Visão geral, Treinos, Ranking, Loja, Resgates, Regras de pontos, Moderação, Ajustes do app e Ver o feed*. Clique de novo: fecha. Entre em *Ranking*: a barra já abre sozinha e marca a página atual.
+- [ ] **Celular:** abra o menu (☰). A barra funciona do mesmo jeito (toque para abrir/fechar).
+- [ ] **Visão geral:** abra *App do paciente > Visão geral*. Confira os 4 cartões (resgates, denúncias, sem abrir o app, sem acesso ao app) e a linha com acesso liberado, abriram em 7 dias e check-ins hoje. Clique em cada cartão: vai para Resgates, Moderação e a lista de pacientes filtrada.
+- [ ] **Selo do menu:** com um resgate pendente (peça um brinde como paciente) ou uma denúncia aberta, a barra do app mostra um número vermelho; quando você entrega/resolve, o número some.
+- [ ] **Painel (Operação):** só 2 cartões de tarefa (cobrar e vencimentos); nada de *sem abrir o app* nem *pendências no app*; a tabela **Risco de renovação** sem a etiqueta *sumido* e ordenada pelo vencimento.
+- [ ] **Painel (Visão executiva):** os pontos de atenção não falam mais de app.
+- [ ] **Pacientes:** em *Mais filtros* não há mais *Sumidos* nem *Sem acesso ao app*. Abra `/admin/pacientes?f=away`: a lista filtra e aparece a etiqueta do filtro com **Limpar filtros**.
+- [ ] **Ficha:** o topo não mostra mais "Visto há…". Abra a aba **App do paciente**: lá aparece "Visto há…" (ou "Nunca entrou no app" / "Sem acesso ao app") ao lado do nível; pontos, treinos e senha provisória continuam lá.
+- [ ] **Ajustes do app:** *Níveis, Tema do dia, Regras de convivência e Termo de consentimento* estão nesta página. Mude um nível e salve: aparece "Ajustes do app salvos". Tente Prata maior que Ouro: o sistema recusa.
+- [ ] **Configurações:** só WhatsApp da renovação, aniversário, mensagens de leads e avisos de renovação. Salve: os Ajustes do app **não** mudam (e o contrário também).
+- [ ] **Privacidade:** entrar como paciente e abrir `/admin/app` ou `/admin/app/ajustes` → bloqueado.
 
 ### F. Celular e aparência
 - [ ] Nenhuma tela tem rolagem horizontal; botões grandes o bastante para o polegar; barra inferior (Início, Feed, Treino, Ranking, Loja) sempre visível.
@@ -733,7 +763,7 @@ Ideal: faça no celular e depois no computador.
 - [ ] No navegador, abrir uma imagem de perfil em janela anônima (sem login) → bloqueado.
 - [ ] Trocar para `'debug' => false` em `config/config.php` → erros não mostram detalhes na tela.
 
-> **Como foi testado aqui:** o código passou por uma bateria automática de **2064 verificações** (login,
+> **Como foi testado aqui:** o código passou por uma bateria automática de **2122 verificações** (login,
 > primeiro acesso, pontos, limites diários, ranking, loja, moderação, admin, planos e valores,
 > perfil esportivo, lista de pacientes (status, ordenação, filtros, consultas, responsáveis), importação por planilha (modelo, prévia, duplicados, erros, "Paciente desde", arquivos quebrados, acesso dos importados, lote de 500), painel gerencial (períodos, cartões, gráficos, carteira, crescimento, equipe e alertas conferidos contra um cálculo independente), aniversários (janelas, 29/02, autorização, mensagem editável, privacidade), cadastro com sexo, CPF (dígitos, duplicado), Instagram e endereço (Brasil e exterior), importação v4 e gráfico por sexo (conferido contra cálculo independente), ficha em abas (cada coisa na aba certa, cada botão volta para a aba certa, privacidade) e menu em grupos, tela Pacientes nova (indicadores conferidos contra o Painel e o banco, atalhos e contagens, "Em atraso", busca por CPF e WhatsApp, paginação, lote, tabela sem valores, parâmetros estranhos na URL, cores e frase do painel), Painel mais limpo (Operação primeiro, cartões de tarefa conferidos contra o banco, pontos de atenção iguais aos alertas, quatro números iguais ao Insights, rótulos do gráfico sem sobreposição, abas da carteira, endereços antigos, venda cancelada saindo do Vendido), CRM / Leads (cadastro e validações, duplicados por e-mail, telefone em qualquer formato, Instagram e paciente, linha do tempo que só ganha linhas, próximo retorno, "Não contatar" e autorização, filtros e indicadores conferidos contra o banco, origens e etapas editáveis, exclusão LGPD, auditoria, acesso só do administrador, escape de HTML), CRM Follow-up 09.4 (colunas por prazo conferidas contra o banco, reagendar com data/tipo/responsável preservados, tarefas de reativação, limite de 40 por coluna, alertas do Painel e do menu, mensagens de WhatsApp por tipo de retorno), CRM evoluído 09.2 (indicadores comerciais conferidos contra cálculo independente, atribuição em lote, estados do follow-up, ficha, perdidos e cadência de reativação 20/30/45 com datas, reabrir, conversão em paciente com resumo antes de gravar, duplicidade, vínculo com paciente existente, venda e parcelas no Financeiro, transação única, reenvio sem duplicar, moedas, segurança e escape de HTML), financeiro (cadastro com pagamento, cartão automático em dia útil, taxas e líquido, Pix para cobrar, comprovantes, cancelamento, moedas, recebíveis), privacidade dos valores e das provas, segurança e CSRF),
 > rodando com o PHP 8 e uma cópia do banco em SQLite. O **import real no MySQL do XAMPP não pôde
