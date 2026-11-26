@@ -121,8 +121,9 @@ $statusTag = function (array $r) use ($cards) {
         <select id="st" name="st" data-autosubmit>
             <option value="">Status</option>
             <option value="active"<?= $stFilter === 'active' ? ' selected' : '' ?>>Ativos (plano em dia)</option>
-            <option value="expired"<?= $stFilter === 'expired' ? ' selected' : '' ?>>Inativos (plano vencido)</option>
-            <option value="disabled"<?= $stFilter === 'disabled' ? ' selected' : '' ?>>Desativados (conta bloqueada)</option>
+            <option value="expired"<?= $stFilter === 'expired' ? ' selected' : '' ?>>Vencidos (plano vencido, sem decisão)</option>
+            <option value="exited"<?= $stFilter === 'exited' ? ' selected' : '' ?>>Inativos (saíram, com motivo)</option>
+            <option value="disabled"<?= $stFilter === 'disabled' ? ' selected' : '' ?>>Desativados (conta bloqueada, sem motivo)</option>
             <option value="nodate"<?= $stFilter === 'nodate' ? ' selected' : '' ?>>Sem data de vencimento</option>
         </select>
         <label class="sr-only" for="v">Vencimento</label>

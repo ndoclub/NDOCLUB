@@ -776,7 +776,7 @@ final class PatientImport
             $warns[] = 'Plano sem Vencimento: o paciente ficará como "sem data" (você pode preencher depois na ficha).';
         }
         if ($renewal !== null && $renewal < $today) {
-            $warns[] = 'Plano já vencido em ' . fmt_date($renewal) . ': o paciente entra como Inativo (plano vencido).';
+            $warns[] = 'Plano já vencido em ' . fmt_date($renewal) . ': o paciente entra como Vencido (plano vencido).';
         }
 
         // ---- Paciente desde (início do acompanhamento; usado pelo painel gerencial)

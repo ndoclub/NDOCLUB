@@ -44,6 +44,15 @@ $nOld = (int) $stats['expired'];
 </div>
 <?php endif; ?>
 
+<?php if (($journey['late'] ?? 0) + ($journey['today'] ?? 0) > 0): ?>
+<div class="ocrm<?= $journey['late'] > 0 ? ' is-alert' : '' ?>" aria-label="Jornada do paciente">
+    <span class="ocrm-t"><?= icon('flag', 18) ?> Jornada do paciente</span>
+    <?php if ($journey['late'] > 0): ?><a class="bad" href="<?= e(url('/admin/jornada')) ?>"><?= e($plural((int) $journey['late'], 'tarefa atrasada', 'tarefas atrasadas')) ?></a><?php endif; ?>
+    <?php if ($journey['today'] > 0): ?><a href="<?= e(url('/admin/jornada')) ?>"><?= e($plural((int) $journey['today'], 'tarefa para hoje', 'tarefas para hoje')) ?></a><?php endif; ?>
+    <a class="ocrm-go" href="<?= e(url('/admin/jornada')) ?>">Abrir a Jornada →</a>
+</div>
+<?php endif; ?>
+
 <div class="ostats" aria-label="Resumo">
     <a href="<?= e(url('/admin/pacientes?st=active')) ?>"><b class="num"><?= (int) $stats['patients'] ?></b><span class="lbl">pacientes em carteira</span></a>
     <a href="<?= e(url('/admin/pacientes?f=athletes')) ?>"><b class="num"><?= (int) $stats['athletes'] ?></b><span class="lbl">atletas</span></a>

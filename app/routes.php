@@ -71,6 +71,12 @@ $router->post('/admin/pacientes/{id}/dieta/pdf-remover', 'Admin\PatientControlle
 $router->post('/admin/pacientes/{id}/esporte', 'Admin\PatientController@sport', $A);
 $router->post('/admin/pacientes/{id}/pagamentos', 'Admin\PatientController@addPayment', $A);
 $router->post('/admin/pacientes/{id}/excluir', 'Admin\PatientController@delete', $A);
+// Jornada do paciente (Atualização 11): ações da aba Jornada da ficha
+$router->post('/admin/pacientes/{id}/jornada/resposta', 'Admin\JourneyController@answer', $A);
+$router->post('/admin/pacientes/{id}/jornada/ultima-consulta', 'Admin\JourneyController@lastConsult', $A);
+$router->post('/admin/pacientes/{id}/jornada/inativar', 'Admin\JourneyController@inactivate', $A);
+$router->post('/admin/pacientes/{id}/jornada/reativar', 'Admin\JourneyController@reactivate', $A);
+$router->post('/admin/pacientes/{id}/jornada/nota', 'Admin\JourneyController@note', $A);
 $router->post('/admin/pacientes/responsavel', 'Admin\PatientController@assign', $A);
 
 // Importação de pacientes por planilha (modelo oficial NDO). Nada é salvo antes do "Confirmar".
@@ -144,6 +150,12 @@ $router->post('/admin/crm/{id}/autorizacao', 'Admin\LeadController@consent', $CR
 $router->post('/admin/crm/{id}/nao-contatar', 'Admin\LeadController@doNotContact', $CRM);
 $router->post('/admin/crm/{id}/excluir', 'Admin\LeadController@destroy', $CRM);
 
+// Jornada do paciente (Atualização 11): tarefas, renovações e vencidos
+$router->get('/admin/jornada', 'Admin\JourneyController@index', $A);
+$router->get('/admin/jornada/ajustes', 'Admin\JourneyController@settings', $A);
+$router->post('/admin/jornada/ajustes', 'Admin\JourneyController@saveSettings', $A);
+$router->post('/admin/jornada/tarefas/{id}/concluir', 'Admin\JourneyController@complete', $A);
+$router->post('/admin/jornada/tarefas/{id}/reabrir', 'Admin\JourneyController@reopen', $A);
 $router->get('/admin/aniversarios', 'Admin\BirthdayController@index', $A);
 $router->get('/admin/responsaveis', 'Admin\ResponsibleController@index', $A);
 $router->get('/admin/responsaveis/novo', 'Admin\ResponsibleController@form', $A);

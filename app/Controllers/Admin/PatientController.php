@@ -9,6 +9,7 @@ use App\Services\Athletes;
 use App\Services\Audit;
 use App\Services\Consultations;
 use App\Services\Insights;
+use App\Services\Journey;
 use App\Services\Levels;
 use App\Services\Payments;
 use App\Services\PersonalData;
@@ -23,7 +24,7 @@ use App\Services\Streak;
 final class PatientController
 {
     /** Abas da ficha do paciente (?aba=). A primeira é a padrão. */
-    public const ABAS = ['resumo' => 'Resumo', 'plano' => 'Plano e financeiro', 'acompanhamento' => 'Acompanhamento', 'app' => 'App do paciente'];
+    public const ABAS = ['resumo' => 'Resumo', 'plano' => 'Plano e financeiro', 'acompanhamento' => 'Acompanhamento', 'jornada' => 'Jornada', 'app' => 'App do paciente'];
 
     /** Endereço da ficha já na aba certa (depois de salvar algo, o admin volta para onde estava). */
     public static function ficha(int $id, string $aba = 'resumo', string $ancora = ''): string
@@ -82,13 +83,13 @@ final class PatientController
     /** Atalhos rápidos do alto da lista (cada um mostra a quantidade). A chave vai na URL como ?f= */
     public static function quickFilters(): array
     {
-        return ['all' => 'Todos', 'active' => 'Ativos', 'expired' => 'Inativos', 'late' => 'Em atraso', 'soon' => 'Renovação próxima'];
+        return ['all' => 'Todos', 'active' => 'Ativos', 'expired' => 'Vencidos', 'late' => 'Em atraso', 'soon' => 'Renovação próxima'];
     }
 
     /** Outros atalhos (dentro de "Mais filtros"). Os links antigos do Painel continuam funcionando. */
     public static function moreFilters(): array
     {
-        return ['green' => 'Em dia', 'yellow' => 'Vencem logo', 'red' => 'Críticos', 'inactive' => 'Desativados',
+        return ['green' => 'Em dia', 'yellow' => 'Vencem logo', 'red' => 'Críticos', 'exited' => 'Inativos (saíram)', 'inactive' => 'Desativados',
                 'athletes' => 'Atletas', 'compete' => 'Competem', 'nocoach' => 'Sem assessoria', 'incomplete' => 'Cadastro incompleto'];
     }
 
@@ -103,7 +104,7 @@ final class PatientController
 
     /**
      * Um paciente entra no atalho? Definições:
-     *  Ativos = plano em dia · Inativos = plano vencido e não renovado
+     *  Ativos = plano em dia · Vencidos = plano vencido e ainda sem decisão · Inativos = saíram com motivo (Jornada)
      *  Em atraso = plano vencido OU parcela pendente já vencida · Renovação próxima = vence de hoje até o limite do selo amarelo.
      */
     private static function matchesQuick(string $f, array $r, int $yellowDays): bool
@@ -115,7 +116,8 @@ final class PatientController
             'expired'    => $r['plan_status']['key'] === 'expired',
             'late'       => $r['plan_status']['key'] === 'expired' || !empty($r['late']),
             'soon'       => $active && $r['renew']['days'] !== null && $r['renew']['days'] >= 0 && $r['renew']['days'] <= $yellowDays,
-            'inactive'   => $r['status'] === 'inactive',
+            'inactive'   => $r['status'] === 'inactive' && empty($r['exit_reason']),
+            'exited'     => $r['status'] === 'inactive' && !empty($r['exit_reason']),
             'green', 'yellow', 'red' => $active && $r['renew']['seal'] === $f,
             'away'       => $active && $r['away'],
             'noapp'      => $r['noapp'],
@@ -148,7 +150,7 @@ final class PatientController
         $dueFilter = $get('v');
         $respFilter = $get('r');
         $consFilter = $get('c');
-        if (!in_array($stFilter, ['active', 'expired', 'disabled', 'nodate'], true)) {
+        if (!in_array($stFilter, ['active', 'expired', 'exited', 'disabled', 'nodate'], true)) {
             $stFilter = '';
         }
         if (!isset(self::dueBuckets()[$dueFilter])) {
@@ -171,7 +173,7 @@ final class PatientController
         $sortDir = $sortDir === 'desc' ? 'desc' : 'asc';
         $ord = $sortKey . '_' . $sortDir;
 
-        $sql = "SELECT u.id, u.name, u.email, u.phone, u.avatar, u.status, u.renewal_date, u.last_seen_at, u.responsible_id, u.app_access,
+        $sql = "SELECT u.id, u.name, u.email, u.phone, u.avatar, u.status, u.renewal_date, u.last_seen_at, u.responsible_id, u.app_access, u.exit_reason,
                        u.cpf, u.addr_street, u.addr_city,
                        pl.name AS plan_name, COALESCE(bl.price, pl.price) AS plan_value,
                        CASE WHEN bl.price IS NOT NULL THEN bl.currency ELSE 'BRL' END AS plan_currency,
@@ -237,7 +239,7 @@ final class PatientController
             $r['renew'] = Renewal::info($r['renewal_date']);
             $r['noapp'] = (int) $r['app_access'] === 0; // importado, acesso ainda não liberado
             $r['away'] = !$r['noapp'] && (empty($r['last_seen_at']) || $r['last_seen_at'] < $weekAgo);
-            $r['plan_status'] = Renewal::planStatus((string) $r['status'], $r['renewal_date']);
+            $r['plan_status'] = Renewal::planStatus((string) $r['status'], $r['renewal_date'], $r['exit_reason'] ?? null);
             $r['cons'] = Consultations::summary((int) $r['done_count'], $r['quota']);
             $r['late'] = isset($lateIds[(int) $r['id']]);
             if ($stFilter !== '' && $r['plan_status']['key'] !== $stFilter) {
@@ -356,6 +358,7 @@ final class PatientController
         }
         $qty = max(1, (int) ($_POST['qty'] ?? 1));
         Audit::log((int) Auth::id(), 'consultation_add', 'user', $id, $qty . ' consulta(s) em ' . (input('held_on') ?: today()));
+        Journey::syncUser($id);
         flash('ok', $qty === 1 ? 'Consulta registrada.' : $qty . ' consultas registradas.');
         redirect(self::ficha($id, 'acompanhamento', 'consultas'));
     }
@@ -369,6 +372,7 @@ final class PatientController
             redirect('/admin/pacientes');
         }
         Audit::log((int) Auth::id(), 'consultation_delete', 'user', (int) $row['user_id'], 'consulta de ' . $row['held_on']);
+        Journey::syncUser((int) $row['user_id']);
         flash('ok', 'Consulta apagada.');
         redirect(self::ficha((int) $row['user_id'], 'acompanhamento', 'consultas'));
     }
@@ -529,6 +533,7 @@ final class PatientController
             return $id;
         });
         Audit::log((int) Auth::id(), 'patient_create', 'user', $id, $name . ($pay ? ' · ' . money((float) $amount, 2, $payCur) . ' em ' . $pay['installments'] . 'x (' . Payments::methodLabel($pay['method']) . ')' : ''));
+        Journey::syncUser((int) $id);
         $_SESSION['_creds'] = ['name' => $name, 'email' => $email, 'password' => $password];
         flash('ok', 'Paciente criado.' . ($pay ? ' Pagamento e parcelas registrados em Financeiro.' : '') . ' Envie o acesso pelo WhatsApp (mensagem pronta abaixo).');
         redirect('/admin/pacientes/' . $id);
@@ -577,7 +582,8 @@ final class PatientController
             'consTotal' => Consultations::total($id),
             'respChoices' => Responsibles::choices(!empty($p['responsible_id']) ? (int) $p['responsible_id'] : null),
             'respName' => !empty($p['responsible_id']) ? DB::val('SELECT name FROM responsibles WHERE id = ?', [(int) $p['responsible_id']]) : null,
-            'planStatus' => Renewal::planStatus((string) $p['status'], $p['renewal_date']),
+            'planStatus' => Renewal::planStatus((string) $p['status'], $p['renewal_date'], $p['exit_reason'] ?? null),
+            'journey' => $aba === 'jornada' ? Journey::forPatient($id) : null,
             'plans' => $plansList,
             'planRow' => $planRow,
             'customPrice' => Plans::customPrice($id),
@@ -698,6 +704,11 @@ final class PatientController
             DB::run('UPDATE users SET msg_optin = 0, msg_optin_at = NULL WHERE id = ?', [$id]);
         }
         Plans::setCustomPrice($id, $custom, $customCur);
+        // Voltou a ficar com o acesso ativo: o motivo de saída da Jornada deixa de valer (o histórico fica na linha do tempo)
+        if ($p['status'] === 'inactive' && $status === 'active' && !empty($p['exit_reason'])) {
+            Journey::reactivate($id, (int) Auth::id(), 'Acesso reativado pelo cadastro.', true);
+        }
+        Journey::syncUser($id);
         Audit::log((int) Auth::id(), 'patient_update', 'user', $id, $p['name']);
         flash('ok', 'Dados salvos.');
         redirect('/admin/pacientes/' . $id);
@@ -729,7 +740,9 @@ final class PatientController
             $pay = $parsed;
         }
 
+        $wasExited = $p['status'] === 'inactive' && !empty($p['exit_reason']);
         $new = Renewal::renew($id, $days, (int) Auth::id(), $amount, !empty($p['plan_id']) ? (int) $p['plan_id'] : null, $pay, $cur);
+        Journey::onRenewed($id, (int) Auth::id(), $new); // linha do tempo da Jornada; quem tinha saído volta para os ativos
         $detail = '+' . $days . ' dias, até ' . $new;
         if ($amount !== null) {
             $detail .= ', ' . money($amount, 2, $cur);
@@ -738,7 +751,7 @@ final class PatientController
             }
         }
         Audit::log((int) Auth::id(), 'renewal', 'user', $id, $detail);
-        flash('ok', 'Renovado até ' . fmt_date($new) . '.' . ($pay ? ' Pagamento e parcelas registrados em Financeiro.' : ''));
+        flash('ok', 'Renovado até ' . fmt_date($new) . '.' . ($pay ? ' Pagamento e parcelas registrados em Financeiro.' : '') . ($wasExited ? ' O paciente voltou para os ativos.' : ''));
         redirect(self::ficha($id, 'plano'));
     }
 

@@ -1340,3 +1340,58 @@ p.kcol-more { margin: 0; cursor: default; }
     .kb-filters .pf-go-t { display: none; }
     .kb-filters .pf-row > select { order: 3; }
 }
+
+/* =====================================================================
+   Jornada do paciente (Atualização 11): tarefas, renovações e vencidos
+   Só usa as cores do tema (variáveis): vermelho só para atraso, verde só para "feito".
+   ===================================================================== */
+.tab-n.tab-n-soft { background: var(--line-strong); color: var(--ink); }
+.jr-sec { padding-bottom: 6px; }
+.jr-sec h3 { display: flex; align-items: center; gap: 8px; }
+.jr-list { display: flex; flex-direction: column; }
+.jr-row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.1fr) minmax(0, .8fr) minmax(0, 1.2fr); gap: 8px 16px; align-items: center; padding: 12px 6px; border-bottom: 1px solid var(--line); }
+.jr-row:last-child { border-bottom: 0; }
+.jr-row.is-late { background: var(--bad-bg); border-radius: 10px; }
+.jr-row.is-today { background: var(--warn-bg); border-radius: 10px; }
+.jr-row.is-off { opacity: .72; }
+.jr-main, .jr-due { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.jr-due .tag { align-self: flex-start; }
+.jr-patient { font-weight: 700; color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.jr-title { font-size: 14.5px; line-height: 1.3; }
+.jr-act { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
+.jr-act .btn { white-space: nowrap; }
+.jr-late { color: var(--bad); }
+.jr-dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px 18px; margin: 0; }
+.jr-dl dt { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--mute); margin-bottom: 3px; }
+.jr-dl dd { margin: 0; font-size: 15px; }
+.jr-inline { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.jr-inline .field { flex: 1 1 220px; margin-bottom: 0; }
+.jr-exit > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; }
+.jr-exit > summary::-webkit-details-marker { display: none; }
+.jr-exit[open] > summary { margin-bottom: 8px; }
+.jr-exit form { display: flex; flex-direction: column; gap: 8px; min-width: 220px; }
+.jr-tl { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.jr-tl li { font-size: 14px; line-height: 1.4; padding-left: 12px; border-left: 3px solid var(--line-strong); }
+/* Renovações e Vencidos no celular/tablet: cada paciente vira um cartão (os botões nunca ficam escondidos à direita) */
+@media (max-width: 900px) {
+    .jr-tbl { overflow: visible; background: none; border: 0; border-radius: 0; box-shadow: none; }
+    .jr-tbl .tbl, .jr-tbl .tbl tbody { display: block; }
+    .jr-tbl .tbl { min-width: 0; }
+    .jr-tbl .tbl thead { display: none; }
+    .jr-tbl .tbl tbody { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    .jr-tbl .tbl tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+    .jr-tbl .tbl tr:hover td { background: none; }
+    .jr-tbl .tbl td { display: block; padding: 0; border: 0; background: none; min-width: 0; }
+    .jr-tbl .tbl td:first-child, .jr-tbl .tbl td:last-child { grid-column: 1 / -1; }
+    .jr-tbl .tbl td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 3px; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--mute); }
+    .jr-tbl .tbl td:first-child::before { display: none; }
+    .jr-tbl .jr-act { justify-content: flex-start; }
+}
+/* Na ficha (coluna estreita) a tarefa empilha: título, prazo, responsável e botões */
+.cols .jr-row { grid-template-columns: 1fr; gap: 8px; }
+.cols .jr-due { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cols .jr-act { justify-content: flex-start; }
+@media (max-width: 760px) {
+    .jr-row { grid-template-columns: 1fr; }
+    .jr-act { justify-content: flex-start; }
+}

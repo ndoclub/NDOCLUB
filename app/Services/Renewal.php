@@ -37,20 +37,23 @@ final class Renewal
 
     /**
      * Status do paciente para o admin (lista e ficha):
-     *  Ativo = plano vigente (vence hoje ou depois) · Inativo = plano venceu e não renovou ·
-     *  Desativado = conta bloqueada pelo admin · Sem data = ainda sem vencimento.
-     * Retorna key (active, expired, disabled, nodate), label e tag (classe visual).
+     *  Ativo = plano vigente (vence hoje ou depois) · Vencido = plano venceu e o time ainda não decidiu (nem renovou, nem inativou) ·
+     *  Inativo = o time tirou o paciente da carteira, com motivo (Atualização 11) · Desativado = conta bloqueada pelo admin, sem motivo de saída ·
+     *  Sem data = ainda sem vencimento.
+     * Retorna key (active, expired, exited, disabled, nodate), label e tag (classe visual).
      */
-    public static function planStatus(string $accountStatus, ?string $date): array
+    public static function planStatus(string $accountStatus, ?string $date, ?string $exitReason = null): array
     {
         if ($accountStatus === 'inactive') {
-            return ['key' => 'disabled', 'label' => 'Desativado', 'tag' => ''];
+            return $exitReason
+                ? ['key' => 'exited', 'label' => 'Inativo', 'tag' => '']
+                : ['key' => 'disabled', 'label' => 'Desativado', 'tag' => ''];
         }
         if (!$date) {
             return ['key' => 'nodate', 'label' => 'Sem data', 'tag' => ''];
         }
         return (int) days_until($date) < 0
-            ? ['key' => 'expired', 'label' => 'Inativo', 'tag' => 'bad']
+            ? ['key' => 'expired', 'label' => 'Vencido', 'tag' => 'bad']
             : ['key' => 'active', 'label' => 'Ativo', 'tag' => 'ok'];
     }
 

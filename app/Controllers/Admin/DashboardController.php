@@ -6,6 +6,7 @@ use App\Core\View;
 use App\Services\Athletes;
 use App\Services\Birthdays;
 use App\Services\Insights;
+use App\Services\Journey;
 use App\Services\Leads;
 use App\Services\Payments;
 use App\Services\Plans;
@@ -70,7 +71,7 @@ final class DashboardController
         }
         unset($b);
 
-        View::render('admin/dashboard', ['title' => 'Painel', 'aba' => 'operacao', 'stats' => $stats, 'risk' => $risk, 'yellow' => $yellow, 'due30' => Plans::dueWithin(30), 'pix' => Payments::attentionStats(), 'crm' => Leads::attention(),
+        View::render('admin/dashboard', ['title' => 'Painel', 'aba' => 'operacao', 'stats' => $stats, 'risk' => $risk, 'yellow' => $yellow, 'due30' => Plans::dueWithin(30), 'pix' => Payments::attentionStats(), 'crm' => Leads::attention(), 'journey' => Journey::attention(),
             'events' => $events, 'eventSports' => Athletes::namesFor(array_column($events, 'id')), 'birthdays' => $birthdays,
         ], 'admin');
     }

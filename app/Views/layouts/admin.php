@@ -3,6 +3,7 @@ $path = strtok(current_path(), '?');
 $is = fn(string $prefix) => $path === $prefix || str_starts_with($path, $prefix . '/');
 $finBadge = \App\Services\Payments::attentionStats()['count'];
 $crmBadge = (int) \App\Services\Leads::attention()['due']; // retornos de leads atrasados ou para hoje (09.4)
+$jrBadge = (int) \App\Services\Journey::attention()['due']; // tarefas da Jornada atrasadas ou para hoje (Atualização 11)
 $appBadge = (int) \App\Services\AppModule::pending()['total']; // resgates pendentes + denúncias abertas (09.5)
 // Menu em grupos: o que a equipe usa todo dia, os cadastros, o que é do app do paciente e o sistema.
 // 09.5: o grupo "App do paciente" é uma barra com seta (recolhida); abre sozinha quando a página é do app.
@@ -10,6 +11,7 @@ $navGroups = [
     'Dia a dia' => [
         ['/admin',             'Painel',         'grid',     $path === '/admin'],
         ['/admin/pacientes',   'Pacientes',      'users',    $is('/admin/pacientes') || $is('/admin/importar')],
+        ['/admin/jornada',     'Jornada',        'flag',     $is('/admin/jornada')],
         [\App\Services\Leads::homeUrl(), 'CRM',        'filter',   $is('/admin/crm')],
         ['/admin/aniversarios', 'Aniversários',  'gift',     $is('/admin/aniversarios')],
         ['/admin/financeiro',  'Financeiro',     'cash',     $is('/admin/financeiro')],
@@ -64,7 +66,7 @@ $navGroups = [
         <div class="nav-sec" role="group" aria-labelledby="nav-g<?= $gi ?>">
             <p class="nav-label" id="nav-g<?= $gi ?>"><?= e($gLabel) ?></p>
             <?php foreach ($gItems as [$href, $label, $ico, $active]): ?>
-                <a href="<?= e(url($href)) ?>"<?= $active ? ' aria-current="page"' : '' ?>><?= icon($ico, 20) ?><span><?= e($label) ?></span><?php if ($href === '/admin/financeiro' && $finBadge > 0): ?><b class="nav-badge" title="Pix para cobrar ou conferir"><?= (int) $finBadge ?></b><?php endif; ?><?php if ($label === 'CRM' && $crmBadge > 0): ?><b class="nav-badge" title="Retornos de leads atrasados ou para hoje"><?= $crmBadge ?></b><?php endif; ?></a>
+                <a href="<?= e(url($href)) ?>"<?= $active ? ' aria-current="page"' : '' ?>><?= icon($ico, 20) ?><span><?= e($label) ?></span><?php if ($href === '/admin/financeiro' && $finBadge > 0): ?><b class="nav-badge" title="Pix para cobrar ou conferir"><?= (int) $finBadge ?></b><?php endif; ?><?php if ($href === '/admin/jornada' && $jrBadge > 0): ?><b class="nav-badge" title="Tarefas da Jornada atrasadas ou para hoje"><?= $jrBadge ?></b><?php endif; ?><?php if ($label === 'CRM' && $crmBadge > 0): ?><b class="nav-badge" title="Retornos de leads atrasados ou para hoje"><?= $crmBadge ?></b><?php endif; ?></a>
             <?php endforeach; ?>
         </div>
         <?php endforeach; ?>

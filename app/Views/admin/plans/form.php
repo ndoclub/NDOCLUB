@@ -15,6 +15,13 @@ $price = old('price', ($plan['price'] ?? null) !== null ? number_format((float) 
             <p class="hint">Só o admin vê. Deixe em branco se ainda não definiu.<?= $isEdit ? ' Se você mudar o valor, quem já está no plano mantém o valor antigo até a próxima renovação.' : '' ?></p></div>
         <div class="field"><label for="consultations_included">Consultas presenciais incluídas</label><input class="input" type="number" id="consultations_included" name="consultations_included" min="0" max="60" inputmode="numeric" value="<?= e(old('consultations_included', ($plan['consultations_included'] ?? null) !== null ? (string) (int) $plan['consultations_included'] : '')) ?>" placeholder="Ex.: 4">
             <p class="hint">Quantas consultas presenciais o plano dá. A lista de pacientes mostra "2 de 4". Em branco = ainda não definido.</p></div>
+        <div class="field full"><label for="journey_type">Jornada do paciente</label>
+            <select id="journey_type" name="journey_type">
+                <?php $jt = \App\Services\Journey::typeOf(old('journey_type', $plan['journey_type'] ?? 'premium')); foreach (\App\Services\Journey::TYPES as $k => $lab): ?>
+                    <option value="<?= e($k) ?>"<?= $jt === $k ? ' selected' : '' ?>><?= e($lab) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <p class="hint">Define as tarefas de renovação deste plano. <strong>Premium e Smart</strong>: dossiê 7 dias antes da última consulta e resposta na última consulta (o intervalo entre consultas sai de duração ÷ consultas; preencha as consultas incluídas). <strong>Escalável</strong>: sem consultas, contato de renovação 15 dias antes do fim. <strong>Mensal</strong>: sem dossiê, mensagem perguntando se quer entrar em um plano 15 dias antes do fim.</p></div>
         <div class="field full"><label class="checkbox"><input type="checkbox" name="active" value="1"<?= (!$isEdit || $plan['active']) ? ' checked' : '' ?>><span>Ativo (aparece ao escolher o plano de um paciente)</span></label>
             <p class="hint">Planos não são apagados: desative para esconder, e os pacientes que já estão nele continuam normais.</p></div>
     </div>

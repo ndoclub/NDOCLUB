@@ -43,6 +43,10 @@ CREATE TABLE users (
   must_change_password TINYINT(1) NOT NULL DEFAULT 1,
   app_access TINYINT(1) NOT NULL DEFAULT 1,
   lead_id INT UNSIGNED NULL,
+  exit_reason VARCHAR(16) NULL,
+  exited_on DATE NULL,
+  exit_note VARCHAR(255) NULL,
+  recontact_on DATE NULL,
   consent_at DATETIME NULL,
   consent_version VARCHAR(12) NULL,
   last_seen_at DATETIME NULL,
@@ -65,6 +69,7 @@ CREATE TABLE plans (
   duration_days INT UNSIGNED NOT NULL,
   price DECIMAL(10,2) NULL,
   consultations_included TINYINT UNSIGNED NULL,
+  journey_type VARCHAR(10) NOT NULL DEFAULT 'premium',
   active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (id)
@@ -410,6 +415,62 @@ CREATE TABLE consultations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
+-- Jornada do paciente (Atualização 11, parte 1: Renovação e Saída).
+-- Cada "ciclo" é o mesmo das consultas (quantas renovações o paciente já teve). Ao renovar, o ciclo muda
+-- e nascem tarefas novas; as antigas ficam no histórico. A linha do tempo (journey_events) NUNCA é editada
+-- nem apagada pelo sistema: correção = nova linha. Só o admin vê. Observações podem ter dado de saúde: não vão para o app do paciente.
+-- journey_tasks.status: pending (a fazer), done (feita), skipped (deixou de valer), prior (anterior ao sistema).
+-- journey_cycles.answer: renova, data_combinada, vai_pensar, nao_renova (resposta dada na última consulta).
+-- ---------------------------------------------------------------------
+CREATE TABLE journey_cycles (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id INT UNSIGNED NOT NULL,
+  cycle SMALLINT UNSIGNED NOT NULL,
+  last_consult_on DATE NULL,
+  answer VARCHAR(14) NULL,
+  answer_on DATE NULL,
+  agreed_on DATE NULL,
+  next_consult_on DATE NULL,
+  updated_at DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_journey_cycle (user_id, cycle),
+  CONSTRAINT fk_jcycle_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE journey_tasks (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id INT UNSIGNED NOT NULL,
+  cycle SMALLINT UNSIGNED NOT NULL,
+  code VARCHAR(24) NOT NULL,
+  assignee VARCHAR(40) NULL,
+  status VARCHAR(8) NOT NULL DEFAULT 'pending',
+  due_on DATE NULL,
+  done_at DATETIME NULL,
+  done_by INT UNSIGNED NULL,
+  note VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_journey_task (user_id, cycle, code),
+  KEY idx_jtasks_status (status, due_on),
+  CONSTRAINT fk_jtask_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE journey_events (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id INT UNSIGNED NOT NULL,
+  cycle SMALLINT UNSIGNED NULL,
+  code VARCHAR(24) NULL,
+  kind VARCHAR(16) NOT NULL,
+  summary VARCHAR(255) NOT NULL,
+  by_user_id INT UNSIGNED NULL,
+  happened_at DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_jevents_user (user_id, happened_at),
+  CONSTRAINT fk_jevent_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
 -- CRM / Leads (Atualização 09). Quem ainda não é paciente: de onde veio, em que etapa está, o que foi combinado.
 -- Origens, etapas e motivos de perda são listas editáveis (não se apaga, só se desativa).
 -- A linha do tempo (lead_events) NUNCA é editada nem apagada pelo sistema: correção = nova linha.
@@ -648,6 +709,9 @@ INSERT INTO lead_lost_reasons (name, sort_order, active) VALUES
 ('Falta de tempo', 5, 1),
 ('Fora da região ou do formato de atendimento', 6, 1),
 ('Outro motivo', 7, 1);
+
+-- Jornada do paciente (Atualização 11): a Jornada só cobra o que vence a partir deste dia (o que veio antes fica como "anterior ao sistema"). Dá para mudar em Jornada > Ajustes.
+INSERT INTO settings (skey, svalue) VALUES ('journey_start_on', CURDATE());
 
 -- Administrador inicial. E-mail: admin@ndoclub.local | Senha provisória: Trocar@123
 -- (o sistema obriga a trocar a senha no primeiro acesso)

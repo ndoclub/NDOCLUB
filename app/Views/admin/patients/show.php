@@ -201,7 +201,7 @@ if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
         </details>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="renovar">
         <h3>Renovar acompanhamento</h3>
         <p class="muted small">Soma os dias a partir do vencimento atual (ou de hoje, se já venceu) e registra a renovação. Com valor preenchido, também registra o pagamento e as parcelas em Financeiro.</p>
         <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/renovar')) ?>" data-confirm="Confirmar a renovação?" data-pay-form data-fees="<?= e(json_encode($fees ?: new stdClass())) ?>">
@@ -321,6 +321,9 @@ if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
     </div>
 </div>
 </div>
+
+<?php elseif ($aba === 'jornada'): ?>
+<?php partial('patient-journey', ['p' => $p, 'j' => $journey, 'id' => $id, 'planStatus' => $planStatus, 'renew' => $renew, 'planRow' => $planRow]); ?>
 
 <?php else: ?>
 <?php $noApp = (int) ($p['app_access'] ?? 1) === 0; $awayNow = !$noApp && (empty($p['last_seen_at']) || $p['last_seen_at'] < date('Y-m-d H:i:s', strtotime('-7 day'))); ?>

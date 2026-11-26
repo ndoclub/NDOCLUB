@@ -5,6 +5,7 @@ use App\Core\Auth;
 use App\Core\DB;
 use App\Core\View;
 use App\Services\Audit;
+use App\Services\Journey;
 use App\Services\Plans;
 
 /** Planos do acompanhamento (Trimestral, Semestral, Anual...) com valor em R$ (só o admin vê). */
@@ -32,8 +33,8 @@ final class PlanController
     {
         $d = $this->validated('/admin/planos/novo');
         $id = DB::insert(
-            'INSERT INTO plans (name, duration_days, price, consultations_included, active, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [$d['name'], $d['days'], $d['price'], $d['consults'], $d['active'], now()]
+            'INSERT INTO plans (name, duration_days, price, consultations_included, journey_type, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [$d['name'], $d['days'], $d['price'], $d['consults'], $d['jtype'], $d['active'], now()]
         );
         Audit::log((int) Auth::id(), 'plan_create', 'plan', $id, $d['name'] . ' (' . $d['days'] . ' dias)');
         flash('ok', 'Plano criado.');
@@ -51,9 +52,10 @@ final class PlanController
         $oldPrice = $plan['price'] === null ? null : (float) $plan['price'];
         $kept = Plans::protectOnPriceChange($id, $oldPrice, $d['price']);
         DB::run(
-            'UPDATE plans SET name = ?, duration_days = ?, price = ?, consultations_included = ?, active = ? WHERE id = ?',
-            [$d['name'], $d['days'], $d['price'], $d['consults'], $d['active'], $id]
+            'UPDATE plans SET name = ?, duration_days = ?, price = ?, consultations_included = ?, journey_type = ?, active = ? WHERE id = ?',
+            [$d['name'], $d['days'], $d['price'], $d['consults'], $d['jtype'], $d['active'], $id]
         );
+        Journey::sync(true); // duração, consultas ou tipo de jornada mudaram: acerta as datas das tarefas
         $old = $plan['price'] === null ? 'sem valor' : money((float) $plan['price']);
         $new = $d['price'] === null ? 'sem valor' : money($d['price']);
         Audit::log((int) Auth::id(), 'plan_update', 'plan', $id, $d['name'] . ': ' . $old . ' -> ' . $new . ($kept ? ' (' . $kept . ' paciente(s) mantêm o valor antigo até renovar)' : ''));
@@ -93,6 +95,7 @@ final class PlanController
             }
             redirect($back);
         }
-        return ['name' => $name, 'days' => $days, 'price' => $price, 'consults' => $consults, 'active' => empty($_POST['active']) ? 0 : 1];
+        $jtype = Journey::typeOf((string) ($_POST['journey_type'] ?? 'premium'));
+        return ['name' => $name, 'days' => $days, 'price' => $price, 'consults' => $consults, 'jtype' => $jtype, 'active' => empty($_POST['active']) ? 0 : 1];
     }
 }
