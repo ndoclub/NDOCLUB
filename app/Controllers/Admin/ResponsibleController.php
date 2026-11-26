@@ -5,6 +5,7 @@ use App\Core\Auth;
 use App\Core\DB;
 use App\Core\View;
 use App\Services\Audit;
+use App\Services\Journey;
 use App\Services\Responsibles;
 
 /** Responsáveis pelos pacientes ("modo babá"). Não são apagados, só desativados. */
@@ -42,6 +43,7 @@ final class ResponsibleController
         }
         $d = $this->validated('/admin/responsaveis/' . $id, $id);
         DB::run('UPDATE responsibles SET name = ?, active = ? WHERE id = ?', [$d['name'], $d['active'], $id]);
+        Journey::renamed((string) $r['name'], $d['name']); // as tarefas da Jornada e os Ajustes acompanham o nome novo
         Audit::log((int) Auth::id(), 'responsible_update', 'responsible', $id, $r['name'] . ' -> ' . $d['name'] . ($d['active'] ? '' : ' (desativado)'));
         flash('ok', 'Responsável salvo.');
         redirect('/admin/responsaveis');

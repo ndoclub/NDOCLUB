@@ -11,13 +11,13 @@ use App\Services\Payments;
 use App\Services\Settings;
 
 /**
- * Jornada do paciente (Atualização 11, parte 1: Renovação e Saída).
- * Página com 3 abas (Tarefas, Renovações, Vencidos), ajustes e as ações da aba "Jornada" da ficha.
+ * Jornada do paciente (Atualização 11: Renovação e Saída; Atualização 12: Entrada e troca de responsável).
+ * Página com 4 abas (Tarefas, Entrada, Renovações, Vencidos), ajustes e as ações da aba "Jornada" da ficha.
  * O sistema só lembra e registra: nunca manda mensagem.
  */
 final class JourneyController
 {
-    public const ABAS = ['tarefas' => 'Tarefas', 'renovacoes' => 'Renovações', 'vencidos' => 'Vencidos'];
+    public const ABAS = ['tarefas' => 'Tarefas', 'entrada' => 'Entrada', 'renovacoes' => 'Renovações', 'vencidos' => 'Vencidos'];
 
     /** Mostra o resultado de uma ação (['ok' => ...] ou ['err' => ...]) como aviso. */
     private function say(array $r): void
@@ -65,9 +65,11 @@ final class JourneyController
             }
             $renewals = Journey::renewals();
             $expired = Journey::expired();
+            $entries = Journey::entries();
             View::render('admin/journey/index', [
                 'title' => 'Jornada do paciente', 'aba' => $aba, 'who' => $who, 'byWho' => $byWho, 'groups' => $groups,
-                'total' => count($tasks), 'renewals' => $renewals, 'expired' => $expired, 'cfg' => Journey::cfg(),
+                'total' => count($tasks), 'renewals' => $renewals, 'expired' => $expired, 'entries' => $entries, 'cfg' => Journey::cfg(),
+                'work' => Journey::workload(), 'team' => Journey::team(),
                 'attn' => Journey::attention(), 'exitReasons' => Journey::EXIT_REASONS, 'back' => current_path(),
             ], 'admin');
         } catch (\PDOException $e) {
@@ -93,11 +95,85 @@ final class JourneyController
         redirect($back);
     }
 
+    // ---------------------------------------------------------------- troca de responsável (Atualização 12)
+
+    /** Passa UMA tarefa para outra pessoa da equipe. */
+    public function reassign(int $id): void
+    {
+        $back = safe_back((string) ($_POST['back'] ?? ''), '/admin/jornada');
+        $r = Journey::reassign($id, input('to'), (int) Auth::id());
+        if (isset($r['ok'])) {
+            Audit::log((int) Auth::id(), 'journey_reassign', 'journey_task', $id, input('to'));
+        }
+        $this->say($r);
+        redirect($back);
+    }
+
+    /** Passa as tarefas marcadas (caixinhas) para outra pessoa. */
+    public function reassignMany(): void
+    {
+        $back = safe_back((string) ($_POST['back'] ?? ''), '/admin/jornada');
+        $ids = isset($_POST['ids']) && is_array($_POST['ids']) ? $_POST['ids'] : [];
+        $r = Journey::reassignMany($ids, input('to'), (int) Auth::id());
+        if (isset($r['ok'])) {
+            Audit::log((int) Auth::id(), 'journey_reassign', 'journey_task', null, ($r['n'] ?? 0) . ' tarefas -> ' . input('to'));
+        }
+        $this->say($r);
+        redirect($back);
+    }
+
+    /** "Passar as tarefas de X para Y" (folga, férias, saída de alguém). */
+    public function passAll(): void
+    {
+        $back = safe_back((string) ($_POST['back'] ?? ''), '/admin/jornada');
+        $r = Journey::passAll(input('from'), input('to'), !empty($_POST['only_late']), (int) Auth::id());
+        if (isset($r['ok'])) {
+            Audit::log((int) Auth::id(), 'journey_reassign', 'journey_task', null, ($r['n'] ?? 0) . ' tarefas de ' . input('from') . ' -> ' . input('to'));
+        }
+        $this->say($r);
+        redirect($back);
+    }
+
+    /** Plantão da semana. */
+    public function duty(): void
+    {
+        $back = safe_back((string) ($_POST['back'] ?? ''), '/admin/jornada');
+        $r = Journey::setDuty(input('name'), (int) Auth::id());
+        if (isset($r['ok'])) {
+            Audit::log((int) Auth::id(), 'settings_update', 'settings', null, 'Plantão da Jornada: ' . input('name'));
+        }
+        $this->say($r);
+        redirect($back);
+    }
+
+    // ---------------------------------------------------------------- Entrada (Atualização 12)
+
+    /** Abre a Entrada de um paciente que ainda não tem (a ficha do paciente novo já abre sozinha). */
+    public function openEntry(int $id): void
+    {
+        $p = $this->patientOr404($id);
+        $r = Journey::openEntry($id, (int) Auth::id(), 'manual');
+        if (isset($r['ok'])) {
+            Audit::log((int) Auth::id(), 'journey_entry_open', 'user', $id, $p['name']);
+        }
+        $this->say($r);
+        redirect(PatientController::ficha($id, 'jornada', 'entrada'));
+    }
+
+    /** Marca o dia da 1ª consulta ou do formulário recebido. Pode vir da ficha ou da própria tarefa na lista. */
+    public function entryDate(int $id): void
+    {
+        $this->patientOr404($id);
+        $back = safe_back((string) ($_POST['back'] ?? ''), '');
+        $this->say(Journey::setEntryDate($id, input('kind'), input('on'), (int) Auth::id()));
+        redirect($back !== '' ? $back : PatientController::ficha($id, 'jornada', 'entrada'));
+    }
+
     // ---------------------------------------------------------------- ajustes
 
     public function settings(): void
     {
-        View::render('admin/journey/settings', ['title' => 'Ajustes da Jornada', 'cfg' => Journey::cfg()], 'admin');
+        View::render('admin/journey/settings', ['title' => 'Ajustes da Jornada', 'cfg' => Journey::cfg(), 'team' => Journey::team()], 'admin');
     }
 
     public function saveSettings(): void
@@ -124,8 +200,17 @@ final class JourneyController
         if (!$errors && $rMax < $rMin) {
             $errors[] = 'O reajuste máximo precisa ser maior ou igual ao mínimo.';
         }
+        $cur = Journey::cfg();
+        // campos da Atualização 12: se o formulário não trouxer o campo, mantém o valor atual
+        $dEntry = array_key_exists('d_entry', $_POST) ? $int('d_entry', 0, 7, 'Prazo do grupo, Welts e cadastro de atleta') : $cur['d_entry'];
+        $dAgenda = array_key_exists('d_agenda', $_POST) ? $int('d_agenda', 0, 14, 'Prazo para agendar a 1ª consulta') : $cur['d_agenda'];
         $who = [];
-        foreach (['dossie' => 'Dossiê', 'ultima' => 'Última consulta', 'contato' => 'Contatos', 'suporte' => 'Suporte'] as $k => $label) {
+        foreach (['dossie' => 'Dossiê', 'ultima' => 'Última consulta', 'contato' => 'Contatos e agendamento', 'suporte' => 'Suporte',
+                  'grupo' => 'Grupo e Welts', 'atleta' => 'Cadastro de atleta', 'consulta' => 'Consultas e liberação do plano', 'plano' => 'Plano e dieta'] as $k => $label) {
+            if (!array_key_exists('who_' . $k, $_POST) && isset($cur['who'][$k])) {
+                $who[$k] = $cur['who'][$k];
+                continue;
+            }
             $v = mb_substr(input('who_' . $k), 0, 40);
             if (mb_strlen($v) < 2) {
                 $errors[] = 'Quem faz — ' . $label . ': informe o nome (ou "Suporte").';
@@ -150,6 +235,15 @@ final class JourneyController
         Settings::set('journey_who_ultima', $who['ultima']);
         Settings::set('journey_who_contact', $who['contato']);
         Settings::set('journey_who_support', $who['suporte']);
+        Settings::set('journey_who_group', $who['grupo']);
+        Settings::set('journey_who_athlete', $who['atleta']);
+        Settings::set('journey_who_consult', $who['consulta']);
+        Settings::set('journey_who_plan', $who['plano']);
+        if (array_key_exists('who_atleta', $_POST)) {
+            Settings::set('journey_athlete_on', empty($_POST['athlete_on']) ? '0' : '1'); // caixinha desmarcada não vem no POST
+        }
+        Settings::set('journey_days_entry', (string) $dEntry);
+        Settings::set('journey_days_schedule', (string) $dAgenda);
         Journey::sync(true); // prazos e responsáveis novos valem já para as tarefas abertas
         Audit::log((int) Auth::id(), 'settings_update', 'settings', null, 'Ajustes da Jornada');
         flash('ok', 'Ajustes da Jornada salvos.');

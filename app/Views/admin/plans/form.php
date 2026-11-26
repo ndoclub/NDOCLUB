@@ -22,6 +22,8 @@ $price = old('price', ($plan['price'] ?? null) !== null ? number_format((float) 
                 <?php endforeach; ?>
             </select>
             <p class="hint">Define as tarefas de renovação deste plano. <strong>Premium e Smart</strong>: dossiê 7 dias antes da última consulta e resposta na última consulta (o intervalo entre consultas sai de duração ÷ consultas; preencha as consultas incluídas). <strong>Escalável</strong>: sem consultas, contato de renovação 15 dias antes do fim. <strong>Mensal</strong>: sem dossiê, mensagem perguntando se quer entrar em um plano 15 dias antes do fim.</p></div>
+        <div class="field full"><label class="checkbox"><input type="checkbox" name="with_training" value="1"<?= !empty(old('with_training', $plan['with_training'] ?? 0)) ? ' checked' : '' ?>><span>Plano com treino (o Gabriel monta o treino)</span></label>
+            <p class="hint">Na Entrada do paciente novo, cria a tarefa "Treino montado" para o Gabriel, em até 2 dias úteis depois da 1ª consulta (fim de semana não conta).</p></div>
         <div class="field full"><label class="checkbox"><input type="checkbox" name="active" value="1"<?= (!$isEdit || $plan['active']) ? ' checked' : '' ?>><span>Ativo (aparece ao escolher o plano de um paciente)</span></label>
             <p class="hint">Planos não são apagados: desative para esconder, e os pacientes que já estão nele continuam normais.</p></div>
     </div>

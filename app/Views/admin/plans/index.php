@@ -16,7 +16,7 @@
             <td class="r num"><?= (int) $p['duration_days'] ?> dias</td>
             <td class="r num"><?= $p['price'] === null ? '<span class="muted">definir</span>' : e(money((float) $p['price'])) ?></td>
             <td class="r num"><?= $p['consultations_included'] === null ? '<span class="muted">definir</span>' : (int) $p['consultations_included'] ?></td>
-            <td class="small"><?= e(\App\Services\Journey::TYPES[\App\Services\Journey::typeOf($p['journey_type'] ?? 'premium')]) ?></td>
+            <td class="small"><?= e(\App\Services\Journey::TYPES[\App\Services\Journey::typeOf($p['journey_type'] ?? 'premium')]) ?><?= !empty($p['with_training']) ? ' <span class="tag">com treino</span>' : '' ?></td>
             <td class="r num"><?php if ((int) $p['patients'] > 0): ?><a href="<?= e(url('/admin/pacientes?plan=' . (int) $p['id'])) ?>"><?= (int) $p['patients'] ?></a><?php else: ?>0<?php endif; ?></td>
             <td class="r"><a class="btn btn-ghost btn-sm" href="<?= e(url('/admin/planos/' . $p['id'])) ?>">Editar</a></td>
         </tr>

@@ -77,6 +77,8 @@ $router->post('/admin/pacientes/{id}/jornada/ultima-consulta', 'Admin\JourneyCon
 $router->post('/admin/pacientes/{id}/jornada/inativar', 'Admin\JourneyController@inactivate', $A);
 $router->post('/admin/pacientes/{id}/jornada/reativar', 'Admin\JourneyController@reactivate', $A);
 $router->post('/admin/pacientes/{id}/jornada/nota', 'Admin\JourneyController@note', $A);
+$router->post('/admin/pacientes/{id}/jornada/entrada', 'Admin\JourneyController@openEntry', $A);
+$router->post('/admin/pacientes/{id}/jornada/entrada-dia', 'Admin\JourneyController@entryDate', $A);
 $router->post('/admin/pacientes/responsavel', 'Admin\PatientController@assign', $A);
 
 // Importação de pacientes por planilha (modelo oficial NDO). Nada é salvo antes do "Confirmar".
@@ -156,6 +158,10 @@ $router->get('/admin/jornada/ajustes', 'Admin\JourneyController@settings', $A);
 $router->post('/admin/jornada/ajustes', 'Admin\JourneyController@saveSettings', $A);
 $router->post('/admin/jornada/tarefas/{id}/concluir', 'Admin\JourneyController@complete', $A);
 $router->post('/admin/jornada/tarefas/{id}/reabrir', 'Admin\JourneyController@reopen', $A);
+$router->post('/admin/jornada/tarefas/{id}/responsavel', 'Admin\JourneyController@reassign', $A);
+$router->post('/admin/jornada/passar-marcadas', 'Admin\JourneyController@reassignMany', $A);
+$router->post('/admin/jornada/passar', 'Admin\JourneyController@passAll', $A);
+$router->post('/admin/jornada/plantao', 'Admin\JourneyController@duty', $A);
 $router->get('/admin/aniversarios', 'Admin\BirthdayController@index', $A);
 $router->get('/admin/responsaveis', 'Admin\ResponsibleController@index', $A);
 $router->get('/admin/responsaveis/novo', 'Admin\ResponsibleController@form', $A);

@@ -49,6 +49,7 @@ $nOld = (int) $stats['expired'];
     <span class="ocrm-t"><?= icon('flag', 18) ?> Jornada do paciente</span>
     <?php if ($journey['late'] > 0): ?><a class="bad" href="<?= e(url('/admin/jornada')) ?>"><?= e($plural((int) $journey['late'], 'tarefa atrasada', 'tarefas atrasadas')) ?></a><?php endif; ?>
     <?php if ($journey['today'] > 0): ?><a href="<?= e(url('/admin/jornada')) ?>"><?= e($plural((int) $journey['today'], 'tarefa para hoje', 'tarefas para hoje')) ?></a><?php endif; ?>
+    <?php foreach (array_slice($journey['byWho'] ?? [], 0, 4, true) as $jw => $jn): ?><a class="bad" href="<?= e(url('/admin/jornada?r=' . rawurlencode((string) $jw))) ?>"><?= $jw === '__none' ? 'Sem responsável' : e($jw) ?>: <?= (int) $jn ?> <?= $jn === 1 ? 'atrasada' : 'atrasadas' ?></a><?php endforeach; ?>
     <a class="ocrm-go" href="<?= e(url('/admin/jornada')) ?>">Abrir a Jornada →</a>
 </div>
 <?php endif; ?>

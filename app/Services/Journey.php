@@ -4,7 +4,7 @@ namespace App\Services;
 use App\Core\DB;
 
 /**
- * Jornada do paciente, parte 1: Renovação e Saída (Atualização 11).
+ * Jornada do paciente: Renovação e Saída (Atualização 11) e Entrada do paciente novo (Atualização 12).
  *
  * A Jornada é uma lista de TAREFAS que o sistema gera sozinho a partir das datas do paciente
  * (vencimento, plano, consultas) e das respostas que o time registra. Cada tarefa tem gatilho, prazo e
@@ -15,6 +15,12 @@ use App\Core\DB;
  * - journey_tasks.status: pending (a fazer), done (feita), skipped (deixou de valer sozinha), prior (anterior ao sistema).
  * - A linha do tempo (journey_events) nunca é editada nem apagada: correção = nova linha.
  * - Só o admin vê. Nada daqui vai para o app do paciente.
+ *
+ * Quem recebe cada tarefa (Atualização 12), sem escala fixa:
+ *  - tarefa "de função" (grupo, consulta, plano...): o nome definido em Ajustes (Lara, Gabriel, Isabela...);
+ *  - tarefa "de cuidado" (confirmar acesso e, depois, o Modo Babá): o Responsável da ficha do paciente; sem ele,
+ *    o plantão da semana; sem plantão, fica "sem responsável" e aparece para todos (nunca some);
+ *  - qualquer pessoa pode passar uma tarefa (ou várias) para outra; a tarefa passada fica "travada" nessa pessoa.
  */
 final class Journey
 {
@@ -53,10 +59,31 @@ final class Journey
         'sair_grupo'        => ['Remover o paciente do grupo, sair e apagar o grupo', 'O plano venceu sem renovar. O paciente fica em "Vencidos" até o time decidir.', 'suporte'],
         'recontato_pausa'   => ['Recontato da pausa', 'O paciente pediu uma pausa. Ver se quer voltar.', 'contato'],
         'mensal_msg'        => ['Mensagem do Mensal: perguntar se quer entrar em um plano', 'O plano mensal está acabando e o paciente ainda não fechou um plano.', 'contato'],
+        // Entrada (paciente novo ou que voltou)
+        'entrada_grupo'    => ['Criar o grupo VIP no WhatsApp e mandar as boas-vindas', 'Nome padrão: ACOMPANHAMENTO PREMIUM – Nome do paciente. Membros: paciente, número comercial e número de suporte. Nas boas-vindas: o que acontece até a consulta, como funciona o suporte e o horário de atendimento.', 'grupo'],
+        'entrada_welts'    => ['Cadastrar no Welts (check-in)', 'Enquanto o check-in não migra para a plataforma.', 'grupo'],
+        'entrada_atleta'   => ['Cadastro de atleta', 'Modalidade, assessoria, próximas provas e treinos longos (aba Resumo da ficha, parte "Perfil esportivo").', 'atleta'],
+        'entrada_agendar'  => ['Agendar a 1ª consulta', 'Agende junto com o paciente (ou o Gabriel, se a venda fechou em call, ou o próprio paciente). Informe o dia aqui: a tarefa fecha sozinha.', 'contato'],
+        'entrada_consulta' => ['1ª consulta', 'Avaliação, estratégia e suplementação; o paciente sai com a próxima consulta marcada. Fecha sozinha quando a consulta é registrada na ficha (aba Acompanhamento, parte Consultas).', 'consulta'],
+        'entrada_plano'    => ['Plano montado e aprovado', 'Lara ou Nívia montam; o Gabriel verifica e aprova. Prazo: 1 dia útil depois da consulta.', 'plano'],
+        'entrada_treino'   => ['Treino montado (plano com treino)', 'O Gabriel monta em até 2 dias úteis depois da consulta (fim de semana não conta).', 'consulta'],
+        'entrada_form'     => ['Formulário do paciente (Escalável)', 'Enviar o formulário e receber de volta. Informe o dia em que chegou: a tarefa fecha sozinha.', 'plano'],
+        'entrada_dieta'    => ['Dieta montada (Escalável)', 'Liberada em até 2 dias úteis depois do formulário.', 'plano'],
+        'entrada_liberar'  => ['Liberar o plano no WebDiet e avisar no grupo', 'Mandar também as orientações de suplementação e os materiais. O dia da liberação calcula a confirmação D+1 (e, depois, o Modo Babá e o 1º check-in).', 'consulta'],
+        'entrada_acesso'   => ['Confirmar o acesso (D+1)', 'Perguntar se conseguiu acessar, abrir e ver o plano e se ficou alguma dúvida. Sem resposta em 24h, novo contato. Não conseguiu acessar: resolver no mesmo dia.', 'cuidador'],
     ];
 
+    /** As tarefas da Entrada, na ordem em que aparecem no checklist. */
+    public const ENTRY_CODES = ['entrada_grupo', 'entrada_welts', 'entrada_atleta', 'entrada_agendar', 'entrada_consulta', 'entrada_plano', 'entrada_treino', 'entrada_form', 'entrada_dieta', 'entrada_liberar', 'entrada_acesso'];
+
+    /** Tarefas da Entrada que o sistema fecha e reabre sozinho, conforme o dado (dia marcado, consulta registrada). */
+    public const ENTRY_AUTO = ['entrada_agendar', 'entrada_consulta', 'entrada_form'];
+
     /** Tarefas que o sistema fecha sozinho (não têm botão "Concluir"). */
-    public const AUTO_DONE = ['ultima_consulta', 'atualizar_plano'];
+    public const AUTO_DONE = ['ultima_consulta', 'atualizar_plano', 'entrada_agendar', 'entrada_consulta', 'entrada_form'];
+
+    /** Como a Entrada foi aberta. */
+    public const ENTRY_KINDS = ['novo' => 'paciente novo', 'reativado' => 'paciente que voltou', 'manual' => 'aberta pela equipe'];
 
     /** Só nascem tarefas de prazo próximo (dias à frente), para a lista não encher de coisa distante. */
     public const HORIZON_DAYS = 30;
@@ -76,11 +103,20 @@ final class Journey
             'd_pausa'  => $n('journey_days_pause', 60, 1, 365),
             'raise_min' => $n('journey_raise_min', 10, 0, 100),
             'raise_max' => $n('journey_raise_max', 25, 0, 100),
+            'd_entry'  => $n('journey_days_entry', 1, 0, 7),
+            'd_agenda' => $n('journey_days_schedule', 2, 0, 14),
+            'athlete_on' => (string) Settings::get('journey_athlete_on', '1') !== '0',
+            'duty'     => trim((string) Settings::get('journey_duty', '')),
+            'duty_on'  => trim((string) Settings::get('journey_duty_on', '')),
             'who' => [
                 'dossie'  => $who('journey_who_dossie', 'Kauanny'),
                 'ultima'  => $who('journey_who_ultima', 'Gabriel'),
                 'contato' => $who('journey_who_contact', 'Isabela'),
                 'suporte' => $who('journey_who_support', 'Suporte'),
+                'grupo'   => $who('journey_who_group', 'Lara'),
+                'atleta'  => $who('journey_who_athlete', 'Nívia'),
+                'consulta' => $who('journey_who_consult', 'Gabriel'),
+                'plano'   => $who('journey_who_plan', 'Lara'),
             ],
         ];
     }
@@ -93,6 +129,73 @@ final class Journey
     public static function addDays(string $date, int $n): string
     {
         return (new \DateTimeImmutable(substr($date, 0, 10)))->modify(($n >= 0 ? '+' : '') . $n . ' day')->format('Y-m-d');
+    }
+
+    /** Soma dias úteis (segunda a sexta; feriado não conta como folga). Com 0 dia, fim de semana vira a próxima segunda. */
+    public static function addBusinessDays(string $date, int $n): string
+    {
+        $d = new \DateTimeImmutable(substr($date, 0, 10));
+        for ($left = max(0, $n); $left > 0;) {
+            $d = $d->modify('+1 day');
+            if ((int) $d->format('N') < 6) {
+                $left--;
+            }
+        }
+        while ((int) $d->format('N') >= 6) {
+            $d = $d->modify('+1 day');
+        }
+        return $d->format('Y-m-d');
+    }
+
+    /**
+     * Quem recebe a tarefa (nome) ou null = sem responsável.
+     * Tarefa "de função": nome dos Ajustes. Tarefa "de cuidado": Responsável da ficha, senão o plantão, senão ninguém.
+     * "Atletas com a Nívia" desligado: o cadastro de atleta também vira tarefa "de cuidado".
+     */
+    public static function whoFor(string $code, array $u, array $cfg): ?string
+    {
+        $key = self::TASKS[$code][2] ?? 'contato';
+        if ($key === 'atleta' && !$cfg['athlete_on']) {
+            $key = 'cuidador';
+        }
+        if ($key === 'cuidador') {
+            $r = trim((string) ($u['resp_name'] ?? ''));
+            if ($r !== '') {
+                return $r;
+            }
+            return $cfg['duty'] !== '' ? $cfg['duty'] : null;
+        }
+        return $cfg['who'][$key] ?? null;
+    }
+
+    /** Equipe: quem pode receber tarefa. Responsáveis ativos + nomes dos Ajustes + quem já tem tarefa aberta. */
+    public static function team(): array
+    {
+        $out = [];
+        $add = function (string $n) use (&$out): void {
+            $n = trim($n);
+            if ($n !== '' && !in_array(mb_strtolower($n), array_map('mb_strtolower', $out), true)) {
+                $out[] = $n;
+            }
+        };
+        foreach (Responsibles::choices() as $r) {
+            if ((int) $r['active'] === 1) {
+                $add((string) $r['name']);
+            }
+        }
+        $cfg = self::cfg();
+        foreach ($cfg['who'] as $w) {
+            $add((string) $w);
+        }
+        $add($cfg['duty']);
+        try {
+            foreach (DB::all("SELECT DISTINCT assignee FROM journey_tasks WHERE status = 'pending' AND assignee IS NOT NULL AND assignee <> '' ORDER BY assignee") as $r) {
+                $add((string) $r['assignee']);
+            }
+        } catch (\Throwable $e) {
+            // sem a tabela ainda: só os nomes dos Ajustes
+        }
+        return $out;
     }
 
     /** Intervalo entre consultas = duração ÷ consultas (Trimestral 90÷2 = 45; Smart 180÷3 = 60). null = plano sem consultas. */
@@ -130,7 +233,10 @@ final class Journey
 
     // ------------------------------------------------------------------ geração das tarefas
 
-    /** Atualiza as tarefas de todos os pacientes (no máximo a cada 10 minutos, a menos que $force). */
+    /**
+     * Atualiza as tarefas de todos os pacientes (no máximo a cada 10 minutos, a menos que $force).
+     * Nunca derruba a tela: se o SQL da Jornada ainda não foi importado, só não gera tarefa (a página da Jornada avisa).
+     */
     public static function sync(bool $force = false): void
     {
         if (!$force) {
@@ -139,14 +245,22 @@ final class Journey
                 return;
             }
         }
-        Settings::set('journey_synced_at', (string) time());
-        self::reconcile(null);
+        try {
+            Settings::set('journey_synced_at', (string) time());
+            self::reconcile(null);
+        } catch (\PDOException $e) {
+            error_log('[Jornada] sync: ' . $e->getMessage());
+        }
     }
 
     /** Atualiza as tarefas de um paciente (depois de renovar, mudar plano, registrar consulta etc.). */
     public static function syncUser(int $userId): void
     {
-        self::reconcile($userId);
+        try {
+            self::reconcile($userId);
+        } catch (\PDOException $e) {
+            error_log('[Jornada] syncUser: ' . $e->getMessage());
+        }
     }
 
     /** Lê o que a conciliação precisa: pacientes, ciclos, tarefas e consultas feitas. */
@@ -156,9 +270,13 @@ final class Journey
         $p = $only ? [$only] : [];
         $users = DB::all(
             "SELECT u.id, u.name, u.status, u.renewal_date, u.plan_id, u.exit_reason, u.exited_on, u.recontact_on,
+                    u.responsible_id, CASE WHEN rs.active = 1 THEN rs.name ELSE NULL END AS resp_name,
                     pl.name AS plan_name, pl.duration_days AS dur, pl.consultations_included AS cota, pl.journey_type AS jtype,
+                    pl.with_training AS with_training,
+                    (SELECT 1 FROM athlete_profiles ap WHERE ap.user_id = u.id AND ap.is_athlete = 1) AS is_athlete,
                     (SELECT COUNT(*) FROM renewals rn WHERE rn.user_id = u.id) AS cyc
-               FROM users u LEFT JOIN plans pl ON pl.id = u.plan_id WHERE $where ORDER BY u.id",
+               FROM users u LEFT JOIN plans pl ON pl.id = u.plan_id LEFT JOIN responsibles rs ON rs.id = u.responsible_id
+              WHERE $where ORDER BY u.id",
             $p
         );
         $cycles = $tasks = $held = [];
@@ -226,6 +344,75 @@ final class Journey
         return $out;
     }
 
+    /**
+     * Tarefas da Entrada que o paciente deveria ter agora (só se a Entrada foi aberta neste ciclo).
+     * Retorna ['want' => código => [prazo, false, true], 'done' => código => nota].
+     *  - want: tarefas abertas, com o prazo (24h = 1 dia; consulta, plano e treino em dias úteis);
+     *  - done: tarefas que os dados já resolveram (dia da consulta marcado, consulta registrada, formulário recebido).
+     * $heldDates = dias das consultas feitas neste ciclo (em ordem). $doneOn = código => dia em que a tarefa foi concluída
+     * (encadeia: plano aprovado -> liberar no mesmo dia útil -> confirmação D+1).
+     */
+    public static function entryWant(array $u, array $cfg, array $cyc, array $heldDates, array $doneOn): array
+    {
+        $want = [];
+        $done = [];
+        if (empty($cyc['entry_on'])) {
+            return ['want' => $want, 'done' => $done];
+        }
+        $E = substr((string) $cyc['entry_on'], 0, 10);
+        $type = self::typeOf($u['jtype'] ?? null);
+        $d1 = self::addDays($E, $cfg['d_entry']);
+        $add = function (string $code, string $due) use (&$want): void {
+            $want[$code] = [$due, false, true];
+        };
+        $add('entrada_grupo', $d1);
+        $add('entrada_welts', $d1);
+        if (!empty($u['is_athlete'])) {
+            $add('entrada_atleta', $d1);
+        }
+
+        $approval = 'entrada_plano';
+        if ($type === 'escalavel') {
+            $approval = 'entrada_dieta';
+            if (!empty($cyc['form_on'])) {
+                $f = substr((string) $cyc['form_on'], 0, 10);
+                $done['entrada_form'] = 'Formulário recebido em ' . fmt_date($f) . '.';
+                $add('entrada_dieta', self::addBusinessDays($f, 2));
+            } else {
+                $add('entrada_form', self::addDays($E, $cfg['d_agenda']));
+            }
+        } else {
+            $first = null;
+            foreach ($heldDates as $h) {
+                if (substr((string) $h, 0, 10) >= $E) {
+                    $first = substr((string) $h, 0, 10);
+                    break;
+                }
+            }
+            $sched = !empty($cyc['first_consult_on']) ? substr((string) $cyc['first_consult_on'], 0, 10) : null;
+            if ($first !== null) {
+                $done['entrada_agendar'] = $sched ? 'Marcada para ' . fmt_date($sched) . '.' : 'A consulta já foi feita.';
+                $done['entrada_consulta'] = 'Consulta registrada em ' . fmt_date($first) . '.';
+                $add('entrada_plano', self::addBusinessDays($first, 1));
+                if (!empty($u['with_training'])) {
+                    $add('entrada_treino', self::addBusinessDays($first, 2));
+                }
+            } elseif ($sched !== null) {
+                $done['entrada_agendar'] = 'Marcada para ' . fmt_date($sched) . '.';
+                $add('entrada_consulta', $sched);
+            } else {
+                $add('entrada_agendar', self::addDays($E, $cfg['d_agenda']));
+            }
+        }
+        if (isset($doneOn[$approval])) {
+            $add('entrada_liberar', self::addBusinessDays($doneOn[$approval], 0));
+        }
+        if (isset($doneOn['entrada_liberar'])) {
+            $add('entrada_acesso', self::addDays($doneOn['entrada_liberar'], 1));
+        }
+        return ['want' => $want, 'done' => $done];
+    }
+
     private static function reconcileUser(array $u, array $cfg, array $mine, array $cycRows, array $heldByCycle): void
     {
         $uid = (int) $u['id'];
@@ -256,7 +443,7 @@ final class Journey
             $pause = $u['exit_reason'] === 'pausa' && !empty($u['recontact_on']);
             $t = $cur['recontato_pausa'] ?? null;
             if ($pause && !$t) {
-                self::insertTask($uid, $cycle, 'recontato_pausa', substr((string) $u['recontact_on'], 0, 10), 'pending', $cfg);
+                self::insertTask($uid, $cycle, 'recontato_pausa', substr((string) $u['recontact_on'], 0, 10), 'pending', self::whoFor('recontato_pausa', $u, $cfg));
             } elseif ($pause && $t && $t['status'] === 'pending' && substr((string) $t['due_on'], 0, 10) !== substr((string) $u['recontact_on'], 0, 10)) {
                 DB::run('UPDATE journey_tasks SET due_on = ?, updated_at = ? WHERE id = ?', [substr((string) $u['recontact_on'], 0, 10), now(), (int) $t['id']]);
             } elseif (!$pause && $t && $t['status'] === 'pending') {
@@ -266,42 +453,81 @@ final class Journey
         }
 
         $cyc = $cycRows[$cycle] ?? null;
-        $want = self::desired($u, $cfg, $cyc, $heldByCycle[$cycle] ?? []);
+        $held = $heldByCycle[$cycle] ?? [];
+        $want = self::desired($u, $cfg, $cyc, $held);
+
+        // Entrada (só quem teve a Entrada aberta neste ciclo)
+        $entryDone = [];
+        if ($cyc && !empty($cyc['entry_on'])) {
+            $doneOn = [];
+            foreach ($cur as $code => $t) {
+                if ($t['status'] === 'done' && !empty($t['done_at'])) {
+                    $doneOn[$code] = substr((string) $t['done_at'], 0, 10);
+                }
+            }
+            $e = self::entryWant($u, $cfg, $cyc, $held, $doneOn);
+            $want = array_merge($want, $e['want']);
+            $entryDone = $e['done'];
+        }
         $horizon = self::addDays($today, self::HORIZON_DAYS);
 
-        foreach ($want as $code => [$due, $gated]) {
-            $who = $cfg['who'][self::TASKS[$code][2]] ?? null;
+        foreach ($want as $code => $w) {
+            [$due, $gated] = [$w[0], $w[1]];
+            $noPrior = !empty($w[2]);
+            $who = self::whoFor($code, $u, $cfg);
             $t = $cur[$code] ?? null;
             if (!$t) {
                 if ($gated && $due > $horizon) {
                     continue; // ainda longe: nasce mais perto do prazo
                 }
-                self::insertTask($uid, $cycle, $code, $due, $due < $cfg['start'] ? 'prior' : 'pending', $cfg);
+                self::insertTask($uid, $cycle, $code, $due, (!$noPrior && $due < $cfg['start']) ? 'prior' : 'pending', $who);
             } elseif ($t['status'] === 'pending' || $t['status'] === 'skipped') {
-                // pendente: acompanha mudança de data e de responsável; "deixou de valer" volta se voltou a valer
-                $same = substr((string) $t['due_on'], 0, 10) === $due && (string) $t['assignee'] === (string) $who && $t['status'] === 'pending';
+                // pendente: acompanha mudança de data e de responsável (menos se alguém passou a tarefa para outra pessoa);
+                // "deixou de valer" volta se voltou a valer
+                $manual = (int) ($t['assignee_manual'] ?? 0) === 1;
+                $whoNow = $manual ? (string) $t['assignee'] : (string) $who;
+                $same = substr((string) $t['due_on'], 0, 10) === $due && (string) $t['assignee'] === $whoNow && $t['status'] === 'pending';
                 if (!$same) {
                     DB::run(
                         'UPDATE journey_tasks SET due_on = ?, assignee = ?, status = ?, note = ?, updated_at = ? WHERE id = ?',
-                        [$due, $who, 'pending', $t['status'] === 'skipped' ? null : $t['note'], now(), (int) $t['id']]
+                        [$due, $whoNow !== '' ? $whoNow : null, 'pending', $t['status'] === 'skipped' ? null : $t['note'], now(), (int) $t['id']]
                     );
                 }
+            } elseif ($t['status'] === 'done' && in_array($code, self::ENTRY_AUTO, true) && !isset($entryDone[$code])) {
+                // fechou sozinha, mas o dado mudou (apagaram o dia marcado ou a consulta): volta a ficar aberta
+                DB::run("UPDATE journey_tasks SET status = 'pending', due_on = ?, note = NULL, done_at = NULL, done_by = NULL, updated_at = ? WHERE id = ?", [$due, now(), (int) $t['id']]);
+                self::log($uid, $cycle, $code, 'tarefa', 'Reaberta sozinha: ' . (self::TASKS[$code][0] ?? $code) . ' (o dado mudou).');
             }
         }
         foreach ($cur as $code => $t) {
-            if ($t['status'] === 'pending' && !isset($want[$code])) {
+            if ($t['status'] === 'pending' && !isset($want[$code]) && !isset($entryDone[$code])) {
                 self::setStatus((int) $t['id'], 'skipped', 'Deixou de valer.');
+            } elseif ($t['status'] === 'done' && empty($t['done_by']) && in_array($code, self::ENTRY_AUTO, true) && !isset($want[$code]) && !isset($entryDone[$code])) {
+                // fechou sozinha e o dado que a fechou sumiu (consulta apagada): deixa de valer, e volta se o dado voltar
+                self::setStatus((int) $t['id'], 'skipped', 'Deixou de valer.');
+                self::log($uid, $cycle, $code, 'tarefa', 'Reaberta sozinha: ' . (self::TASKS[$code][0] ?? $code) . ' (o dado mudou).');
+            }
+        }
+        // Tarefas da Entrada que o dado já resolveu: ficam "feitas" sozinhas (aparecem marcadas no checklist)
+        foreach ($entryDone as $code => $note) {
+            $t = $cur[$code] ?? null;
+            if (!$t) {
+                $due = $want[$code][0] ?? substr((string) $cyc['entry_on'], 0, 10);
+                self::insertTask($uid, $cycle, $code, $due, 'done', self::whoFor($code, $u, $cfg), $note);
+            } elseif ($t['status'] === 'pending' || $t['status'] === 'skipped') {
+                self::setStatus((int) $t['id'], 'done', $note);
+                self::log($uid, $cycle, $code, 'tarefa', 'Fechou sozinha: ' . (self::TASKS[$code][0] ?? $code) . ' (' . rtrim($note, '.') . ').');
             }
         }
     }
 
-    private static function insertTask(int $userId, int $cycle, string $code, string $due, string $status, array $cfg): void
+    private static function insertTask(int $userId, int $cycle, string $code, string $due, string $status, ?string $who, ?string $note = null): void
     {
-        $who = $cfg['who'][self::TASKS[$code][2]] ?? null;
+        $note = $note ?? ($status === 'prior' ? 'Anterior ao sistema.' : null);
         try {
             DB::run(
-                'INSERT INTO journey_tasks (user_id, cycle, code, assignee, status, due_on, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [$userId, $cycle, $code, $who, $status, $due, $status === 'prior' ? 'Anterior ao sistema.' : null, now(), now()]
+                'INSERT INTO journey_tasks (user_id, cycle, code, assignee, status, due_on, done_at, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [$userId, $cycle, $code, $who, $status, $due, $status === 'done' ? now() : null, $note, now(), now()]
             );
         } catch (\Throwable $e) {
             // duas telas gerando ao mesmo tempo: a chave única já garantiu uma só tarefa
@@ -344,10 +570,27 @@ final class Journey
         if ($t['code'] === 'atualizar_plano') {
             return ['err' => 'Esta tarefa fecha sozinha quando você usa "Renovar" na ficha do paciente.'];
         }
+        if ($t['code'] === 'entrada_agendar') {
+            return ['err' => 'Para fechar, informe o dia da 1ª consulta (campo na própria tarefa ou na ficha, aba Jornada). Ela fecha sozinha.'];
+        }
+        if ($t['code'] === 'entrada_form') {
+            return ['err' => 'Para fechar, informe o dia em que o formulário chegou (campo na própria tarefa ou na ficha, aba Jornada). Ela fecha sozinha.'];
+        }
+        if ($t['code'] === 'entrada_consulta') {
+            return ['err' => 'Esta tarefa fecha sozinha quando a consulta é registrada na ficha (aba Acompanhamento, parte Consultas).'];
+        }
         $note = mb_substr(trim($note), 0, 255);
         self::setStatus($taskId, 'done', $note !== '' ? $note : null, $by);
         self::log((int) $t['user_id'], (int) $t['cycle'], $t['code'], 'tarefa', 'Concluída: ' . (self::TASKS[$t['code']][0] ?? $t['code']) . ($note !== '' ? ' (' . $note . ')' : ''), $by);
-        return ['ok' => 'Tarefa concluída: ' . $t['name'] . '.', 'user_id' => (int) $t['user_id']];
+        $extra = '';
+        if ($t['code'] === 'entrada_liberar') {
+            $extra = ' A confirmação D+1 foi marcada para ' . fmt_date(self::addDays(today(), 1)) . '.';
+        } elseif ($t['code'] === 'entrada_acesso') {
+            self::log((int) $t['user_id'], (int) $t['cycle'], null, 'entrada', 'Entrada concluída: acesso confirmado.', $by);
+            $extra = ' A Entrada deste paciente está completa.';
+        }
+        self::syncUser((int) $t['user_id']); // encadeia a próxima etapa da Entrada
+        return ['ok' => 'Tarefa concluída: ' . $t['name'] . '.' . $extra, 'user_id' => (int) $t['user_id']];
     }
 
     /** Observação livre na linha do tempo do paciente (só o admin vê; pode ter dado de saúde). */
@@ -377,6 +620,7 @@ final class Journey
         }
         DB::run("UPDATE journey_tasks SET status = 'pending', note = NULL, done_at = NULL, done_by = NULL, updated_at = ? WHERE id = ?", [now(), $taskId]);
         self::log((int) $t['user_id'], (int) $t['cycle'], $t['code'], 'tarefa', 'Reaberta: ' . (self::TASKS[$t['code']][0] ?? $t['code']), $by);
+        self::syncUser((int) $t['user_id']);
         return ['ok' => 'Tarefa reaberta.', 'user_id' => (int) $t['user_id']];
     }
 
@@ -384,7 +628,7 @@ final class Journey
     private static function patientRow(int $userId): ?array
     {
         return DB::one(
-            "SELECT u.id, u.name, u.status, u.renewal_date, u.plan_id, u.exit_reason,
+            "SELECT u.id, u.name, u.status, u.renewal_date, u.plan_id, u.exit_reason, u.responsible_id,
                     pl.duration_days AS dur, pl.consultations_included AS cota, pl.journey_type AS jtype,
                     (SELECT COUNT(*) FROM renewals rn WHERE rn.user_id = u.id) AS cyc
                FROM users u LEFT JOIN plans pl ON pl.id = u.plan_id WHERE u.id = ? AND u.role = 'patient'",
@@ -483,9 +727,12 @@ final class Journey
             $due = $answer === 'data_combinada' ? $agreedOn : self::addDays($nextConsult, -$cfg['d_contato']);
             $who = $cfg['who']['contato'];
             if ($contact) {
+                if ((int) ($contact['assignee_manual'] ?? 0) === 1) {
+                    $who = (string) $contact['assignee']; // alguém passou esta tarefa para outra pessoa: continua com ela
+                }
                 DB::run("UPDATE journey_tasks SET status = 'pending', due_on = ?, assignee = ?, note = NULL, done_at = NULL, done_by = NULL, updated_at = ? WHERE id = ?", [$due, $who, now(), (int) $contact['id']]);
             } else {
-                self::insertTask($userId, $cycle, 'contato_renovacao', $due, 'pending', $cfg);
+                self::insertTask($userId, $cycle, 'contato_renovacao', $due, 'pending', $who);
             }
         } elseif ($contact && $contact['status'] === 'pending') {
             self::setStatus((int) $contact['id'], 'skipped', 'Deixou de valer.');
@@ -560,9 +807,230 @@ final class Journey
         self::log($userId, (int) $u['cyc'], null, 'renovou', 'Renovou até ' . fmt_date($newDate) . '. Novo ciclo do plano.', $by);
         if ($u['status'] === 'inactive' && !empty($u['exit_reason'])) {
             self::reactivate($userId, $by, 'Renovou o plano e voltou para a carteira.');
+            self::openEntry($userId, $by, 'reativado'); // quem volta faz a entrada de novo (grupo novo)
             return;
         }
         self::syncUser($userId);
+    }
+
+    // ------------------------------------------------------------------ Entrada
+
+    /** Abre a Entrada do paciente neste ciclo (paciente novo, que voltou, ou aberta pela equipe). Só uma vez por ciclo. */
+    public static function openEntry(int $userId, ?int $by, string $kind = 'novo'): array
+    {
+        $u = self::patientRow($userId);
+        if (!$u) {
+            return ['err' => 'Paciente não encontrado.'];
+        }
+        $kind = isset(self::ENTRY_KINDS[$kind]) ? $kind : 'manual';
+        $cycle = (int) $u['cyc'];
+        $cyc = DB::one('SELECT * FROM journey_cycles WHERE user_id = ? AND cycle = ?', [$userId, $cycle]);
+        if ($cyc && !empty($cyc['entry_on'])) {
+            return ['err' => 'A Entrada deste paciente já foi aberta neste plano.'];
+        }
+        try {
+            self::upsertCycle($userId, $cycle, ['entry_on' => today(), 'entry_kind' => $kind]);
+        } catch (\PDOException $e) {
+            error_log('[Jornada] openEntry: ' . $e->getMessage());
+            return ['err' => 'Não foi possível abrir a Entrada. Importe o arquivo database/atualizacao_12_entrada.sql no phpMyAdmin e tente de novo.'];
+        }
+        self::log($userId, $cycle, null, 'entrada', 'Entrada aberta (' . self::ENTRY_KINDS[$kind] . ').', $by);
+        self::syncUser($userId);
+        return ['ok' => 'Entrada aberta: as tarefas de ' . $u['name'] . ' foram criadas (grupo, Welts, 1ª consulta e as etapas seguintes).'];
+    }
+
+    /**
+     * Marca (ou limpa) o dia da 1ª consulta ($kind = 'consulta') ou do formulário recebido (Escalável, $kind = 'form').
+     * Fecha a tarefa de agendar e cria a seguinte.
+     */
+    public static function setEntryDate(int $userId, string $kind, string $date, ?int $by): array
+    {
+        $u = self::patientRow($userId);
+        if (!$u) {
+            return ['err' => 'Paciente não encontrado.'];
+        }
+        $cycle = (int) $u['cyc'];
+        $cyc = DB::one('SELECT * FROM journey_cycles WHERE user_id = ? AND cycle = ?', [$userId, $cycle]);
+        if (!$cyc || empty($cyc['entry_on'])) {
+            return ['err' => 'A Entrada deste paciente ainda não foi aberta.'];
+        }
+        if (!in_array($kind, ['consulta', 'form'], true)) {
+            return ['err' => 'Escolha o que está marcando.'];
+        }
+        $E = substr((string) $cyc['entry_on'], 0, 10);
+        if ($date !== '') {
+            if (!Payments::validDate($date)) {
+                return ['err' => 'Data inválida.'];
+            }
+            if ($kind === 'consulta' && ($date < self::addDays($E, -30) || $date > self::addDays(today(), 400))) {
+                return ['err' => 'Informe o dia da consulta (de hoje em diante, ou um dia recente que ainda falta registrar).'];
+            }
+            if ($kind === 'form' && ($date > today() || $date < self::addDays($E, -30))) {
+                return ['err' => 'Informe o dia em que o formulário chegou (hoje ou um dia que já passou).'];
+            }
+        }
+        $col = $kind === 'consulta' ? 'first_consult_on' : 'form_on';
+        self::upsertCycle($userId, $cycle, [$col => $date !== '' ? $date : null]);
+        $label = $kind === 'consulta' ? '1ª consulta' : 'Formulário recebido';
+        self::log($userId, $cycle, null, 'consulta', $date !== '' ? ($kind === 'consulta' ? '1ª consulta marcada para ' . fmt_date($date) . '.' : 'Formulário recebido em ' . fmt_date($date) . '.') : $label . ': dia limpo.', $by);
+        self::syncUser($userId);
+        return ['ok' => $date !== '' ? ($kind === 'consulta' ? '1ª consulta marcada para ' . fmt_date($date) . '.' : 'Formulário registrado em ' . fmt_date($date) . '.') : $label . ': dia limpo, a tarefa voltou a ficar aberta.'];
+    }
+
+    // ------------------------------------------------------------------ troca de responsável
+
+    /** O nome é de alguém da equipe? (evita nome inventado em formulário adulterado) */
+    private static function validTeamName(string $name): bool
+    {
+        $name = trim($name);
+        if ($name === '' || mb_strlen($name) > 40) {
+            return false;
+        }
+        foreach (self::team() as $n) {
+            if (mb_strtolower($n) === mb_strtolower($name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Nome certo como está na equipe (maiúsculas e acentos do cadastro). */
+    private static function teamName(string $name): string
+    {
+        foreach (self::team() as $n) {
+            if (mb_strtolower($n) === mb_strtolower(trim($name))) {
+                return $n;
+            }
+        }
+        return trim($name);
+    }
+
+    /**
+     * Passa tarefas pendentes para outra pessoa. $to = nome da equipe, ou '__auto' (volta ao responsável padrão: o sistema decide de novo).
+     * Retorna ['ok' => texto, 'n' => quantas] ou ['err' => texto].
+     */
+    private static function moveTasks(array $rows, string $to, ?int $by): array
+    {
+        $auto = $to === '__auto';
+        if (!$auto && !self::validTeamName($to)) {
+            return ['err' => 'Escolha uma pessoa da equipe.'];
+        }
+        $to = $auto ? '' : self::teamName($to);
+        $n = 0;
+        $users = [];
+        foreach ($rows as $t) {
+            if ($t['status'] !== 'pending') {
+                continue;
+            }
+            $from = trim((string) $t['assignee']);
+            if (!$auto && mb_strtolower($from) === mb_strtolower($to) && (int) $t['assignee_manual'] === 1) {
+                continue;
+            }
+            if ($auto) {
+                DB::run('UPDATE journey_tasks SET assignee_manual = 0, updated_at = ? WHERE id = ?', [now(), (int) $t['id']]);
+            } else {
+                DB::run('UPDATE journey_tasks SET assignee = ?, assignee_manual = 1, updated_at = ? WHERE id = ?', [$to, now(), (int) $t['id']]);
+                self::log((int) $t['user_id'], (int) $t['cycle'], $t['code'], 'tarefa', 'Passada de ' . ($from !== '' ? $from : 'sem responsável') . ' para ' . $to . ': ' . (self::TASKS[$t['code']][0] ?? $t['code']), $by);
+            }
+            $users[(int) $t['user_id']] = true;
+            $n++;
+        }
+        if ($auto) {
+            foreach (array_keys($users) as $uid) {
+                self::syncUser($uid); // recalcula o responsável padrão
+            }
+        }
+        if ($n === 0) {
+            return ['err' => 'Nenhuma tarefa pendente para passar.'];
+        }
+        $what = $n === 1 ? '1 tarefa' : $n . ' tarefas';
+        return ['ok' => $auto ? $what . ($n === 1 ? ' voltou' : ' voltaram') . ' ao responsável padrão.' : $what . ($n === 1 ? ' passou' : ' passaram') . ' para ' . $to . '.', 'n' => $n];
+    }
+
+    /** Passa UMA tarefa para outra pessoa (ou '__auto' = voltar ao responsável padrão). */
+    public static function reassign(int $taskId, string $to, ?int $by): array
+    {
+        $t = DB::one('SELECT * FROM journey_tasks WHERE id = ?', [$taskId]);
+        if (!$t) {
+            return ['err' => 'Tarefa não encontrada.'];
+        }
+        if ($t['status'] !== 'pending') {
+            return ['err' => 'Só dá para passar uma tarefa que ainda está pendente.'];
+        }
+        return self::moveTasks([$t], $to, $by);
+    }
+
+    /** Passa VÁRIAS tarefas escolhidas (caixinhas na lista) para outra pessoa. */
+    public static function reassignMany(array $taskIds, string $to, ?int $by): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $taskIds), fn($i) => $i > 0)));
+        if (!$ids) {
+            return ['err' => 'Marque as tarefas que quer passar.'];
+        }
+        $rows = DB::all('SELECT * FROM journey_tasks WHERE id IN (' . implode(',', array_fill(0, count($ids), '?')) . ")  AND status = 'pending'", $ids);
+        return self::moveTasks($rows, $to, $by);
+    }
+
+    /**
+     * "Passar as tarefas de X para Y" (folga, férias, saída): todas as pendentes de X (ou só as atrasadas).
+     * $from = nome, ou '__none' para as que estão sem responsável.
+     */
+    public static function passAll(string $from, string $to, bool $onlyLate, ?int $by): array
+    {
+        $from = trim($from);
+        if ($from !== '__none' && $from === '') {
+            return ['err' => 'Escolha de quem são as tarefas.'];
+        }
+        if ($from !== '__none' && mb_strtolower($from) === mb_strtolower(trim($to))) {
+            return ['err' => 'Escolha duas pessoas diferentes.'];
+        }
+        $sql = "SELECT t.* FROM journey_tasks t JOIN users u ON u.id = t.user_id WHERE t.status = 'pending' AND u.role = 'patient'";
+        $p = [];
+        if ($from === '__none') {
+            $sql .= " AND (t.assignee IS NULL OR t.assignee = '')";
+        } else {
+            $sql .= ' AND t.assignee = ?';
+            $p[] = $from;
+        }
+        if ($onlyLate) {
+            $sql .= ' AND t.due_on < ?';
+            $p[] = today();
+        }
+        return self::moveTasks(DB::all($sql, $p), $to, $by);
+    }
+
+    /** Plantão da semana: quem recebe as tarefas "de cuidado" dos pacientes sem Responsável. Vazio = ninguém (tarefa sem responsável). */
+    public static function setDuty(string $name, ?int $by): array
+    {
+        $name = trim($name);
+        if ($name !== '' && !self::validTeamName($name)) {
+            return ['err' => 'Escolha uma pessoa da equipe para o plantão.'];
+        }
+        $name = $name !== '' ? self::teamName($name) : '';
+        Settings::set('journey_duty', $name);
+        Settings::set('journey_duty_on', $name !== '' ? today() : '');
+        self::sync(true); // as tarefas de cuidado sem Responsável seguem o plantão
+        return ['ok' => $name !== '' ? 'Plantão desta semana: ' . $name . '.' : 'Plantão limpo: as tarefas de cuidado sem Responsável ficam sem dono (visíveis para todos).'];
+    }
+
+    /** Responsável renomeado em Cadastros: as tarefas abertas e os Ajustes acompanham o nome novo. */
+    public static function renamed(string $old, string $new): void
+    {
+        $old = trim($old);
+        $new = trim($new);
+        if ($old === '' || $new === '' || $old === $new) {
+            return;
+        }
+        try {
+            DB::run('UPDATE journey_tasks SET assignee = ? WHERE assignee = ?', [$new, $old]);
+            foreach (['journey_who_dossie', 'journey_who_ultima', 'journey_who_contact', 'journey_who_support', 'journey_who_group', 'journey_who_athlete', 'journey_who_consult', 'journey_who_plan', 'journey_duty'] as $k) {
+                if (trim((string) Settings::get($k, '')) === $old) {
+                    Settings::set($k, $new);
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[Jornada] renamed: ' . $e->getMessage());
+        }
     }
 
     // ------------------------------------------------------------------ telas
@@ -574,7 +1042,7 @@ final class Journey
         if ($cache !== null) {
             return $cache;
         }
-        $cache = ['late' => 0, 'today' => 0, 'due' => 0];
+        $cache = ['late' => 0, 'today' => 0, 'due' => 0, 'byWho' => []];
         try {
             self::sync(false);
             $t = today();
@@ -586,6 +1054,12 @@ final class Journey
             $cache['late'] = (int) ($r['late'] ?? 0);
             $cache['today'] = (int) ($r['today'] ?? 0);
             $cache['due'] = $cache['late'] + $cache['today'];
+            foreach (self::workload() as $who => $w) {
+                if ($w['late'] > 0) {
+                    $cache['byWho'][$who] = $w['late'];
+                }
+            }
+            arsort($cache['byWho']);
         } catch (\Throwable $e) {
             // sem as tabelas da Jornada (SQL 11 não importado): sem alerta
         }
@@ -616,6 +1090,77 @@ final class Journey
             $out[$r['who']] = (int) $r['n'];
         }
         return $out;
+    }
+
+    /** Carga de cada pessoa: [nome ou '__none' => ['n' => pendentes, 'late' => atrasadas]]. Quem esquece fica visível. */
+    public static function workload(): array
+    {
+        $out = [];
+        foreach (DB::all(
+            "SELECT COALESCE(NULLIF(t.assignee, ''), '__none') AS who, COUNT(*) AS n, SUM(CASE WHEN t.due_on < ? THEN 1 ELSE 0 END) AS late
+               FROM journey_tasks t JOIN users u ON u.id = t.user_id
+              WHERE t.status = 'pending' AND u.role = 'patient' GROUP BY 1 ORDER BY 1",
+            [today()]
+        ) as $r) {
+            $out[$r['who']] = ['n' => (int) $r['n'], 'late' => (int) $r['late']];
+        }
+        return $out;
+    }
+
+    /**
+     * Aba "Entrada": pacientes com a Entrada aberta e ainda não concluída (acesso não confirmado), do mais antigo ao mais novo.
+     * Cada linha: progresso (feitas de total), próxima tarefa e se alguma está atrasada.
+     */
+    public static function entries(): array
+    {
+        [$users, $cycles, $tasks] = self::load(null);
+        $rows = [];
+        foreach ($users as $u) {
+            if ($u['status'] !== 'active') {
+                continue;
+            }
+            $id = (int) $u['id'];
+            $cycle = (int) $u['cyc'];
+            $cyc = $cycles[$id][$cycle] ?? null;
+            if (!$cyc || empty($cyc['entry_on'])) {
+                continue;
+            }
+            $mine = [];
+            foreach ($tasks[$id] ?? [] as $t) {
+                if ((int) $t['cycle'] === $cycle && in_array($t['code'], self::ENTRY_CODES, true)) {
+                    $mine[$t['code']] = $t;
+                }
+            }
+            if (isset($mine['entrada_acesso']) && $mine['entrada_acesso']['status'] === 'done') {
+                continue; // Entrada completa
+            }
+            $done = 0;
+            $total = 0;
+            $next = null;
+            $late = 0;
+            foreach ($mine as $t) {
+                if ($t['status'] === 'done') {
+                    $done++;
+                    $total++;
+                } elseif ($t['status'] === 'pending') {
+                    $total++;
+                    if (substr((string) $t['due_on'], 0, 10) < today()) {
+                        $late++;
+                    }
+                    if ($next === null || (string) $t['due_on'] < (string) $next['due_on']) {
+                        $next = $t;
+                    }
+                }
+            }
+            $E = substr((string) $cyc['entry_on'], 0, 10);
+            $rows[] = [
+                'id' => $id, 'name' => $u['name'], 'plan' => $u['plan_name'], 'since' => $E, 'kind' => $cyc['entry_kind'],
+                'days' => max(0, -1 * (int) days_until($E)), 'done' => $done, 'total' => $total, 'next' => $next, 'late' => $late,
+                'resp' => $u['resp_name'],
+            ];
+        }
+        usort($rows, fn($a, $b) => [$a['since'], $a['name']] <=> [$b['since'], $b['name']]);
+        return $rows;
     }
 
     /** Em que ponto o paciente está na renovação (texto curto para a lista). */
@@ -742,7 +1287,25 @@ final class Journey
         $withConsults = in_array($type, ['premium', 'smart'], true) && $cota !== null && $cota >= 1;
         $R = $u && !empty($u['renewal_date']) ? substr((string) $u['renewal_date'], 0, 10) : null;
         $lc = ($withConsults && $u) ? self::lastConsult($cyc, $R, (int) $u['dur'], $cota, $held) : ['date' => null, 'source' => null];
-        $tasks = DB::all('SELECT * FROM journey_tasks WHERE user_id = ? AND cycle = ? ORDER BY due_on, id', [$userId, $cycle]);
+        $allTasks = DB::all('SELECT * FROM journey_tasks WHERE user_id = ? AND cycle = ? ORDER BY due_on, id', [$userId, $cycle]);
+        $tasks = [];
+        $entryByCode = [];
+        foreach ($allTasks as $t) {
+            if (in_array($t['code'], self::ENTRY_CODES, true)) {
+                $entryByCode[$t['code']] = $t;
+            } else {
+                $tasks[] = $t;
+            }
+        }
+        $entryTasks = [];
+        foreach (self::ENTRY_CODES as $code) {
+            if (isset($entryByCode[$code])) {
+                $entryTasks[] = $entryByCode[$code];
+            }
+        }
+        $entryDone = count(array_filter($entryTasks, fn($t) => $t['status'] === 'done'));
+        $entryTotal = count(array_filter($entryTasks, fn($t) => in_array($t['status'], ['done', 'pending'], true)));
+        $respRow = $u && !empty($u['responsible_id']) ? DB::one('SELECT name, active FROM responsibles WHERE id = ?', [(int) $u['responsible_id']]) : null;
         $done = 0;
         $total = 0;
         foreach ($tasks as $t) {
@@ -768,7 +1331,15 @@ final class Journey
             'withConsults' => $withConsults, 'last' => $lc, 'interval' => $u ? self::interval((int) $u['dur'], $cota) : null,
             'tasks' => $tasks, 'done' => $done, 'total' => $total,
             'events' => DB::all('SELECT * FROM journey_events WHERE user_id = ? ORDER BY happened_at DESC, id DESC LIMIT 40', [$userId]),
-            'reajuste' => $reajuste, 'heldCount' => count($held), 'cota' => $cota,
+            'reajuste' => $reajuste, 'heldCount' => count($held), 'cota' => $cota, 'team' => self::team(),
+            'entry' => [
+                'open' => !empty($cyc['entry_on']), 'on' => $cyc['entry_on'] ?? null, 'kind' => $cyc['entry_kind'] ?? null,
+                'first_consult_on' => $cyc['first_consult_on'] ?? null, 'form_on' => $cyc['form_on'] ?? null,
+                'tasks' => $entryTasks, 'done' => $entryDone, 'total' => $entryTotal,
+                'finished' => isset($entryByCode['entrada_acesso']) && $entryByCode['entrada_acesso']['status'] === 'done',
+                'escalavel' => $type === 'escalavel', 'resp' => ($respRow && (int) $respRow['active'] === 1) ? $respRow['name'] : null,
+                'respOff' => ($respRow && (int) $respRow['active'] !== 1) ? $respRow['name'] : null,
+            ],
         ];
     }
 }

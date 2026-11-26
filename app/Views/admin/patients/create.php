@@ -38,6 +38,10 @@
                 <?php endforeach; ?>
             </select>
             <p class="hint">Quem da equipe cuida deste paciente (modo babá). Dá para mudar depois.</p></div>
+        <div class="field full"><label class="checkbox"><input type="checkbox" name="is_athlete" value="1"<?= !empty(old('is_athlete')) ? ' checked' : '' ?>><span>É atleta</span></label>
+            <p class="hint">Marque se o paciente treina para prova ou esporte. Cria a tarefa "Cadastro de atleta" na Entrada. Os detalhes (modalidade, assessoria, provas) você completa na ficha.</p></div>
+        <div class="field full"><label class="checkbox"><input type="checkbox" name="open_entry" value="1"<?= (!empty($GLOBALS['NDO_OLD']) ? !empty(old('open_entry')) : true) ? ' checked' : '' ?>><span>Abrir a Entrada (paciente novo)</span></label>
+            <p class="hint">Cria as tarefas do checklist de entrada para a equipe: grupo no WhatsApp, Welts, agendar a 1ª consulta, plano, liberação e confirmação D+1. Desmarque só se o paciente já é antigo e está sendo cadastrado agora.</p></div>
         <h3 class="sub full" style="margin:12px 0 4px">Pagamento</h3>
         <p class="muted small full" style="margin:0 0 12px">Já registra a venda em Financeiro. Para o valor, o sistema usa o do plano; mude se este paciente combinou outro valor. Só o admin vê.</p>
         <?php

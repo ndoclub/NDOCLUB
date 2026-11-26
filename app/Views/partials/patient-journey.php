@@ -1,6 +1,6 @@
 <?php
 /**
- * Aba "Jornada" da ficha do paciente (Atualização 11, parte 1: Renovação e Saída).
+ * Aba "Jornada" da ficha do paciente (Atualização 11: Renovação e Saída; Atualização 12: Entrada).
  * Recebe: $p (paciente), $j (Journey::forPatient), $id, $planStatus, $renew, $planRow
  * Só o admin vê. Nada daqui vai para o app do paciente.
  */
@@ -14,13 +14,62 @@ $hasPlan = !empty($p['plan_id']);
 $active = $p['status'] === 'active';
 $exited = $p['status'] === 'inactive' && !empty($p['exit_reason']);
 $back = PatientController::ficha($id, 'jornada');
-$kindLabel = ['tarefa' => 'Tarefa', 'resposta' => 'Resposta', 'consulta' => 'Consulta', 'saida' => 'Saída', 'volta' => 'Volta', 'renovou' => 'Renovação', 'nota' => 'Observação'];
+$kindLabel = ['tarefa' => 'Tarefa', 'resposta' => 'Resposta', 'consulta' => 'Consulta', 'saida' => 'Saída', 'volta' => 'Volta', 'renovou' => 'Renovação', 'nota' => 'Observação', 'entrada' => 'Entrada'];
+$en = $j['entry'];
+$team = $j['team'];
 $answer = $cyc['answer'] ?? null;
 ?>
-<p class="muted small" style="margin:0 0 12px">Renovação e saída deste paciente: as tarefas nascem sozinhas a partir do plano e do vencimento. O sistema só lembra e registra; as mensagens você manda pelo WhatsApp. Só o admin vê esta aba.</p>
+<p class="muted small" style="margin:0 0 12px">Entrada, renovação e saída deste paciente: as tarefas nascem sozinhas a partir do plano, do vencimento e das consultas. O sistema só lembra e registra; as mensagens você manda pelo WhatsApp. Só o admin vê esta aba.</p>
 
 <div class="cols">
 <div>
+    <div class="panel" id="entrada">
+        <h3>Entrada</h3>
+        <?php if (!$en['open']): ?>
+            <p class="muted small" style="margin:0 0 10px">Este paciente não tem a Entrada aberta. A Entrada é o checklist do paciente <strong>novo</strong> (ou que voltou): grupo no WhatsApp, Welts, 1ª consulta, plano, liberação e confirmação de acesso. Para quem já estava na carteira não precisa.</p>
+            <?php if ($active): ?>
+            <form method="post" action="<?= e(url('/admin/pacientes/' . $id . '/jornada/entrada')) ?>" data-confirm="Abrir a Entrada deste paciente? As tarefas de grupo, Welts e 1ª consulta serão criadas agora.">
+                <?= csrf_field() ?>
+                <div class="form-actions" style="margin-top:0"><button class="btn btn-sm" type="submit">Abrir a Entrada</button></div>
+            </form>
+            <?php endif; ?>
+        <?php else: ?>
+            <p style="margin:0 0 10px">
+                <?php if ($en['finished']): ?><span class="tag ok">Entrada concluída</span><?php else: ?><span class="tag warn">Em andamento</span><?php endif; ?>
+                <span class="small muted">aberta em <?= e(fmt_date((string) $en['on'])) ?><?= isset(Journey::ENTRY_KINDS[$en['kind']]) ? ' (' . e(Journey::ENTRY_KINDS[$en['kind']]) . ')' : '' ?></span>
+                <?php if ($en['total'] > 0): ?> · <span class="small"><?= (int) $en['done'] ?> de <?= (int) $en['total'] ?> etapas</span> <progress class="jr-prog" max="<?= (int) $en['total'] ?>" value="<?= (int) $en['done'] ?>"></progress><?php endif; ?>
+            </p>
+            <p class="small" style="margin:0 0 10px">
+                <?php if ($en['resp']): ?>Quem cuida: <strong><?= e($en['resp']) ?></strong> (Responsável da ficha). A confirmação D+1 vai para ele.
+                <?php elseif ($cfg['duty'] !== ''): ?>Sem Responsável na ficha: a confirmação D+1 vai para o plantão (<strong><?= e($cfg['duty']) ?></strong>). Defina o Responsável na aba Resumo.
+                <?php else: ?>Sem Responsável na ficha e sem plantão: a confirmação D+1 fica <strong>sem responsável</strong> (aparece para todos). Defina o Responsável na aba Resumo.
+                <?php endif; ?>
+                <?php if ($en['respOff']): ?> <span class="tag warn"><?= e($en['respOff']) ?> está desativado(a)</span><?php endif; ?>
+            </p>
+            <?php if ($active): ?>
+            <form class="jr-inline" method="post" action="<?= e(url('/admin/pacientes/' . $id . '/jornada/entrada-dia')) ?>">
+                <?= csrf_field() ?>
+                <?php if ($en['escalavel']): ?>
+                    <input type="hidden" name="kind" value="form">
+                    <div class="field"><label for="en-on">Formulário recebido em</label><input class="input" type="date" id="en-on" name="on" max="<?= e(today()) ?>" value="<?= e((string) ($en['form_on'] ?? '')) ?>"></div>
+                <?php else: ?>
+                    <input type="hidden" name="kind" value="consulta">
+                    <div class="field"><label for="en-on">1ª consulta marcada para</label><input class="input" type="date" id="en-on" name="on" value="<?= e((string) ($en['first_consult_on'] ?? '')) ?>"></div>
+                <?php endif; ?>
+                <button class="btn btn-sm" type="submit">Salvar</button>
+            </form>
+            <p class="hint" style="margin-top:4px"><?= $en['escalavel']
+                ? 'Escalável: a Lara monta a dieta em até 2 dias úteis depois do formulário. Em branco, a tarefa do formulário continua aberta.'
+                : 'O dia marcado fecha a tarefa de agendar e cria a da consulta. Quando a consulta é registrada (aba Acompanhamento, parte Consultas), o plano é cobrado em 1 dia útil' . ($planRow && !empty($planRow['with_training']) ? ' e o treino em 2 dias úteis' : '') . '.' ?></p>
+            <?php endif; ?>
+            <?php if ($en['tasks']): ?>
+            <div class="jr-list" style="margin-top:8px">
+                <?php foreach ($en['tasks'] as $t): $t['patient'] = $p['name']; partial('journey-task-row', ['t' => $t, 'back' => PatientController::ficha($id, 'jornada', 'entrada'), 'showPatient' => false, 'team' => $team]); endforeach; ?>
+            </div>
+            <?php endif; ?>
+        <?php endif; ?>
+    </div>
+
     <div class="panel">
         <h3>Plano e prazos</h3>
         <?php if (!$hasPlan || !$R): ?>
@@ -100,7 +149,7 @@ $answer = $cyc['answer'] ?? null;
             <p class="muted small">Ainda não há tarefas. Elas nascem perto do prazo (até <?= (int) \App\Services\Journey::HORIZON_DAYS ?> dias antes) ou quando você registra uma resposta.</p>
         <?php else: ?>
             <div class="jr-list">
-                <?php foreach ($j['tasks'] as $t): $t['patient'] = $p['name']; partial('journey-task-row', ['t' => $t, 'back' => $back, 'showPatient' => false]); endforeach; ?>
+                <?php foreach ($j['tasks'] as $t): $t['patient'] = $p['name']; partial('journey-task-row', ['t' => $t, 'back' => $back, 'showPatient' => false, 'team' => $team]); endforeach; ?>
             </div>
         <?php endif; ?>
     </div>
@@ -115,7 +164,7 @@ $answer = $cyc['answer'] ?? null;
                 <?= csrf_field() ?>
                 <div class="form-actions" style="margin-top:8px"><button class="btn btn-sm" type="submit">Voltar para os ativos</button></div>
             </form>
-            <p class="hint">Quem volta faz a entrada de novo (grupo novo e Modo Babá). Se ele renovar pelo botão Renovar, volta sozinho para os ativos.</p>
+            <p class="hint">Se ele renovar pelo botão Renovar, volta sozinho para os ativos e a <strong>Entrada</strong> abre de novo (grupo novo e Modo Babá). Voltando por aqui, sem renovar, o plano é o mesmo e a Entrada não reabre.</p>
         <?php else: ?>
             <?php if ($R && $R < today() && $active): ?><p class="small" style="margin:0 0 10px"><span class="tag bad">Vencido</span> O plano venceu e ninguém decidiu ainda: renove ou tire da carteira abaixo. Ele não vira inativo sozinho.</p><?php endif; ?>
             <?php if ($p['status'] === 'inactive'): ?><p class="small muted" style="margin:0 0 10px">Conta desativada, sem motivo de saída registrado.</p><?php endif; ?>

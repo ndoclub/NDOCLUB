@@ -323,7 +323,10 @@ if (!in_array($planDays, $renewChoices, true)) { $planDays = 90; }
 </div>
 
 <?php elseif ($aba === 'jornada'): ?>
-<?php partial('patient-journey', ['p' => $p, 'j' => $journey, 'id' => $id, 'planStatus' => $planStatus, 'renew' => $renew, 'planRow' => $planRow]); ?>
+<?php if ($journey === null): ?>
+    <div class="panel"><h3>Falta importar uma atualização do banco</h3>
+        <p>A aba Jornada precisa das atualizações 11 e 12 do banco. No phpMyAdmin, aba Importar, importe <code>database/atualizacao_11_jornada.sql</code> e depois <code>database/atualizacao_12_entrada.sql</code>, e atualize esta página (Ctrl+F5).</p></div>
+<?php else: partial('patient-journey', ['p' => $p, 'j' => $journey, 'id' => $id, 'planStatus' => $planStatus, 'renew' => $renew, 'planRow' => $planRow]); endif; ?>
 
 <?php else: ?>
 <?php $noApp = (int) ($p['app_access'] ?? 1) === 0; $awayNow = !$noApp && (empty($p['last_seen_at']) || $p['last_seen_at'] < date('Y-m-d H:i:s', strtotime('-7 day'))); ?>

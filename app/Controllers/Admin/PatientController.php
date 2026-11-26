@@ -533,10 +533,31 @@ final class PatientController
             return $id;
         });
         Audit::log((int) Auth::id(), 'patient_create', 'user', $id, $name . ($pay ? ' · ' . money((float) $amount, 2, $payCur) . ' em ' . $pay['installments'] . 'x (' . Payments::methodLabel($pay['method']) . ')' : ''));
-        Journey::syncUser((int) $id);
+        if (!empty($_POST['is_athlete'])) {
+            DB::run('INSERT INTO athlete_profiles (user_id, is_athlete, updated_at) VALUES (?, 1, ?)', [$id, now()]);
+        }
+        $entryMsg = '';
+        if (!empty($_POST['open_entry'])) {
+            // Entrada: o checklist do paciente novo (grupo, Welts, 1ª consulta, plano, liberação e confirmação D+1)
+            $er = Journey::openEntry((int) $id, (int) Auth::id(), 'novo');
+            $entryMsg = isset($er['ok']) ? ' A Entrada foi aberta: veja as tarefas na aba Jornada.' : '';
+        } else {
+            Journey::syncUser((int) $id);
+        }
         $_SESSION['_creds'] = ['name' => $name, 'email' => $email, 'password' => $password];
-        flash('ok', 'Paciente criado.' . ($pay ? ' Pagamento e parcelas registrados em Financeiro.' : '') . ' Envie o acesso pelo WhatsApp (mensagem pronta abaixo).');
+        flash('ok', 'Paciente criado.' . ($pay ? ' Pagamento e parcelas registrados em Financeiro.' : '') . $entryMsg . ' Envie o acesso pelo WhatsApp (mensagem pronta abaixo).');
         redirect('/admin/pacientes/' . $id);
+    }
+
+    /** Dados da aba Jornada; null se o SQL da Jornada ainda não foi importado (a aba avisa em vez de dar erro). */
+    private static function journeyOrNull(int $id): ?array
+    {
+        try {
+            return Journey::forPatient($id);
+        } catch (\PDOException $e) {
+            error_log('[Jornada] ficha: ' . $e->getMessage());
+            return null;
+        }
     }
 
     public function show(int $id): void
@@ -583,7 +604,7 @@ final class PatientController
             'respChoices' => Responsibles::choices(!empty($p['responsible_id']) ? (int) $p['responsible_id'] : null),
             'respName' => !empty($p['responsible_id']) ? DB::val('SELECT name FROM responsibles WHERE id = ?', [(int) $p['responsible_id']]) : null,
             'planStatus' => Renewal::planStatus((string) $p['status'], $p['renewal_date'], $p['exit_reason'] ?? null),
-            'journey' => $aba === 'jornada' ? Journey::forPatient($id) : null,
+            'journey' => $aba === 'jornada' ? self::journeyOrNull($id) : null,
             'plans' => $plansList,
             'planRow' => $planRow,
             'customPrice' => Plans::customPrice($id),
@@ -906,6 +927,7 @@ final class PatientController
             redirect('/admin/pacientes/' . $id);
         }
         Athletes::save($id, $parsed, null);
+        Journey::syncUser($id); // "é atleta" muda as tarefas da Entrada
         $d = $parsed['data'];
         Audit::log((int) Auth::id(), 'athlete_update', 'user', $id, $d['is_athlete'] ? count($parsed['sports']) . ' modalidade(s)' . ($d['competes'] ? ', compete' : '') : 'não é atleta');
         flash('ok', 'Perfil esportivo salvo.');

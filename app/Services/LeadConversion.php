@@ -63,6 +63,7 @@ final class LeadConversion
                 );
                 $startOn = $c['joined_on'];
                 $note = 'Novo paciente cadastrado';
+                Journey::openEntry((int) $uid, $by, 'novo'); // lead que virou paciente novo: abre o checklist de Entrada
             } else {
                 $uid = (int) $c['patient_id'];
                 DB::run('UPDATE users SET plan_id = ?, responsible_id = COALESCE(?, responsible_id) WHERE id = ?', [$planId, $resp, $uid]);
